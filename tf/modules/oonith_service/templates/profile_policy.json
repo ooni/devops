@@ -1,0 +1,51 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ecsInstanceRole",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:DeregisterContainerInstance",
+        "ecs:DiscoverPollEndpoint",
+        "ecs:Poll",
+        "ecs:RegisterContainerInstance",
+        "ecs:Submit*",
+        "ecs:StartTelemetrySession"
+      ],
+      "Resource": ["*"]
+    },
+    {
+      "Sid": "CloudWatchLogsFullAccess",
+      "Effect": "Allow",
+      "Action": ["logs:*", "cloudwatch:GenerateQuery"],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetResourcePolicy",
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:ListSecretVersionIds"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "secretsmanager:ListSecrets",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+        "elasticloadbalancing:DeregisterTargets",
+        "elasticloadbalancing:Describe*",
+        "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+        "elasticloadbalancing:RegisterTargets"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
