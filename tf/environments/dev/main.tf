@@ -219,15 +219,24 @@ resource "aws_s3_bucket" "ooniapi_codepipeline_bucket" {
   bucket = "codepipeline-ooniapi-${var.aws_region}-${random_id.artifact_id.hex}"
 }
 
+resource "aws_s3_bucket" "oonith_codepipeline_bucket" {
+  bucket = "codepipeline-oonith-${var.aws_region}-${random_id.artifact_id.hex}"
+}
+
 # The aws_codestarconnections_connection resource is created in the state
 # PENDING. Authentication with the connection provider must be completed in the
 # AWS Console.
 # See: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/codestarconnections_connection 
-resource "aws_codestarconnections_connection" "ooniapi" {
+resource "aws_codestarconnections_connection" "oonidevops" {
   name          = "ooniapi"
   provider_type = "GitHub"
 
   depends_on = [module.adm_iam_roles]
+}
+
+moved {
+  from = aws_codestarconnections_connection.ooniapi
+  to = aws_codestarconnections_connection.oonidevops
 }
 
 ### OONI Tier0 Backend Proxy
@@ -269,6 +278,26 @@ module "ooniapi_cluster" {
   )
 }
 
+module "oonith_cluster" {
+  source = "../../modules/ecs_cluster"
+
+  name = "oonith-ecs-cluster"
+  key_name = module.adm_iam_roles.oonidevops_key_name
+  vpc_id = module.network.vpc_id
+  subnet_ids = module.network.vpc_subnet[*].id
+
+  asg_min = 2
+  asg_max = 6
+  asg_desired = 2
+
+  instance_type = "t2.small"
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-th-ecs-cluster" }
+  )
+}
+
 #### OONI Tier0
 
 #### OONI Run service
@@ -280,7 +309,7 @@ module "ooniapi_oonirun_deployer" {
   repo                    = "ooni/backend"
   branch_name             = "master"
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
-  codestar_connection_arn = aws_codestarconnections_connection.ooniapi.arn
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 
@@ -326,7 +355,7 @@ module "ooniapi_ooniauth_deployer" {
   repo                    = "ooni/backend"
   branch_name             = "master"
   buildspec_path          = "ooniapi/services/ooniauth/buildspec.yml"
-  codestar_connection_arn = aws_codestarconnections_connection.ooniapi.arn
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 
@@ -378,7 +407,8 @@ module "ooniapi_ooniauth" {
     { Name = "ooni-tier0-ooniauth" }
   )
 }
-### OONI Tier0 API Frontend
+
+#### OONI Tier0 API Frontend
 
 module "ooniapi_frontend" {
   source = "../../modules/ooniapi_frontend"
