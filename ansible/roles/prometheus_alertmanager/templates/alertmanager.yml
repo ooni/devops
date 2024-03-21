@@ -1,0 +1,79 @@
+---
+# managed by ansible - see ansible/roles/alertmanager/templates/alertmanager.yml.j2
+
+global:
+  # While sending alerts directly to MX don't forget to:
+  # - whitelist IP addressess on MX SPAM filters so recepients don't drop the messages on ingress,
+  #   the instruction to do that for G Suite MX can be found at https://support.google.com/a/answer/60751?hl=en
+  #   see also `openobservatory_smtp_whitelist` variable
+  # - amend SPF records for domain name used in `smtp_from` so messages don't look fishy on egress
+  smtp_hello: {{ inventory_hostname }}
+  smtp_from: noreply+prometheus@ooni.io
+  slack_api_url: '{{ alertmanager_slack_api_url }}'
+  # The smarthost and SMTP sender used for mail notifications.
+  #smtp_smarthost: 'localhost:25'
+  #smtp_from: 'alertmanager@example.org'
+  #smtp_auth_username: 'alertmanager'
+  #smtp_auth_password: 'password'
+
+# The directory from which notification templates are read.
+templates:
+- '/etc/prometheus/alertmanager_templates/*.tmpl'
+
+# The root route on which each incoming alert enters.
+route:
+  # The labels by which incoming alerts are grouped together.
+  # Batching using `alertname` leads to over-grouping and OONI currently has no
+  # _defined_ notion of clusters and/or service, so grouping is done using
+  # `instance` tag. That sort of grouping is useful for disk-space alerts.
+  group_by: ['alertname', 'instance']
+  group_wait: 30s
+  # When the first notification was sent, wait 'group_interval' to send a batch
+  # of new alerts that started firing for that group.
+  group_interval: 5m
+
+  # If an alert has successfully been sent, wait 'repeat_interval' to
+  # resend them.
+  repeat_interval: 3h
+
+  # A default receiver
+  receiver: team-all
+
+  # All the above attributes are inherited by all child routes and can
+  # overwritten on each.
+  routes:
+  - receiver: team-email
+    repeat_interval: 24h
+    match: {severity: info}
+
+# Inhibition rules allow to mute a set of alerts given that another alert is
+# firing.
+# We use this to mute any warning-level notifications if the same alert is
+# already critical.
+inhibit_rules:
+
+{# # One may expect `min` instead of `sort|first`, but that's jinja 2.10+ and 2.8 is used now. #}
+{% set am_mx_openobservatory = (lookup('dig', 'openobservatory.org/MX', 'flat=0') | sort(attribute='preference') | first).exchange.rstrip('.').lower() %}
+
+receivers:
+- name: 'team-all'
+  email_configs:
+{% for u in ['arturo', 'simone'] %}
+  - to: '{{ u }}@openobservatory.org'
+    send_resolved: true
+    smarthost: {{ am_mx_openobservatory }}:25
+{% endfor %}
+  slack_configs:
+  - send_resolved: true
+    text: '{% raw %}{{ template "slack.ooni.text" . }}{% endraw %}'
+    title: '{% raw %}{{ template "slack.ooni.title" . }}{% endraw %}'
+    channel: '#ooni-bots'
+
+- name: 'team-email' # no slack
+  email_configs:
+{% for u in ['arturo', 'simone'] %}
+  - to: '{{ u }}@openobservatory.org'
+    send_resolved: true
+    smarthost: {{ am_mx_openobservatory }}:25
+{% endfor %}
+...

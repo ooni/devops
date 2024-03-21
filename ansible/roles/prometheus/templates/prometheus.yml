@@ -1,0 +1,151 @@
+---
+global:
+  scrape_interval:     15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  scrape_timeout:      15s
+
+# the path is absolute as ansible `validates` temporary file in some temporary directory
+rule_files:
+  - "/etc/prometheus/alert_rules.yml"
+  - "/etc/prometheus/alert_ooni.yml"
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: [ '127.0.0.1:9093' ]
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+
+{% for bbjob in blackbox_jobs %}
+  - job_name: "{{ bbjob.name }}"
+    metrics_path: /probe
+    params:
+      module: [{{ bbjob.module }}]
+    static_configs:
+      - targets:
+  {% for target in (bbjob.targets|sort) %}
+        - {{ target }}
+  {% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: (.*)(:80)?
+        target_label: __param_target
+        replacement: ${1}
+      - source_labels: [__param_target]
+        regex: (.*)
+        target_label: instance
+        replacement: ${1}
+      - source_labels: []
+        regex: .*
+        target_label: __address__
+        replacement: 127.0.0.1:9115
+{% endfor %}
+
+  - job_name: 'node'
+    scrape_interval: 5s
+    scheme: https
+    tls_config:
+      ca_file: "{{ prometheus_exporter_cert }}"
+      cert_file: "{{ prometheus_ssl_dir }}/{{ inventory_hostname }}.chain"
+      key_file: "{{ prometheus_ssl_dir }}/{{ inventory_hostname }}.key"
+      # XXX this is a hotfix to https://github.com/ooni/backend/issues/747
+      insecure_skip_verify: true
+    static_configs:
+      - targets:
+{% for host in (dom0_hosts|sort) %}
+        - {{ host }}:9100
+{% endfor %}
+
+#  - job_name: 'netdata'
+#    scrape_interval: 5s
+#    scheme: https
+#    metrics_path: /api/v1/allmetrics
+#    params:
+#      format: [prometheus]
+#    tls_config:
+#      ca_file: "{{ prometheus_exporter_cert }}"
+#      cert_file: "{{ prometheus_ssl_dir }}/{{ inventory_hostname }}.chain"
+#      key_file: "{{ prometheus_ssl_dir }}/{{ inventory_hostname }}.key"
+#    static_configs:
+#      - targets:
+
+  - job_name: 'raw-netdata'
+    scrape_interval: 5s
+    scheme: http
+    metrics_path: "/api/v1/allmetrics"
+    params:
+      format: [prometheus]
+    static_configs:
+      - targets:
+        - ams-pg-test.ooni.org:19999
+        - ams-pg.ooni.org:19999
+        - backend-fsn.ooni.org:19999
+        - backend-hel.ooni.org:19999
+        - 0.th.ooni.org:19999
+        - 1.th.ooni.org:19999
+        - 2.th.ooni.org:19999
+        - 3.th.ooni.org:19999
+        # - 2.th.ooni.org:19999
+
+  - job_name: 'test-helpers'
+    scrape_interval: 5s
+    scheme: http
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+        - 0.th.ooni.org:9001
+        - 1.th.ooni.org:9001
+        - 2.th.ooni.org:9001
+        - 3.th.ooni.org:9001
+
+  - job_name: 'ooni-api'
+    scrape_interval: 5s
+    scheme: https
+    static_configs:
+      - targets: [ 'api.ooni.io:443' ]
+
+  - job_name: 'ooniapi-services'
+    scrape_interval: 5s
+    scheme: https
+    metrics_path: "/metrics"
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password }}'
+    static_configs:
+      targets:
+        - ooniauth.api.dev.ooni.io
+        - oonirun.api.dev.ooni.io
+
+  - job_name: 'ooni-web'
+    scrape_interval: 5m
+    scheme: https
+    metrics_path: /_web.mtime.txt
+    static_configs:
+    - targets: # all mirrors listed in https://github.com/TheTorProject/ooni-web#ooni-web
+      - ooni.io:443
+      - ooni.torproject.org:443
+      - openobservatory.github.io:443
+      - ooni.netlify.com:443
+
+  - job_name: 'clickhouse'
+    scrape_interval: 5s
+    scheme: http
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+        - backend-fsn.ooni.org:9363
+
+  # See ansible/roles/ooni-backend/tasks/main.yml for the scraping targets
+  - job_name: 'haproxy'
+    scrape_interval: 5s
+    scheme: https
+    metrics_path: "/__haproxy_prom_metrics"
+    static_configs:
+      - targets:
+        - backend-hel.ooni.org:444
+        - ams-pg-test.ooni.org:444
+
+...

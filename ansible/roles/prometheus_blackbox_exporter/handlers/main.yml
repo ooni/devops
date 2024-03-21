@@ -1,0 +1,4 @@
+- name: restart blackbox_exporter
+  service:
+    name: prometheus-blackbox-exporter
+    state: restarted

@@ -1,0 +1,2 @@
+prometheus_ssl_dir: /etc/prometheus/ssl
+prometheus_exporter_cert: "/etc/prometheus/exporter_ca.cert"

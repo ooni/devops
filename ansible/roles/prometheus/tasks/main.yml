@@ -1,0 +1,28 @@
+---
+- name: Configure rules files
+  copy:
+    src: "{{ item }}"
+    dest: "/etc/prometheus/"
+    owner: root
+    group: root
+    mode: 0644
+    validate: "/usr/bin/promtool check rules %s"
+  with_fileglob:
+    - "alert_*.yml"
+  notify:
+    - reload prometheus
+  tags: prometheus
+
+- name: Configure Prometheus
+  template:
+    src: prometheus.yml
+    dest: "/etc/prometheus/prometheus.yml"
+    owner: root
+    group: root
+    mode: 0644
+    validate: "/usr/bin/promtool check config %s"
+  notify:
+    - reload prometheus
+  tags: prometheus
+  vars:
+    prometheus_metrics_password: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/ooni_services/prometheus_metrics_password') }}"

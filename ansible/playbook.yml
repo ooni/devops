@@ -6,10 +6,16 @@
   vars:
     clickhouse_reader_password: "{{ lookup('env', 'CLICKHOUSE_READER_PASSWORD') }}"
   roles:
-  - clickhouse
+    - clickhouse
   handlers:
     - name: restart clickhouse-server
       service:
         name: clickhouse-server
         state: restarted
 
+- name: Update monitoring config
+  hosts: monitoring.ooni.org
+  roles:
+    - prometheus
+    - prometheus_blackbox_exporter
+    - prometheus_alertmanager

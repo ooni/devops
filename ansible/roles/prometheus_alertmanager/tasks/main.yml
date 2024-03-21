@@ -1,0 +1,41 @@
+- name: Installs packages
+  tags: monitoring, alertmanager
+  apt:
+    install_recommends: no
+    cache_valid_time: 86400
+    name:
+      - prometheus-alertmanager
+
+- name: Configure Alertmanager templates
+  tags: monitoring, alertmanager
+  notify:
+    - reload alertmanager
+  copy:
+    src: "{{ item }}"
+    dest: /etc/prometheus/alertmanager_templates/
+    owner: root
+    group: root
+    mode: 0644
+  with_fileglob:
+    - templates/*.tmpl
+
+- name: Configure Alertmanager
+  tags: alertmanager
+  lineinfile:
+    path: /etc/default/prometheus-alertmanager
+    regexp: "^ARGS="
+    line: ARGS='--cluster.listen-address= --web.listen-address="127.0.0.1:9093" --web.external-url="https://grafana.ooni.org"'
+
+- name: Reload Alertmanager
+  tags: alertmanager
+  notify:
+    - reload alertmanager
+  template:
+    src: alertmanager.yml
+    dest: /etc/prometheus/alertmanager.yml
+    owner: root
+    group: root
+    mode: 0644
+    validate: "amtool check-config %s"
+  vars:
+    alertmanager_slack_api_url: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/prometheus/alertmanager_slack_api_url') }}"
