@@ -271,6 +271,53 @@ module "ooniapi_cluster" {
 
 #### OONI Tier0
 
+#### OONI Probe service
+
+module "ooniapi_ooniprobe_deployer" {
+  source = "../../modules/ooniapi_service_deployer"
+
+  service_name            = "ooniprobe"
+  repo                    = "ooni/backend"
+  branch_name             = "master"
+  buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
+  codestar_connection_arn = aws_codestarconnections_connection.ooniapi.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_service_name = module.ooniapi_ooniprobe.ecs_service_name
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+}
+
+module "ooniapi_ooniprobe" {
+  source = "../../modules/ooniapi_service"
+
+  vpc_id     = module.network.vpc_id
+  subnet_ids = module.network.vpc_subnet[*].id
+
+  service_name             = "ooniprobe"
+  default_docker_image_url = "ooni/api-ooniprobe:latest"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+
+  task_secrets = {
+    POSTGRESQL_URL              = aws_secretsmanager_secret_version.oonipg_url.arn
+    JWT_ENCRYPTION_KEY          = aws_secretsmanager_secret_version.jwt_secret.arn
+    PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
+  }
+
+  ooniapi_service_security_groups = [
+    module.ooniapi_cluster.web_security_group_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-ooniprobe" }
+  )
+}
+
+
 #### OONI Run service
 
 module "ooniapi_oonirun_deployer" {
