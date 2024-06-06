@@ -41,7 +41,7 @@ jobs:
 
           [oonidevops_user_dev]
           aws_access_key_id = ${{ secrets.OONIDEVOPS_AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key = ${{ secrets.OONIDEVOPS_AWS_SECRET_ACCESS_KEY }}
+          aws_secret_access_key = ${{ secrets.OONIDEVOPS_AWS_SECRET_ACCESS_KEY }} 
           EOF
           chmod 700 ~/.aws/
           chmod 600 ~/.aws/credentials
@@ -94,6 +94,7 @@ jobs:
           script: |
             const terraformPlanOutput = `${{ steps.plan.outputs.terraform_plan }}`;
             const terraformApplyOutput = `${{ steps.apply.outputs.terraform_apply }}`;
+            const terraformValidateOutput = `${{ steps.validate.outputs.terraform_validate }}`;
 
             const terraformPlanPlanLine = terraformPlanOutput.split('\n').find(line => line.startsWith('Plan:'));
             const terraformApplyPlanLine = terraformApplyOutput.split('\n').find(line => line.startsWith('Plan:'));
@@ -107,7 +108,7 @@ jobs:
             <details><summary>Validation Output</summary>
 
             \`\`\`\n
-            ${{ steps.validate.outputs.terraform_validate }}
+            ${terraformValidateOutput}
             \`\`\`
 
             </details>
