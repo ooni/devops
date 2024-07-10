@@ -201,6 +201,23 @@ resource "aws_codepipeline" "oonith" {
     aws_codebuild_project.oonith
   ]
 
+  trigger {
+    provider_type = "CodeStarSourceConnection"
+
+    git_configuration {
+      source_action_name = "Source"
+
+      push {
+        branches {
+          includes = ["master"]
+        }
+        tags {
+          includes = [var.trigger_tag]
+        }
+      }
+    }
+  }
+
   stage {
     action {
 
