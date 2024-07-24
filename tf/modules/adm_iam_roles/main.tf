@@ -8,6 +8,44 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
+resource "aws_iam_policy" "ooniansible" {
+  name        = "OONIAnsiblePolicy"
+  path        = "/"
+  description = "Policy used by the ansible"
+
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+
+  tags = var.tags
+}
+
+resource "aws_iam_user" "ooniansible" {
+  name = "ooniansible"
+  path = "/"
+}
+
+resource "aws_iam_access_key" "ooniansible_key" {
+  user = aws_iam_user.ooniansible.name
+}
+
+
+resource "aws_iam_user_policy_attachment" "ooniansible_user_policy_attach" {
+  user       = aws_iam_user.ooniansible.name
+  policy_arn = aws_iam_policy.ooniansible.arn
+}
+
 resource "aws_iam_policy" "oonidevops" {
   name        = "OONIDevopsPolicy"
   path        = "/"
@@ -60,7 +98,6 @@ EOF
 
   tags = var.tags
 }
-
 resource "aws_iam_role" "oonidevops" {
   name                = "oonidevops"
   assume_role_policy  = data.aws_iam_policy_document.assume_role.json
