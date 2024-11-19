@@ -32,6 +32,10 @@ variable "ooniapi_oonifindings_target_group_arn" {
   description = "arn for the target group of the oonifindings service"
 }
 
+variable "ooniapi_oonimeasurements_target_group_arn" {
+  description = "arn for the target group of the oonimeasurements service"
+}
+
 variable "dns_zone_ooni_io" {
   description = "id of the DNS zone for ooni_io"
 }
