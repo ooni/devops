@@ -1,0 +1,8 @@
+---
+- name: "notify #ooni-bots at openobservatory.slack.com"
+  slack:
+    token: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ansible_slack_token', profile='oonidevops_user_prod') }}"
+    channel: "#ooni-bots"
+    msg: "{{ lookup('template', 'notify-slack.j2') }}"
+  delegate_to: localhost
+  run_once: true
