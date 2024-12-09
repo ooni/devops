@@ -1,0 +1,7 @@
+- name: Ensure all hosts are bootstrapped correctly
+  hosts: all
+  become: yes
+  roles:
+    - bootstrap
+  tags:
+    - bootstrap

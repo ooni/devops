@@ -1,11 +1,6 @@
 ---
-- name: Ensure all hosts are bootstrapped correctly
-  hosts: all
-  become: yes
-  roles:
-    - bootstrap
-  tags:
-    - bootstrap
+- name: Include bootstrap playbook
+  ansible.builtin.import_playbook: deploy-bootstrap.yml
 
 - name: Include tier0 playbook
   ansible.builtin.import_playbook: deploy-tier0.yml

@@ -1,0 +1,10 @@
+---
+- name: Update monitoring config
+  hosts: monitoring.ooni.org
+  become: true
+  tags:
+    - monitoring
+  roles:
+    - prometheus
+    - prometheus_blackbox_exporter
+    - prometheus_alertmanager
