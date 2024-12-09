@@ -415,7 +415,7 @@ module "ooniapi_reverseproxy" {
 }
 
 module "ooni_backendproxy" {
-  source = "../../modules/ooni_backendproxy"
+  source = "../../modules/ec2"
 
   stage = local.environment
 
@@ -427,19 +427,44 @@ module "ooni_backendproxy" {
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3a.nano"
 
-  backend_url        = "https://backend-fsn.ooni.org/"
-  wcth_addresses     = module.ooni_th_droplet.droplet_ipv4_address
-  wcth_domain_suffix = "th.ooni.org"
-  clickhouse_url     = "clickhouse1.prod.ooni.io"
-  clickhouse_port    = "9000"
+  name = "oonibkprx"
+  ingress_rules = [{
+    from_port = 22,
+    to_port = 22,
+    protocol = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+  }, {
+    from_port = 80,
+    to_port = 80,
+    protocol = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+  }, {
+    from_port = 9000,
+    to_port = 9000,
+    protocol = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+  }]
+
+  egress_rules = [{
+    from_port = 0,
+    to_port = 0,
+    protocol = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+  }, {
+    from_port = 0,
+    to_port = 0,
+    protocol = "-1",
+    ipv6_cidr_blocks = ["::/0"]
+  }]
+
+  sg_prefix = "oobkprx"
+  tg_prefix = "bkprx"
 
   tags = merge(
     local.tags,
     { Name = "ooni-tier0-backendproxy" }
   )
 }
-
-
 
 #### OONI Run service
 

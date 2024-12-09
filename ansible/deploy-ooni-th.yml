@@ -1,0 +1,12 @@
+---
+- name: Deploy webconnectivity test helpers
+  hosts:
+    - 0.do.th.dev.ooni.io
+    - 0.do.th.prod.ooni.io 
+    - 1.do.th.prod.ooni.io 
+    - 2.do.th.prod.ooni.io 
+  roles:
+    - role: bootstrap
+    - role: nginx
+      tags: nginx
+    - role: 
