@@ -1,0 +1,11 @@
+---
+- name: Add stream nginx config
+  tags: webserv
+  template:
+    src: templates/99-stream.conf
+    dest: /etc/nginx/modules-enabled/99-stream.conf
+    mode: 0755
+    owner: root
+  notify:
+    - reload nginx
+    - restart nginx

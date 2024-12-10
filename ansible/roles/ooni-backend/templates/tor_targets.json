@@ -1,13 +1,13 @@
 {
-  "128.31.0.39:9101": {
-    "address": "128.31.0.39:9101",
-    "fingerprint": "9695DFC35FFEB861329B9F1AB04C46397020CE31",
+  "128.31.0.39:9201": {
+    "address": "128.31.0.39:9201",
+    "fingerprint": "1A25C6358DB91342AA51720A5038B72742732498",
     "name": "moria1",
     "protocol": "or_port_dirauth"
   },
-  "128.31.0.39:9131": {
-    "address": "128.31.0.39:9131",
-    "fingerprint": "9695DFC35FFEB861329B9F1AB04C46397020CE31",
+  "128.31.0.39:9231": {
+    "address": "128.31.0.39:9231",
+    "fingerprint": "1A25C6358DB91342AA51720A5038B72742732498",
     "name": "moria1",
     "protocol": "dir_port"
   },
@@ -23,15 +23,15 @@
     "name": "gabelmoo",
     "protocol": "dir_port"
   },
-  "154.35.175.225:443": {
-    "address": "154.35.175.225:443",
-    "fingerprint": "CF6D0AAFB385BE71B8E111FC5CFF4B47923733BC",
+  "216.218.219.41:443": {
+    "address": "216.218.219.41:443",
+    "fingerprint": "E3E42D35F801C9D5AB23584E0025D56FE2B33396",
     "name": "Faravahar",
     "protocol": "or_port_dirauth"
   },
-  "154.35.175.225:80": {
-    "address": "154.35.175.225:80",
-    "fingerprint": "CF6D0AAFB385BE71B8E111FC5CFF4B47923733BC",
+  "216.218.219.41:80": {
+    "address": "216.218.219.41:80",
+    "fingerprint": "E3E42D35F801C9D5AB23584E0025D56FE2B33396",
     "name": "Faravahar",
     "protocol": "dir_port"
   },
@@ -109,14 +109,14 @@
     },
     "protocol": "obfs4"
   },
-  "45.66.33.45:443": {
-    "address": "45.66.33.45:443",
+  "45.66.35.11:443": {
+    "address": "45.66.35.11:443",
     "fingerprint": "7EA6EAD6FD83083C538F44038BBFA077587DD755",
     "name": "dizum",
     "protocol": "or_port_dirauth"
   },
-  "45.66.33.45:80": {
-    "address": "45.66.33.45:80",
+  "45.66.35.11:80": {
+    "address": "45.66.35.11:80",
     "fingerprint": "7EA6EAD6FD83083C538F44038BBFA077587DD755",
     "name": "dizum",
     "protocol": "dir_port"
@@ -211,15 +211,15 @@
     },
     "protocol": "obfs4"
   },
-  "86.59.21.38:443": {
-    "address": "86.59.21.38:443",
-    "fingerprint": "847B1F850344D7876491A54892F904934E4EB85D",
+  "217.196.147.77:443": {
+    "address": "217.196.147.77:443",
+    "fingerprint": "FAA4BCA4A6AC0FB4CA2F8AD5A11D9E122BA894F6",
     "name": "tor26",
     "protocol": "or_port_dirauth"
   },
-  "86.59.21.38:80": {
-    "address": "86.59.21.38:80",
-    "fingerprint": "847B1F850344D7876491A54892F904934E4EB85D",
+  "217.196.147.77:80": {
+    "address": "217.196.147.77:80",
+    "fingerprint": "FAA4BCA4A6AC0FB4CA2F8AD5A11D9E122BA894F6",
     "name": "tor26",
     "protocol": "dir_port"
   },
