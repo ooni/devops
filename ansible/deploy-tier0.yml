@@ -5,6 +5,9 @@
 - name: Include ooni-backend playbook
   ansible.builtin.import_playbook: deploy-ooni-backend.yml
 
+- name: Include ooni-clickhouse-proxy playbook
+  ansible.builtin.import_playbook: deploy-clickhouse-proxy.yml
+
 - name: Include clickhouse playbook
   ansible.builtin.import_playbook: deploy-clickhouse.yml
 

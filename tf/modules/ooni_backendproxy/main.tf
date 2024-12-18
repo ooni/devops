@@ -14,7 +14,6 @@ resource "aws_security_group" "nginx_sg" {
     protocol    = "tcp"
     from_port   = 9000
     to_port     = 9000
-    cidr_blocks = var.private_subnet_cidr
   }
 
   ingress {

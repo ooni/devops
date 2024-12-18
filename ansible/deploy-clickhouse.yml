@@ -3,7 +3,7 @@
   hosts:
     - notebook.ooni.org
     - data1.htz-fsn.prod.ooni.nu
-    #- data2.htz-fsn.prod.ooni.nu
+    - data2.htz-fsn.prod.ooni.nu
     - data3.htz-fsn.prod.ooni.nu
   become: true
   tags:

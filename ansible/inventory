@@ -22,3 +22,6 @@ data3.htz-fsn.prod.ooni.nu
 
 [ghs-ams]
 openvpn-server1.ooni.io
+
+[aws-proxy]
+clickhouseproxy.dev.ooni.io
