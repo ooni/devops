@@ -1,0 +1,8 @@
+---
+- name: Deploy airflow hosts
+  hosts:
+    - data2.htz-fsn.prod.ooni.nu
+  become: true
+  roles:
+    # Comes from https://github.com/idealista/airflow-role
+    - {"role": "airflow"}
