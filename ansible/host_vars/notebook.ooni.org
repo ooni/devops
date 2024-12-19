@@ -64,8 +64,13 @@ ssh_users:
     comment: "Ben Ginoe"
     keys:
         - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOWdWCATiHUAzoS3mn3pFMIYDmi3n4Ekuzv5cEtvV0W1 root@parrot"
+  felixhoffmnn:
+    login: felixhoffmnn
+    comment: "Felix Hoffmann"
+    keys:
+        - "sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIHsT7RNb3xSc4jseb6vPPvC2ORWQHQr66AQR54Vikt/cAAAAB3NzaDpocGk= ssh:hpi"
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel ]
-non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe ]
+non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn ]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
