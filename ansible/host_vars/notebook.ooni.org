@@ -64,6 +64,12 @@ ssh_users:
     comment: "Ben Ginoe"
     keys:
         - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOWdWCATiHUAzoS3mn3pFMIYDmi3n4Ekuzv5cEtvV0W1 root@parrot"
+
+  agix:
+    login: agix
+    comment: "Armin Huremagic"
+    keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOzCkhJ4DgtReYaR4MVh+FzDw7s2j3v4qBmE+Mpk+igc agix@riseup.net"]
+ 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel ]
 non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe ]
 jupyterhub_allowed_users: "{{ ssh_users }}"
