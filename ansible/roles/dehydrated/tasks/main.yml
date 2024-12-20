@@ -42,10 +42,8 @@
     dest: /var/lib/dehydrated/acme-challenges/ooni-acme-canary
     mode: 0644
     owner: root
-
-- name: reload nginx
-  tags: dehydrated
-  shell: systemctl reload nginx.service
+  notify: 
+    - reload nginx
 
 - name: allow incoming TCP connections to Nginx on port 80
   tags: dehydrated
@@ -54,10 +52,8 @@
     create: yes
     block: |
       add rule inet filter input tcp dport 80 counter accept comment "incoming HTTP"
-
-- name: reload nftables service
-  tags: dehydrated
-  shell: systemctl reload nftables.service
+  notify:
+    - reload nftables
 
 - name: Configure domains {{ ssl_domains }}
   # https://github.com/dehydrated-io/dehydrated/blob/master/docs/domains_txt.md
@@ -93,16 +89,8 @@
     name: dehydrated.timer
     state: started
     enabled: yes
-
-- name: Run dehydrated service immediately
-  # creates:
-  # /var/lib/dehydrated/certs/<name>/chain.pem cert.pem privkey.pem fullchain.pem
-  tags: dehydrated
-  systemd:
-    name: dehydrated.service
-    state: started
-    enabled: yes
-
-- name: reload nginx
-  tags: dehydrated
-  shell: systemctl reload nginx.service
+  notify:
+    # creates:
+    # /var/lib/dehydrated/certs/<name>/chain.pem cert.pem privkey.pem fullchain.pem
+    - restart dehydrated
+    - reload nginx

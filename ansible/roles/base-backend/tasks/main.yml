@@ -94,8 +94,8 @@
     create: yes
     block: |
       add rule inet filter input ip saddr {{ lookup('dig', 'prometheus.ooni.org/A') }} tcp dport 19999 counter accept comment "netdata.service"
-    notify:
-      - reload nftables
+  notify:
+    - reload nftables
 
 - name: configure netdata.service
   tags: netdata

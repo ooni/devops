@@ -27,3 +27,9 @@ db-1.proteus.ooni.io
 ams-slack-1.ooni.org
 #mia-echoth.ooni.nu
 #mia-httpth.ooni.nu
+
+[aws-proxy]
+clickhouseproxy.dev.ooni.io
+
+[backend]
+backend-hel.ooni.org

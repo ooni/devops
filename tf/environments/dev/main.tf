@@ -414,8 +414,8 @@ module "ooniapi_reverseproxy" {
   )
 }
 
-module "ooni_backendproxy" {
-  source = "../../modules/ooni_backendproxy"
+module "ooni_clickhouse_proxy" {
+  source = "../../modules/ec2"
 
   stage = local.environment
 
@@ -427,19 +427,55 @@ module "ooni_backendproxy" {
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3a.nano"
 
-  backend_url        = "https://backend-fsn.ooni.org/"
-  wcth_addresses     = module.ooni_th_droplet.droplet_ipv4_address
-  wcth_domain_suffix = "th.ooni.org"
-  clickhouse_url     = "clickhouse1.prod.ooni.io"
-  clickhouse_port    = "9000"
+  name = "oonickprx"
+  ingress_rules = [{
+    from_port = 22,
+    to_port = 22,
+    protocol = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+  }, {
+    from_port = 80,
+    to_port = 80,
+    protocol = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+  }, {
+    from_port = 9000,
+    to_port = 9000,
+    protocol = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+  }]
+
+  egress_rules = [{
+    from_port = 0,
+    to_port = 0,
+    protocol = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+  }, {
+    from_port = 0,
+    to_port = 0,
+    protocol = "-1",
+    ipv6_cidr_blocks = ["::/0"]
+  }]
+
+  sg_prefix = "oockprx"
+  tg_prefix = "ckpr"
 
   tags = merge(
     local.tags,
-    { Name = "ooni-tier0-backendproxy" }
+    { Name = "ooni-tier0-clickhouseproxy" }
   )
 }
 
+resource "aws_route53_record" "clickhouse_proxy_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "clickhouseproxy.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
 
+  records = [
+    module.ooni_clickhouse_proxy.aws_instance_public_dns
+  ]
+}
 
 #### OONI Run service
 

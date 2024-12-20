@@ -1,7 +1,11 @@
 ---
-- hosts: backend-hel.ooni.org
+- name: Deploy ooni backend services
+  hosts: backend-hel.ooni.org
+  become: true
   roles:
     - role: bootstrap
+      vars:
+        admin_group_name: adm
     - role: base-backend
     - role: nftables
     - role: nginx
@@ -19,3 +23,13 @@
     - role: ooni-backend
       vars: 
         ssl_domain: backend-hel.ooni.org
+        collector_id: 2
+        clickhouse_url: "clickhouse://write:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_write_password', profile='oonidevops_user_prod') | hash('sha256') }}@clickhouse3.prod.ooni.io/oonitest"
+        bucket_name: ooni-data-eu-fra-test
+        public_bucket_name: ooni-data-eu-fra-test
+        collectors: 
+          - "backend-hel.ooni.org"
+        fastpath_version: 0.86~pr831-395
+        analysis_version: 1.12~pr836-412
+        deb_bucket_name: ooni-internal-deb
+        deb_server_name: deb-cli.ooni.org

@@ -1,0 +1,20 @@
+---
+- name: Create the modules-enabled directory if not exists
+  tags: webserv
+  ansible.builtin.file:
+    path: /etc/nginx/modules-enabled
+    state: directory
+    mode: 0755
+    owner: root
+    group: root
+
+- name: Add stream nginx config
+  tags: webserv
+  template:
+    src: templates/99-stream.conf
+    dest: /etc/nginx/modules-enabled/99-stream.conf
+    mode: 0755
+    owner: root
+  notify:
+    - reload nginx
+    - restart nginx

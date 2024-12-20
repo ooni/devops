@@ -68,6 +68,7 @@
 
 - name: install systemd-resolved
   tags: resolved
+  ignore_errors: yes # some ubuntu hosts do not have the systemd-resolved package
   ansible.builtin.apt:
     install_recommends: no
     cache_valid_time: 86400
