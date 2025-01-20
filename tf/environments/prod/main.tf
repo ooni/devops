@@ -172,7 +172,7 @@ module "oonipg" {
   allow_cidr_blocks     = [
     "10.0.0.0/8",
     # airflow host
-    "142.132.254.225/26"
+    "142.132.254.225"
   ]
   allow_security_groups = []
 
