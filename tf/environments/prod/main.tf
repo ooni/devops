@@ -169,7 +169,11 @@ module "oonipg" {
   # In order to do this we need to change the launch template of the ECS service
   # to deploy them specifically inside of the two allocated subnets as opposed
   # to picking a random IP in side of the full /8
-  allow_cidr_blocks     = ["10.0.0.0/8"]
+  allow_cidr_blocks     = [
+    "10.0.0.0/8",
+    # airflow host
+    "142.132.254.225/26"
+  ]
   allow_security_groups = []
 
   tags = merge(
