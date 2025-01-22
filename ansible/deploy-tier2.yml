@@ -6,15 +6,8 @@
   roles:
     - ssh_users
 
-- name: Deploy notebook host
-  hosts: notebook.ooni.org
-  become: true
-  tags:
-    - notebook
-  vars:
-    enable_oonipipeline_worker: false
-  roles:
-    - oonidata
+- name: Include notebook playbook
+  ansible.builtin.import_playbook: deploy-notebook.yml
 
 # commented out due to the fact it requires manual config of ~/.ssh/config
 #- name: Setup codesign box

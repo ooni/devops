@@ -1,0 +1,10 @@
+---
+- name: Deploy notebook host
+  hosts: notebook.ooni.org
+  become: true
+  tags:
+    - notebook
+  vars:
+    enable_oonipipeline_worker: false
+  roles:
+    - oonidata
