@@ -188,6 +188,10 @@ data "aws_ssm_parameter" "jwt_secret" {
   name = "/oonidevops/secrets/ooni_services/jwt_secret"
 }
 
+data "aws_ssm_parameter" "oonipg_url" {
+  name = "/oonidevops/secrets/ooni-tier0-postgres/postgresql_write_url"
+}
+
 resource "random_password" "prometheus_metrics_password" {
   length  = 32
   special = false
@@ -340,7 +344,7 @@ module "ooniapi_ooniprobe" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_secrets = {
-    POSTGRESQL_URL              = aws_secretsmanager_secret_version.oonipg_url.arn
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
   }
@@ -502,7 +506,7 @@ module "ooniapi_oonirun" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_secrets = {
-    POSTGRESQL_URL              = aws_secretsmanager_secret_version.oonipg_url.arn
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
   }
@@ -550,7 +554,7 @@ module "ooniapi_oonifindings" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_secrets = {
-    POSTGRESQL_URL              = aws_secretsmanager_secret_version.oonipg_url.arn
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
@@ -599,7 +603,7 @@ module "ooniapi_ooniauth" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_secrets = {
-    POSTGRESQL_URL              = aws_secretsmanager_secret_version.oonipg_url.arn
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
 
@@ -666,7 +670,7 @@ module "ooniapi_oonimeasurements" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_secrets = {
-    POSTGRESQL_URL              = aws_secretsmanager_secret_version.oonipg_url.arn
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
