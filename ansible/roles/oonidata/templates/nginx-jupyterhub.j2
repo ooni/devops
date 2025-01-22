@@ -59,7 +59,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         # Inject password for default user
-        proxy_set_header 'Basic ZGVmYXVsdDo=';
+        proxy_set_header Authorization 'Basic ZGVmYXVsdDo=';
 
         add_header 'Access-Control-Allow-Credentials' 'true';
         add_header 'Access-Control-Allow-Origin' '*';
