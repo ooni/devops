@@ -83,9 +83,14 @@ ssh_users:
     comment: Tony Morella
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBTiOgr4PenzkF03NqFTGgacZ1BUWLkdCS1xNba4iLfP hynnot"
+  snourin:
+    login: snourin
+    comment: Sadia Nourin
+    keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMPCgwEAxLlpo0tiM+jo4w9d1TmH2xKMJ4xVQc7DzZiQ sadia.nourin@live.com"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, hynnot ]
-non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn ]
+non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
