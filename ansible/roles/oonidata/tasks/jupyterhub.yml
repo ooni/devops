@@ -79,6 +79,20 @@
     - jupyterhub
     - config
 
+
+- name: Write htaccess file
+  ansible.builtin.template:
+    src: htaccess_click
+    dest: /etc/nginx/htaccess_click
+    owner: oonipipeline
+    mode: "0655"
+  notify:
+    - Reload nginx
+  tags:
+    - oonidata
+    - jupyterhub
+    - config
+
 - name: Setup oonidata nginx config
   ansible.builtin.template:
     src: nginx-jupyterhub.j2
