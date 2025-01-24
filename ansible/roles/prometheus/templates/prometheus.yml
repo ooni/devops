@@ -77,22 +77,22 @@ scrape_configs:
     relabel_configs:
         # cleanup the address to only contain the fqdn:port
       - source_labels: [__address__]
-        regex: '(https?)://([^/]+)(/.*)?(?::(\d+))?'
-        replacement: '$2${4:+:$4}'
+        regex: '(https|http)://([^/]+)(:\d+)?(/.*)'
+        replacement: '$2$3'
         target_label: __address__
         # set the scheme based on what has been parsed in the address
       - source_labels: [__address__]
-        regex: '(https?)://([^/]+)(/.*)?(?::(\d+))?'
+        regex: '(https|http)://([^/]+)(:\d+)?(/.*)'
         replacement: '$1'
         target_label: __scheme__
         # set the path based on the address suffix
       - source_labels: [__address__]
-        regex: '(https?)://([^/]+)(/.*)?(?::(\d+))?'
-        replacement: '${3:-/metrics}'
+        regex: '(https|http)://([^/]+)(:\d+)?(/.*)'
+        replacement: '${4:-/metrics}'
         target_label: __metrics_path__
         # set the instance name to the address without the port
       - source_labels: [__address__]
-        regex: '(https?)://([^/]+)(/.*)?(?::(\d+))?'
+        regex: '(https|http)://([^/]+)(:\d+)?(/.*)'
         replacement: '$2'
         target_label: instance
         # set the environment label to prod or dev
