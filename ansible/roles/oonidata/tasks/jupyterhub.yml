@@ -117,5 +117,3 @@
   tags:
     - oonidata
     - dehydrated
-  vars:
-    ssl_domains: "{{ ssl_domains }}"
