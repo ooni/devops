@@ -4,7 +4,7 @@
 - name: Create Grafana repo GPG pubkey
   tags: apt
   template:
-    src: templates/grafana.gpg
+    src: templates/grafana.asc
     dest: /etc/apt/grafana.asc
     mode: 0644
     owner: root
