@@ -113,15 +113,7 @@
     - nginx
 
 - ansible.builtin.include_role:
-    name: geerlingguy.certbot
+    name: dehydrated
   tags:
     - oonidata
-    - certbot
-  vars:
-    certbot_admin_email: admin@ooni.org
-    certbot_create_extra_args: ""
-    certbot_create_if_missing: true
-    certbot_create_standalone_stop_services:
-      - nginx
-    certbot_certs:
-      - domains: "{{ certbot_domains }}"
+    - dehydrated

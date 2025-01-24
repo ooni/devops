@@ -1,2 +1,0 @@
-admin_group_name: adm
-tls_cert_dir: /var/lib/dehydrated/certs

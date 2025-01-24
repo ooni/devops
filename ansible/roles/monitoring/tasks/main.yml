@@ -1,11 +1,27 @@
 ---
 # # monitoring host # #
 
+- name: Create Grafana repo GPG pubkey
+  tags: apt
+  template:
+    src: templates/grafana.asc
+    dest: /etc/apt/grafana.asc
+    mode: 0644
+    owner: root
+
 - name: Set grafana apt repo
   tags: monitoring, grafana
   template:
     src: templates/grafana.list
     dest: /etc/apt/sources.list.d/grafana.list
+    mode: 0644
+    owner: root
+
+- name: Create Grafana sources list
+  tags: apt
+  template:
+    src: templates/grafana.sources
+    dest: /etc/apt/sources.list.d/grafana.sources
     mode: 0644
     owner: root
 
@@ -37,22 +53,6 @@
     mode: 0644
     owner: root
 
-- name: Create Grafana repo GPG pubkey
-  tags: apt
-  template:
-    src: templates/grafana.gpg
-    dest: /etc/apt/grafana.asc
-    mode: 0644
-    owner: root
-
-- name: Create Grafana sources list
-  tags: apt
-  template:
-    src: templates/grafana.sources
-    dest: /etc/apt/sources.list.d/grafana.sources
-    mode: 0644
-    owner: root
-
 - name: Installs grafana
   tags: monitoring, grafana
   apt:
@@ -65,7 +65,7 @@
   tags: monitoring, grafana
   lineinfile:
     path: /etc/grafana/grafana.ini
-    regexp: '^;?domain = '
+    regexp: "^;?domain = "
     line: domain = grafana.ooni.org
 
 - name: Autoremove
@@ -188,7 +188,7 @@
   tags: fail2ban
   lineinfile:
     path: /etc/fail2ban/jail.conf
-    regexp: '^backend '
+    regexp: "^backend "
     line: backend = systemd
 
 - name: Configure fail2ban
