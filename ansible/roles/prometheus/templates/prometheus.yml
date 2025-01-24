@@ -90,20 +90,7 @@ scrape_configs:
     static_configs:
       - targets: [ 'api.ooni.io:443' ]
 
-  - job_name: 'ooniapi-services-dev'
-    scrape_interval: 5s
-    scheme: https
-    metrics_path: "/metrics"
-    basic_auth:
-      username: 'prom'
-      password: '{{ prometheus_metrics_password_dev }}'
-    static_configs:
-      - targets:
-        - ooniauth.dev.ooni.io
-        - oonirun.dev.ooni.io
-        - ooniprobe.dev.ooni.io
-
-  - job_name: 'ooniapi-services-prod'
+  - job_name: 'ooniapi-services'
     scrape_interval: 5s
     scheme: https
     metrics_path: "/metrics"
@@ -115,6 +102,14 @@ scrape_configs:
         - ooniauth.prod.ooni.io
         - oonirun.prod.ooni.io
         - ooniprobe.prod.ooni.io
+        - ooniauth.dev.ooni.io
+        - oonirun.dev.ooni.io
+        - ooniprobe.dev.ooni.io
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: ".*\.(prod|dev)\..*"
+        target_label: environment
+        replacement: ${1}
 
   - job_name: 'oonith-prod'
     scrape_interval: 5s
@@ -131,6 +126,18 @@ scrape_configs:
         - 1.do.th.prod.ooni.io
         - 2.do.th.prod.ooni.io
         - 2.do.th.prod.ooni.io:9001
+
+  - job_name: 'node_exporter'
+    scrape_interval: 5s
+    scheme: https
+    metrics_path: "/metrics/node_exporter"
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password_prod }}'
+    static_configs:
+      - targets:
+        - data1.htz-fsn.prod.ooni.nu
+        - data3.htz-fsn.prod.ooni.nu
 
   - job_name: 'ooni-web'
     scrape_interval: 5m
@@ -151,22 +158,10 @@ scrape_configs:
       - targets:
         - backend-fsn.ooni.org:9363
 
-  - job_name: 'clickhouse cluster'
+  - job_name: 'clickhouse-cluster'
     scrape_interval: 5s
     scheme: http
     metrics_path: "/metrics/clickhouse"
-    basic_auth:
-      username: 'prom'
-      password: '{{ prometheus_metrics_password_prod }}'
-    static_configs:
-      - targets:
-        - data1.htz-fsn.prod.ooni.nu:9100
-        - data3.htz-fsn.prod.ooni.nu:9100
-
-  - job_name: 'node new'
-    scrape_interval: 5s
-    scheme: http
-    metrics_path: "/metrics/node_exporter"
     basic_auth:
       username: 'prom'
       password: '{{ prometheus_metrics_password_prod }}'
