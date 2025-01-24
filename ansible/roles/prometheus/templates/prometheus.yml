@@ -138,6 +138,7 @@ scrape_configs:
       - targets:
         - data1.htz-fsn.prod.ooni.nu
         - data3.htz-fsn.prod.ooni.nu
+        - notebook.ooni.org
 
   - job_name: 'ooni-web'
     scrape_interval: 5m
@@ -167,8 +168,9 @@ scrape_configs:
       password: '{{ prometheus_metrics_password_prod }}'
     static_configs:
       - targets:
-        - data1.htz-fsn.prod.ooni.nu:9100
-        - data3.htz-fsn.prod.ooni.nu:9100
+        - data1.htz-fsn.prod.ooni.nu
+        - data3.htz-fsn.prod.ooni.nu
+        - notebook.ooni.org
 
   # See ansible/roles/ooni-backend/tasks/main.yml for the scraping targets
   - job_name: 'haproxy'
