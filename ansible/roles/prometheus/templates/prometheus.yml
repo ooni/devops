@@ -107,9 +107,9 @@ scrape_configs:
         - ooniprobe.dev.ooni.io
     relabel_configs:
       - source_labels: [__address__]
-        regex: ".*\.(prod|dev)\..*"
+        regex: "(prod|dev)"
         target_label: environment
-        replacement: ${1}
+        replacement: "$1"
 
   - job_name: 'oonith-prod'
     scrape_interval: 5s
