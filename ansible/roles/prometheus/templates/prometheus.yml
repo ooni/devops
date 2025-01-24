@@ -75,11 +75,6 @@ scrape_configs:
         - http://1.do.th.prod.ooni.io:9001/metrics
         - http://2.do.th.prod.ooni.io:9001/metrics
     relabel_configs:
-        # cleanup the address to only contain the fqdn:port
-      - source_labels: [__address__]
-        regex: '(https|http)://([^/]+)(:\d+)?(/.*)'
-        replacement: '$2$3'
-        target_label: __address__
         # set the scheme based on what has been parsed in the address
       - source_labels: [__address__]
         regex: '(https|http)://([^/]+)(:\d+)?(/.*)'
@@ -104,6 +99,11 @@ scrape_configs:
         regex: '^$'
         replacement: 'prod'
         target_label: environment
+        # cleanup the address to only contain the fqdn:port
+      - source_labels: [__address__]
+        regex: '(https|http)://([^/]+)(:\d+)?(/.*)'
+        replacement: '$2$3'
+        target_label: __address__
 
 # TODO: should this be re-enabled?
 #  - job_name: 'netdata'
