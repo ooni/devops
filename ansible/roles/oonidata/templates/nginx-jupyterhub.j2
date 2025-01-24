@@ -12,11 +12,9 @@ server {
 
     ssl_certificate {{ tls_cert_dir }}/{{ inventory_hostname }}/fullchain.pem;
     ssl_certificate_key {{ tls_cert_dir }}/{{ inventory_hostname }}/privkey.pem;
-    ssl_trusted_certificate {{ tls_cert_dir }}/{{ inventory_hostname }}/chain.pem;
+    ssl_trusted_certificate {{ ttls_cert_dirls_cert_dir }}/{{ inventory_hostname }}/chain.pem;
 
     server_name _;
-    access_log  /var/log/nginx/{{ inventory_hostname }}.access.log;
-    error_log   /var/log/nginx/{{ inventory_hostname }}.log warn;
 
     add_header Access-Control-Allow-Origin *;
 

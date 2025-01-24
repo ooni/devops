@@ -1,10 +1,13 @@
 ---
 - name: Deploy notebook host
-  hosts: notebook.ooni.org
+  hosts: notebook1.htz-fsn.prod.ooni.nu
   become: true
   tags:
     - notebook
   vars:
     enable_oonipipeline_worker: false
+    ssl_domains:
+      - "{{ inventory_hostname }}"
+      - "notebook.ooni.org"
   roles:
     - oonidata
