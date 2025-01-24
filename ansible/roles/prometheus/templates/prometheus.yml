@@ -88,7 +88,7 @@ scrape_configs:
         # set the path based on the address suffix
       - source_labels: [__address__]
         regex: '(https|http)://([^/]+)(:\d+)?(/.*)'
-        replacement: '${4:-/metrics}'
+        replacement: '$4'
         target_label: __metrics_path__
         # set the instance name to the address without the port
       - source_labels: [__address__]
@@ -131,7 +131,7 @@ scrape_configs:
 
   - job_name: 'clickhouse-cluster'
     scrape_interval: 5s
-    scheme: http
+    scheme: https
     metrics_path: "/metrics/clickhouse"
     basic_auth:
       username: 'prom'
@@ -171,9 +171,11 @@ scrape_configs:
         - ooniauth.prod.ooni.io
         - oonirun.prod.ooni.io
         - ooniprobe.prod.ooni.io
-        - ooniauth.dev.ooni.io
-        - oonirun.dev.ooni.io
-        - ooniprobe.dev.ooni.io
+        # these require a different password. Probably we should update them to
+        # take the same one for the purpose of monitoring.
+        # - ooniauth.dev.ooni.io
+        # - oonirun.dev.ooni.io
+        # - ooniprobe.dev.ooni.io
     relabel_configs:
       - source_labels: [__address__]
         regex: "(prod|dev)"
