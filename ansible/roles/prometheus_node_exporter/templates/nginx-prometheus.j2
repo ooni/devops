@@ -3,7 +3,7 @@
 server {
     listen 443 ssl http2;
 
-    server_name _;
+    server_name {{ inventory_hostname }};
     include /etc/nginx/ssl_intermediate.conf;
 
     ssl_certificate /var/lib/dehydrated/certs/{{ inventory_hostname }}/fullchain.pem;
