@@ -17,7 +17,6 @@
     - conda
 
 - ansible.builtin.import_tasks: jupyterhub.yml
-  when: enable_jupyterhub
   tags:
     - oonidata
     - jupyterhub
@@ -61,9 +60,3 @@
     - oonidata
     - oonipipeline
     - packages
-
-- ansible.builtin.import_tasks: oonipipeline-worker.yml
-  when: enable_oonipipeline_worker
-  tags:
-    - oonidata
-    - oonipipeline
