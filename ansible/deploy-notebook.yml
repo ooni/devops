@@ -5,9 +5,9 @@
   tags:
     - notebook
   vars:
-    enable_oonipipeline_worker: false
+    notebook_domain: "notebook.ooni.org"
     ssl_domains:
       - "{{ inventory_hostname }}"
       - "notebook.ooni.org"
   roles:
-    - oonidata
+    - notebook
