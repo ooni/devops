@@ -2,12 +2,11 @@ miniconda_install_dir: /opt/miniconda
 jupyterhub_config_dir: /etc/jupyterhub
 jupyterhub_runtime_dir: /srv/jupyterhub
 oonipipeline_runtime_dir: /srv/oonipipeline
-tls_cert_dir: /etc/letsencrypt/live
+tls_cert_dir: /var/lib/dehydrated/certs
 admin_group_name: admin
-enable_oonipipeline_worker: true
-enable_jupyterhub: true
 clickhouse_url: "clickhouse://localhost"
-certbot_domains:
+notebook_domain: "{{ inventory_hostname }}"
+ssl_domains:
   - "{{ inventory_hostname }}"
 conda_forge_packages:
   - seaborn

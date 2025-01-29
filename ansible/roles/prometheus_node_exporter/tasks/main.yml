@@ -4,6 +4,15 @@
     - nginx
     - node_exporter
 
+- ansible.builtin.include_role:
+    name: dehydrated
+  tags:
+    - oonidata
+    - dehydrated
+  vars:
+    ssl_domains:
+      - "{{ inventory_hostname }}"
+
 - include_tasks: install.yml
 
 - name: create ooni configuration directory
@@ -40,16 +49,3 @@
     - monitoring
     - node_exporter
     - config
-
-- ansible.builtin.include_role:
-    name: nftables
-  vars:
-    nft_rules_tcp:
-      - name: 9100
-        rules:
-          - add rule inet filter input ip saddr 5.9.112.244 tcp dport 9100 counter accept comment "clickhouse prometheus from monitoring.ooni.org"
-  tags:
-    - monitoring
-    - node_exporter
-    - config
-    - nftables

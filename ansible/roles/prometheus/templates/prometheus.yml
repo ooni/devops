@@ -19,6 +19,7 @@ alerting:
 scrape_configs:
   # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
 
+  # Node exporter metrics
 {% for bbjob in blackbox_jobs %}
   - job_name: "{{ bbjob.name }}"
     metrics_path: /probe
@@ -60,6 +61,51 @@ scrape_configs:
         - {{ host }}:9100
 {% endfor %}
 
+  - job_name: 'node_exporter'
+    scrape_interval: 5s
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password_prod }}'
+    static_configs:
+      - targets:
+        - https://data1.htz-fsn.prod.ooni.nu/metrics/node_exporter
+        - https://data3.htz-fsn.prod.ooni.nu/metrics/node_exporter
+        - https://notebook1.htz-fsn.prod.ooni.nu/metrics/node_exporter
+        - http://0.do.th.prod.ooni.io:9001/metrics
+        - http://1.do.th.prod.ooni.io:9001/metrics
+        - http://2.do.th.prod.ooni.io:9001/metrics
+    relabel_configs:
+        # set the scheme based on what has been parsed in the address
+      - source_labels: [__address__]
+        regex: '(https|http)://([^/^:]+)(:\d+)?(/.*)'
+        replacement: '$1'
+        target_label: __scheme__
+        # set the path based on the address suffix
+      - source_labels: [__address__]
+        regex: '(https|http)://([^/^:]+)(:\d+)?(/.*)'
+        replacement: '$4'
+        target_label: __metrics_path__
+        # set the instance name to the address without the port
+      - source_labels: [__address__]
+        regex: '(https|http)://([^/^:]+)(:\d+)?(/.*)'
+        replacement: '$2'
+        target_label: instance
+        # set the environment label to prod or dev
+      - source_labels: [instance]
+        regex: '.*\.(prod|dev)\..*'
+        replacement: '$1'
+        target_label: environment
+      - source_labels: [environment]
+        regex: '^$'
+        replacement: 'prod'
+        target_label: environment
+        # cleanup the address to only contain the fqdn:port
+      - source_labels: [__address__]
+        regex: '(https|http)://([^/]+)(:\d+)?(/.*)'
+        replacement: '$2$3'
+        target_label: __address__
+
+# TODO: should this be re-enabled?
 #  - job_name: 'netdata'
 #    scrape_interval: 5s
 #    scheme: https
@@ -72,6 +118,29 @@ scrape_configs:
 #      key_file: "{{ prometheus_ssl_dir }}/{{ inventory_hostname }}.key"
 #    static_configs:
 #      - targets:
+
+  # Application level metrics
+
+  - job_name: 'clickhouse'
+    scrape_interval: 5s
+    scheme: http
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+        - backend-fsn.ooni.org:9363
+
+  - job_name: 'clickhouse-cluster'
+    scrape_interval: 5s
+    scheme: https
+    metrics_path: "/metrics/clickhouse"
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password_prod }}'
+    static_configs:
+      - targets:
+        - data1.htz-fsn.prod.ooni.nu
+        - data3.htz-fsn.prod.ooni.nu
+        - notebook1.htz-fsn.prod.ooni.nu
 
   - job_name: 'raw-netdata'
     scrape_interval: 5s
@@ -90,20 +159,7 @@ scrape_configs:
     static_configs:
       - targets: [ 'api.ooni.io:443' ]
 
-  - job_name: 'ooniapi-services-dev'
-    scrape_interval: 5s
-    scheme: https
-    metrics_path: "/metrics"
-    basic_auth:
-      username: 'prom'
-      password: '{{ prometheus_metrics_password_dev }}'
-    static_configs:
-      - targets:
-        - ooniauth.dev.ooni.io
-        - oonirun.dev.ooni.io
-        - ooniprobe.dev.ooni.io
-
-  - job_name: 'ooniapi-services-prod'
+  - job_name: 'ooniapi-services'
     scrape_interval: 5s
     scheme: https
     metrics_path: "/metrics"
@@ -115,8 +171,18 @@ scrape_configs:
         - ooniauth.prod.ooni.io
         - oonirun.prod.ooni.io
         - ooniprobe.prod.ooni.io
+        # these require a different password. Probably we should update them to
+        # take the same one for the purpose of monitoring.
+        # - ooniauth.dev.ooni.io
+        # - oonirun.dev.ooni.io
+        # - ooniprobe.dev.ooni.io
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: "(prod|dev)"
+        target_label: environment
+        replacement: "$1"
 
-  - job_name: 'oonith-prod'
+  - job_name: 'oonith'
     scrape_interval: 5s
     scheme: http
     metrics_path: "/metrics"
@@ -125,13 +191,9 @@ scrape_configs:
       password: '{{ prometheus_metrics_password_prod }}'
     static_configs:
       - targets:
-        - 0.do.th.prod.ooni.io:9001
         - 0.do.th.prod.ooni.io
-        - 1.do.th.prod.ooni.io:9001
         - 1.do.th.prod.ooni.io
         - 2.do.th.prod.ooni.io
-        - 2.do.th.prod.ooni.io:9001
-
   - job_name: 'ooni-web'
     scrape_interval: 5m
     scheme: https
@@ -143,37 +205,6 @@ scrape_configs:
       - openobservatory.github.io:443
       - ooni.netlify.app:443
 
-  - job_name: 'clickhouse'
-    scrape_interval: 5s
-    scheme: http
-    metrics_path: "/metrics"
-    static_configs:
-      - targets:
-        - backend-fsn.ooni.org:9363
-
-  - job_name: 'clickhouse cluster'
-    scrape_interval: 5s
-    scheme: http
-    metrics_path: "/metrics/clickhouse"
-    basic_auth:
-      username: 'prom'
-      password: '{{ prometheus_metrics_password_prod }}'
-    static_configs:
-      - targets:
-        - data1.htz-fsn.prod.ooni.nu:9100
-        - data3.htz-fsn.prod.ooni.nu:9100
-
-  - job_name: 'node new'
-    scrape_interval: 5s
-    scheme: http
-    metrics_path: "/metrics/node_exporter"
-    basic_auth:
-      username: 'prom'
-      password: '{{ prometheus_metrics_password_prod }}'
-    static_configs:
-      - targets:
-        - data1.htz-fsn.prod.ooni.nu:9100
-        - data3.htz-fsn.prod.ooni.nu:9100
 
   # See ansible/roles/ooni-backend/tasks/main.yml for the scraping targets
   - job_name: 'haproxy'
