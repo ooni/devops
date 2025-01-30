@@ -24,13 +24,13 @@ resource "aws_iam_access_key" "ooni_monitoring" {
   user = aws_iam_user.ooni_monitoring.name
 }
 
-resource "aws_ssm_parameter" "ooni_monitoring" {
+resource "aws_ssm_parameter" "ooni_monitoring_access_key" {
   name = "/oonidevops/secrets/ooni_monitoring/access_key"
   type = "SecureString"
   value = aws_iam_access_key.ooni_monitoring.id
 }
 
-resource "aws_ssm_parameter" "ooni_monitoring" {
+resource "aws_ssm_parameter" "ooni_monitoring_secret_key" {
   name = "/oonidevops/secrets/ooni_monitoring/secret_key"
   type = "SecureString"
   value = aws_iam_access_key.ooni_monitoring.secret
