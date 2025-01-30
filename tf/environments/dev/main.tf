@@ -788,3 +788,10 @@ resource "aws_acm_certificate_validation" "ooniapi_frontend" {
   certificate_arn         = aws_acm_certificate.ooniapi_frontend.arn
   validation_record_fqdns = [for record in aws_route53_record.ooniapi_frontend_cert_validation : record.fqdn]
 }
+
+### Ooni monitoring
+
+module "ooni_monitoring" {
+  source = "../../modules/ooni_monitoring"
+  tags = local.tags  
+}
