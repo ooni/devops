@@ -61,3 +61,7 @@ variable "instance_type" {
 variable "instance_volume_size" {
   default = "5"
 }
+
+variable "monitoring_sg_ids" {
+  default = []
+}

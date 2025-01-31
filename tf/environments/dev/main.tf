@@ -301,6 +301,8 @@ module "ooniapi_cluster" {
 
   instance_type = "t3a.micro"
 
+  monitoring_sg_ids = [module.ooni_clickhouse_proxy.ec2_sg_id]
+
   tags = merge(
     local.tags,
     { Name = "ooni-tier0-api-ecs-cluster" }

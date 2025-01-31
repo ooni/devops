@@ -120,6 +120,14 @@ resource "aws_security_group" "container_host" {
     ]
   }
 
+  ingress {
+    protocol = "tcp"
+    from_port = 80
+    to_port = 80
+
+    security_groups = var.monitoring_sg_ids
+  }
+
   egress {
     from_port        = 0
     to_port          = 0
