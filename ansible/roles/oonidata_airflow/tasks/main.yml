@@ -19,7 +19,7 @@
 - name: Checkout oonidata repo
   become_user: airflow
   ansible.builtin.git:
-    repo: 'https://github.com/ooni/data.git'
+    repo: "https://github.com/ooni/data.git"
     dest: /opt/airflow/oonidata
     version: main
 
@@ -58,23 +58,9 @@
   ansible.builtin.file:
     path: /opt/oonidata
     state: directory
-    mode: '0755'
+    mode: "0755"
     owner: airflow
     recurse: yes
-
-- ansible.builtin.include_role:
-    name: nginx
-  tags:
-    - oonidata
-    - nginx
-
-- ansible.builtin.include_role:
-    name: dehydrated
-  tags:
-    - oonidata
-    - dehydrated
-  vars:
-    ssl_domains: "{{ [ inventory_hostname ] + [ airflow_public_fqdn ] }}"
 
 - name: Setup airflow nginx config
   ansible.builtin.template:
