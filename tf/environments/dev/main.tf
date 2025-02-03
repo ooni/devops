@@ -795,5 +795,9 @@ resource "aws_acm_certificate_validation" "ooniapi_frontend" {
 
 module "ooni_monitoring" {
   source = "../../modules/ooni_monitoring"
+  environment = local.environment
+  aws_region = var.aws_region
+  cluster_id = module.ooniapi_cluster.cluster_id
+
   tags = local.tags  
 }
