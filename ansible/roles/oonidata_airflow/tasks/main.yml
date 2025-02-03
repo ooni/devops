@@ -1,5 +1,5 @@
 - name: Ensure Airflow group
-  group:
+  ansible.builtin.group:
     name: "airflow"
   become: true
 
@@ -7,7 +7,7 @@
 # this was added after the user had already been created by the airflow_role
 # and so it's failing because it's trying to modify the user.
 #- name: Ensure Airflow user
-#  user:
+#  ansible.builtin.user:
 #    name: "airflow"
 #    group: "airflow"
 #    system: true
@@ -18,12 +18,14 @@
 
 - name: Checkout oonidata repo
   become_user: airflow
+  become: true
   ansible.builtin.git:
     repo: "https://github.com/ooni/data.git"
     dest: /opt/airflow/oonidata
     version: main
 
-- ansible.builtin.include_role:
+- name: Install airflow
+  ansible.builtin.include_role:
     name: ooni.airflow_role
   tags:
     - oonidata
@@ -60,7 +62,7 @@
     state: directory
     mode: "0755"
     owner: airflow
-    recurse: yes
+    recurse: true
 
 - name: Setup airflow nginx config
   ansible.builtin.template:
