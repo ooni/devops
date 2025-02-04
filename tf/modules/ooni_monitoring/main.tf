@@ -66,6 +66,10 @@ resource "aws_ecs_task_definition" "ooni_service_discovery" {
         {
           name = "AWS_REGION"
           value = var.aws_region
+        },
+        {
+          name = "DiscoveryOptions__EcsClusters"
+          value = var.cluster_name
         }
       ]
       secrets = [
@@ -94,7 +98,6 @@ resource "aws_ecs_task_definition" "ooni_service_discovery" {
 resource "aws_ecs_service" "service" {
   name            = local.name
   cluster         = var.cluster_id
-  launch_type     = "EC2"
   task_definition = aws_ecs_task_definition.ooni_service_discovery.id
   desired_count   = 1
 
@@ -115,7 +118,7 @@ resource "aws_ecs_service" "service" {
 }
 
 resource "aws_iam_role" "ecs_sd_task" {
-  name = "${local.name}-task-role"
+  name = "${local.name}-task-role-execution"
 
   tags = var.tags
 
@@ -134,6 +137,13 @@ resource "aws_iam_role" "ecs_sd_task" {
   ]
 }
 EOF
+}
+
+resource "aws_iam_role_policy" "ooni_ecs_sd_task" {
+  name = "${local.name}-task-role-execution"
+  role = aws_iam_role.ecs_sd_task.name
+
+  policy = templatefile("${path.module}/templates/profile_policy.json", {})
 }
 
 resource "aws_cloudwatch_log_group" "ooni_ecs_sd" {
