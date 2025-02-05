@@ -800,5 +800,5 @@ module "ooni_monitoring" {
   cluster_id = module.ooniapi_cluster.cluster_id
 
   tags = local.tags  
-  cluster_name = module.ooniapi_cluster.cluster_name
+  cluster_names = [module.ooniapi_cluster.cluster_name]
 }

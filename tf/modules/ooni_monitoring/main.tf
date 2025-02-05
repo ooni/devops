@@ -69,7 +69,7 @@ resource "aws_ecs_task_definition" "ooni_service_discovery" {
         },
         {
           name = "DiscoveryOptions__EcsClusters"
-          value = var.cluster_name
+          value = join(";", var.cluster_names)
         }
       ]
       secrets = [
