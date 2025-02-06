@@ -33,6 +33,7 @@ fi
 
 # Move it to an executable path
 tar xvfz node_exporter-*.*-amd64.tar.gz
+chmod 555 node_exporter-*.*-amd64/node_exporter
 sudo mv node_exporter-*.*-amd64/node_exporter /usr/local/bin/
 
 
