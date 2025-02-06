@@ -301,8 +301,6 @@ module "ooniapi_cluster" {
 
   instance_type = "t3a.micro"
 
-  monitoring_sg_ids = [module.ooni_clickhouse_proxy.ec2_sg_id]
-
   tags = merge(
     local.tags,
     { Name = "ooni-tier0-api-ecs-cluster" }
@@ -797,8 +795,6 @@ module "ooni_monitoring" {
   source = "../../modules/ooni_monitoring"
   environment = local.environment
   aws_region = var.aws_region
-  cluster_id = module.ooniapi_cluster.cluster_id
 
   tags = local.tags  
-  cluster_names = [module.ooniapi_cluster.cluster_name]
 }
