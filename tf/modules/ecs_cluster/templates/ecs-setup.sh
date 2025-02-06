@@ -8,6 +8,8 @@ ECS_ENABLE_TASK_IAM_ROLE=true
 EOF
 
 # Install node exporter on this machine
+# IN CASE OF UPDATE: You can find this downloads and its checksums here: 
+# https://prometheus.io/download/#node_exporter
 DOWNLOAD_LINK='https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz'
 CHECKSUM='6809dd0b3ec45fd6e992c19071d6b5253aed3ead7bf0686885a51d85c6643c66'
 
