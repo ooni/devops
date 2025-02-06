@@ -18,16 +18,3 @@ variable "aws_region" {
   description = "AWS region"
   type = string
 }
-
-variable "task_secrets" {
-  type = map(string)
-  default = {}
-}
-
-variable "cluster_id" {
-  type = string
-}
-
-variable "cluster_names" {
-  type = list(string)
-}
