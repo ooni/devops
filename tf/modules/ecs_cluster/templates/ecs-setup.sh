@@ -7,6 +7,9 @@ ECS_CONTAINER_INSTANCE_TAGS=${jsonencode(ecs_cluster_tags)}
 ECS_ENABLE_TASK_IAM_ROLE=true
 EOF
 
+# Exit on error and show running commands
+set -ex
+
 # Install node exporter on this machine
 # IN CASE OF UPDATE: You can find this downloads and its checksums here: 
 # https://prometheus.io/download/#node_exporter
