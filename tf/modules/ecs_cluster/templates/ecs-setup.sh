@@ -10,12 +10,23 @@ EOF
 # Install node exporter on this machine
 DOWNLOAD_LINK='https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz'
 CHECKSUM='6809dd0b3ec45fd6e992c19071d6b5253aed3ead7bf0686885a51d85c6643c66'
-# TODO Checksum this file
 
 # Download node exporter binary
 echo "Downloading node exporter..."
 cd /tmp
 curl -O -L $DOWNLOAD_LINK
+
+# Checksum the file
+ACTUAL_FILE=$(ls | grep node_exporter-*.*-amd64.tar.gz)
+echo "$CHECKSUM $ACTUAL_FILE" | sha256sum -c -
+if [[ $? -eq 0 ]]; then
+    echo "Node exporter checksum validation OK!"
+else
+    echo "[ERROR] Checksum validation for node exporter failed!" >&2
+    exit 1
+fi
+
+# Move it to an executable path
 tar xvfz node_exporter-*.*-amd64.tar.gz
 sudo mv node_exporter-*.*-amd64/node_exporter /usr/local/bin/
 
