@@ -51,7 +51,8 @@ After=network.target
 User=node_exporter
 Group=node_exporter
 Type=simple
-ExecStart=/usr/local/bin/node_exporter
+ExecStart=/usr/local/bin/node_exporter --web.listen-address=:${node_exporter_port}
+Restart=always
 [Install]
 WantedBy=multi-user.target
 EOF
