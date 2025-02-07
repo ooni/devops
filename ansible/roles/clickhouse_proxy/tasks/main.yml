@@ -39,6 +39,7 @@
   notify:
     - reload nginx
     - restart nginx
+
 - name: Add prometheus proxy nginx config
   tags: webserv
   template:
