@@ -301,6 +301,13 @@ module "ooniapi_cluster" {
 
   instance_type = "t3a.micro"
 
+  monitoring_sg_ids = [
+    # The clickhouse proxy has an nginx configuration
+    # to proxy requests from the monitoring server
+    # to the cluster instances
+    module.ooni_clickhouse_proxy.ec2_sg_id
+  ]
+
   tags = merge(
     local.tags,
     { Name = "ooni-tier0-api-ecs-cluster" }
@@ -440,6 +447,11 @@ module "ooni_clickhouse_proxy" {
     to_port = 9000,
     protocol = "tcp",
     cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+  }, {
+    from_port = 9200,
+    to_port = 9200,
+    protocol = "tcp"
+    cidr_blocks = ["5.9.112.244/32"] # TODO set this as parameter
   }]
 
   egress_rules = [{
