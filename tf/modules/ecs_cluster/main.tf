@@ -122,8 +122,8 @@ resource "aws_security_group" "container_host" {
 
   ingress {
     protocol = "tcp"
-    from_port = 80
-    to_port = 80
+    from_port = 9100
+    to_port = 9100
 
     security_groups = var.monitoring_sg_ids
   }
