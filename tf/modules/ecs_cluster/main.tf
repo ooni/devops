@@ -145,6 +145,7 @@ resource "aws_launch_template" "container_host" {
   user_data = base64encode(templatefile("${path.module}/templates/ecs-setup.sh", {
     ecs_cluster_name = var.name,
     ecs_cluster_tags = var.tags
+    node_exporter_port = var.node_exporter_port
   }))
 
   update_default_version               = true
