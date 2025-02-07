@@ -218,7 +218,7 @@ scrape_configs:
   # EC2 instances monitoring: 
   - job_name: 'ooni-api-ec2'
     scrape_interval: 5s
-    scheme: https
+    scheme: http # TODO change to https
     metrics_path: "/metrics" 
 
     # Node level metrics for cluster nodes
@@ -229,8 +229,23 @@ scrape_configs:
         port: 9100 # should be the proxy 
     relabel_configs: # Change the host to the proxy host with relabeling
       - source_labels: [__address__]
+        regex: "([0-9\\.]+):([0-9]+)" # <ip>:<port>"
+        replacement: "$1"
+        target_label: "ec2_host"
+        action: "replace"
+      - source_labels: [__address__]
         regex: "([0-9\\.]+):([0-9]+)" # <ip>:<port>
         replacement: "{{clickhouse_proxy_host_dev}}:9200/${1}/metrics"
         target_label: "proxy_host"
+        action: "replace"
+      - source_labels: [proxy_host]
+        regex: "([^/]*)/(.*)"
+        replacement: "$1"
+        target_label: "__address__"
+        action: "replace"
+      - source_labels: [proxy_host]
+        regex: "([^/]*)/(.*)"
+        replacement: "/$2"
+        target_label: "__metrics_path__"
         action: "replace"
 ...
