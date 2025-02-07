@@ -153,3 +153,6 @@ blackbox_jobs:
 
 prometheus_aws_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_dev') }}"
 prometheus_aws_secret_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_dev') }}"
+# TODO lookup this value somewhere else 
+clickhouse_proxy_host_dev: "clickhouseproxy.dev.ooni.io"
+clickhouse_proxy_host_prod: "clickhouseproxy.dev.ooni.io" # TODO Change for prod
