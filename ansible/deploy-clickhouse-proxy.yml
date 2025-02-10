@@ -11,7 +11,6 @@
       shell: /sbin/nologin
       system: true
   #   # required by node exporter, see: 
-  #   TODO: Create the certificate for node exporter
   #   # https://galaxy.ansible.com/ui/repo/published/prometheus/prometheus/content/role/node_exporter/
   #   - name: Create node_exporter cert dir 
   #     file: 
@@ -36,7 +35,7 @@
     - role: prometheus.prometheus.node_exporter
       vars:
         node_exporter_system_user: node_exporter
-        node_exporter_system_group: node_exporter
+        node_exporter_system_user: node_exporter
       #   node_exporter_tls_server_config:
       #     cert_file: /etc/node_exporter/tls.cert
       #     key_file: /etc/node_exporter/tls.key
