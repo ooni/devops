@@ -3,6 +3,28 @@
   hosts:
     - clickhouseproxy.dev.ooni.io
   become: true
+  pre_tasks: 
+  - name: Create node exporter user
+    user:
+      name: node_exporter
+      state: present
+      shell: /sbin/nologin
+      system: true
+  #   # required by node exporter, see: 
+  #   TODO: Create the certificate for node exporter
+  #   # https://galaxy.ansible.com/ui/repo/published/prometheus/prometheus/content/role/node_exporter/
+  #   - name: Create node_exporter cert dir 
+  #     file: 
+  #       path: "/etc/node_exporter"
+  #       state: directory
+  #       owner: root
+  #       group: root
+  #   - name: Create cert and key for node exporter
+  #     openssl_certificate:
+  #       path: /etc/node_exporter/tls.cert
+  #       csr_path: /etc/node_exporter/tls.csr
+  #       privatekey_path: /etc/node_exporter/tls.key
+  #       provider: selfsigned
   roles:
     - role: bootstrap
     - role: nginx
@@ -11,3 +33,10 @@
       vars: 
         clickhouse_url: "clickhouse3.prod.ooni.io"
         clickhouse_port: 9000
+    - role: prometheus.prometheus.node_exporter
+      vars:
+        node_exporter_system_user: node_exporter
+        node_exporter_system_group: node_exporter
+      #   node_exporter_tls_server_config:
+      #     cert_file: /etc/node_exporter/tls.cert
+      #     key_file: /etc/node_exporter/tls.key
