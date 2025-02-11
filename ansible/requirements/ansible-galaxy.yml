@@ -1,19 +1,15 @@
-roles:
-  - src: willshersystems.sshd
-    version: v0.25.0
-  - src: nginxinc.nginx
-    version: 0.24.3
-  - src: geerlingguy.certbot
-    version: 5.2.0
-  - src: artis3n.tailscale
-    version: v4.5.0
-  - src: https://github.com/idealista/clickhouse_role
-    scm: git
-    version: 3.5.1
-    name: idealista.clickhouse_role
-  - src: https://github.com/ooni/airflow-role.git
-    scm: git
-    name: ooni.airflow_role
-collections: 
-  - name: prometheus.prometheus
-    version: 0.24.1
+- src: willshersystems.sshd
+  version: v0.25.0
+- src: nginxinc.nginx
+  version: 0.24.3
+- src: geerlingguy.certbot
+  version: 5.2.0
+- src: artis3n.tailscale
+  version: v4.5.0
+- src: https://github.com/idealista/clickhouse_role
+  scm: git
+  version: 3.5.1
+  name: idealista.clickhouse_role
+- src: https://github.com/ooni/airflow-role.git
+  scm: git
+  name: ooni.airflow_role
