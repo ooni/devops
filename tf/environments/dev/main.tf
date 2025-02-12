@@ -418,6 +418,10 @@ module "ooniapi_reverseproxy" {
   )
 }
 
+data "dns_a_record_set" "monitoring_host" {
+  host     = "monitoring.ooni.org" 
+}
+
 module "ooni_clickhouse_proxy" {
   source = "../../modules/ec2"
 
@@ -451,7 +455,7 @@ module "ooni_clickhouse_proxy" {
     from_port = 9200,
     to_port = 9200,
     protocol = "tcp"
-    cidr_blocks = ["5.9.112.244/32"] # TODO set this as parameter
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs): "${tostring(ip)}/32"] # TODO set this as parameter
   }]
 
   egress_rules = [{
