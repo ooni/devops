@@ -419,7 +419,7 @@ module "ooniapi_reverseproxy" {
 }
 
 data "dns_a_record_set" "monitoring_host" {
-  host     = "monitoring.ooni.org" 
+  host = "monitoring.ooni.org"
 }
 
 module "ooni_clickhouse_proxy" {
@@ -437,36 +437,36 @@ module "ooni_clickhouse_proxy" {
 
   name = "oonickprx"
   ingress_rules = [{
-    from_port = 22,
-    to_port = 22,
-    protocol = "tcp",
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
-  }, {
-    from_port = 80,
-    to_port = 80,
-    protocol = "tcp",
+    }, {
+    from_port   = 80,
+    to_port     = 80,
+    protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
-  }, {
-    from_port = 9000,
-    to_port = 9000,
-    protocol = "tcp",
+    }, {
+    from_port   = 9000,
+    to_port     = 9000,
+    protocol    = "tcp",
     cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
-  }, {
-    from_port = 9200,
-    to_port = 9200,
-    protocol = "tcp"
-    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs): "${tostring(ip)}/32"] # TODO set this as parameter
+    }, {
+    from_port   = 9200,
+    to_port     = 9200,
+    protocol    = "tcp"
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
   }]
 
   egress_rules = [{
-    from_port = 0,
-    to_port = 0,
-    protocol = "-1",
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
     cidr_blocks = ["0.0.0.0/0"],
-  }, {
-    from_port = 0,
-    to_port = 0,
-    protocol = "-1",
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
     ipv6_cidr_blocks = ["::/0"]
   }]
 
@@ -808,9 +808,9 @@ resource "aws_acm_certificate_validation" "ooniapi_frontend" {
 ### Ooni monitoring
 
 module "ooni_monitoring" {
-  source = "../../modules/ooni_monitoring"
+  source      = "../../modules/ooni_monitoring"
   environment = local.environment
-  aws_region = var.aws_region
+  aws_region  = var.aws_region
 
-  tags = local.tags  
+  tags = local.tags
 }
