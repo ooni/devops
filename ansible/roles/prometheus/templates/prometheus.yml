@@ -214,4 +214,12 @@ scrape_configs:
     static_configs:
       - targets:
         - backend-hel.ooni.org:444
+
+  # Scrape tasks in ECS using file based discovery
+  - job_name: "ecs-tasks"
+    scrape_interval: 5s
+    scheme: https
+    file_sd_configs:
+      - files: 
+        - '/var/lib/prometheus/file_discovery/*.json'
 ...

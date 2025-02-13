@@ -53,6 +53,14 @@
     mode: 0644
     owner: root
 
+- name: Create file-discovery directory for prometheus
+  tags: monitoring, prometheus
+  file:
+    path: /var/lib/prometheus/file_discovery
+    state: directory
+    owner: root
+    group: root
+
 - name: Installs grafana
   tags: monitoring, grafana
   apt:
