@@ -218,7 +218,7 @@ scrape_configs:
   # EC2 instances monitoring: 
   - job_name: 'ooni-api-ec2'
     scrape_interval: 5s
-    scheme: https # TODO change to https
+    scheme: https 
     metrics_path: "/metrics" 
 
     # Node level metrics for cluster nodes
