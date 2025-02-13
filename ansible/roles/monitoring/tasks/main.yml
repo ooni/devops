@@ -61,6 +61,15 @@
     owner: root
     group: root
 
+- name: Add script for ecs-discovery 
+  tags: monitoring, prometheus
+  template: 
+    src: templates/ecs-discovery.py 
+    dest: /usr/bin/
+    mode: 555
+    owner: root
+    group: root
+
 - name: Installs grafana
   tags: monitoring, grafana
   apt:
