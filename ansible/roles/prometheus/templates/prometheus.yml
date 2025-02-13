@@ -216,7 +216,7 @@ scrape_configs:
         - backend-hel.ooni.org:444
 
   # EC2 instances monitoring: 
-  - job_name: 'ooni-api-ec2'
+  - job_name: 'ooni-aws-ec2'
     scrape_interval: 5s
     scheme: https 
     metrics_path: "/metrics" 
