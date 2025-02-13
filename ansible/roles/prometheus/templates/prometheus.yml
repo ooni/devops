@@ -222,4 +222,29 @@ scrape_configs:
     file_sd_configs:
       - files: 
         - '/var/lib/prometheus/file_discovery/*.json'
+    relabel_configs: # Change the host to the proxy host with relabeling
+      # Store ip in ecs_host
+      - source_labels: [__address__]
+        regex: "([0-9\\.]+):([0-9]+)" # <ip>:<port>"
+        replacement: "$1"
+        target_label: "ec2_host"
+        action: "replace"
+      # Store the full adress with path in proxy_host
+      - source_labels: [__address__]
+        regex: "([0-9\\.]+):([0-9]+)" # <ip>:<port>
+        replacement: "{{clickhouse_proxy_host_dev}}:9200/${1}/${2}/metrics" # proxy.org:9200/<private_ip>/<port>/metrics
+        target_label: "proxy_host"
+        action: "replace"
+      # Change the address where to send the scrape request to
+      - source_labels: [proxy_host]
+        regex: "([^/]*)/(.*)"
+        replacement: "$1"
+        target_label: "__address__"
+        action: "replace"
+      # Change the metrics path to include ip address and /metrics path
+      - source_labels: [proxy_host]
+        regex: "([^/]*)/(.*)"
+        replacement: "/$2"
+        target_label: "__metrics_path__"
+        action: "replace"
 ...
