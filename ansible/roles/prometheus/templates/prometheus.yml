@@ -223,8 +223,8 @@ scrape_configs:
 
     # Node level metrics for cluster nodes
     ec2_sd_configs:
-      - access_key: "{{prometheus_aws_access_key}}" 
-        secret_key: "{{prometheus_aws_secret_key}}"
+      - access_key: "{{prometheus_aws_access_key_dev}}" 
+        secret_key: "{{prometheus_aws_secret_key_dev}}"
         region: "eu-central-1"
         port: 9100 # should be the proxy 
     relabel_configs: # Change the host to the proxy host with relabeling
