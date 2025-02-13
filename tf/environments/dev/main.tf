@@ -452,6 +452,7 @@ module "ooni_clickhouse_proxy" {
     protocol    = "tcp",
     cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
     }, {
+    // For the prometheus proxy:
     from_port   = 9200,
     to_port     = 9200,
     protocol    = "tcp"
