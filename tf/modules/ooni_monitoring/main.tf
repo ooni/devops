@@ -1,3 +1,11 @@
+locals {
+  name = "ecs-service-discovery-${var.environment}"
+
+  tags = {
+    Name = local.name
+    Environment = var.environment
+  }
+}
 resource "aws_iam_user" "ooni_monitoring" {
   name = "oonidevops-monitoring"
 }

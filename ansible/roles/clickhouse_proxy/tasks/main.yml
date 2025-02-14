@@ -9,6 +9,17 @@
   notify:
     - reload nftables  
 
+# For prometheus scrape requests
+- name: Allow traffic on port 9200
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9200.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 9200 counter accept comment "prometheus"
+  notify:
+    - reload nftables  
+
 - name: Create the modules-enabled directory if not exists
   tags: webserv
   ansible.builtin.file:
@@ -23,6 +34,17 @@
   template:
     src: templates/99-stream.conf
     dest: /etc/nginx/modules-enabled/99-stream.conf
+    mode: 0755
+    owner: root
+  notify:
+    - reload nginx
+    - restart nginx
+
+- name: Add prometheus proxy nginx config
+  tags: webserv
+  template:
+    src: templates/prometheus-proxy.conf
+    dest: /etc/nginx/conf.d/prometheus-proxy.conf
     mode: 0755
     owner: root
   notify:

@@ -5,12 +5,17 @@
   become: true
   roles:
     - role: bootstrap
+    - role: dehydrated
+      vars: 
+        ssl_domains: 
+          - clickhouseproxy.dev.ooni.io
     - role: nginx
       tags: nginx
     - role: clickhouse_proxy
       vars: 
         clickhouse_url: "clickhouse3.prod.ooni.io"
         clickhouse_port: 9000
+        clickhouse_proxy_public_fqdn: "clickhouseproxy.dev.ooni.io"
     - role: dehydrated
       vars:
         ssl_domains: "clickhouseproxy.dev.ooni.io"
