@@ -62,6 +62,10 @@ variable "instance_volume_size" {
   default = "5"
 }
 
+variable "monitoring_sg_ids" {
+  default = []
+}
+
 variable "node_exporter_port" {
   default = "9100"
 }

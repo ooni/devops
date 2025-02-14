@@ -150,3 +150,12 @@ blackbox_jobs:
   - name: icmp
     module: icmp
     targets: "{{ dom0_hosts | list }}"
+
+prometheus_aws_access_key_dev: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_dev') }}"
+prometheus_aws_secret_key_dev: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_dev') }}"
+
+prometheus_aws_access_key_prod: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_prod') }}"
+prometheus_aws_secret_key_prod: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_prod') }}"
+
+clickhouse_proxy_host_dev: "clickhouseproxy.dev.ooni.io"
+clickhouse_proxy_host_prod: "clickhouseproxy.dev.ooni.io" # TODO Change for prod
