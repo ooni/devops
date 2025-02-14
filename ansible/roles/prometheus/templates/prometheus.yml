@@ -253,6 +253,9 @@ scrape_configs:
   - job_name: "ecs-tasks"
     scrape_interval: 5s
     scheme: https
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password_dev }}'
     file_sd_configs:
       - files: 
         - '/var/lib/prometheus/file_discovery/*.json'
