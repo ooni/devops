@@ -115,9 +115,10 @@ resource "aws_security_group" "container_host" {
     from_port = 32768
     to_port   = 61000
 
-    security_groups = [
+    security_groups = concat([
       aws_security_group.web.id,
-    ]
+    ], 
+    var.monitoring_sg_ids)
   }
 
   ingress {
