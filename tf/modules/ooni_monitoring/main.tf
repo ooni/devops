@@ -20,6 +20,15 @@ resource "aws_iam_user_policy" "ooni_monitoring" {
       {
         Action = [
           "ec2:DescribeInstances",
+          # For ECS Discovery
+          "ECS:ListClusters",
+          "ECS:ListTasks",
+          "ECS:DescribeTask",
+          "EC2:DescribeInstances",
+          "ECS:DescribeContainerInstances",
+          "ECS:DescribeTasks",
+          "ECS:DescribeTaskDefinition",
+          "ECS:DescribeClusters"
         ]
         Effect   = "Allow"
         Resource = "*"
