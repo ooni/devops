@@ -250,7 +250,7 @@ scrape_configs:
         action: "replace"
 
   # Scrape tasks in ECS using file based discovery, useful for application level metrics
-  - job_name: "ecs-tasks"
+  - job_name: "ecs-tasks-dev"
     scrape_interval: 5s
     scheme: https
     basic_auth:
