@@ -70,6 +70,24 @@
     owner: root
     group: root
 
+- name: Add settings file for ecs-discovery
+  tags: monitoring, prometheus
+  template:
+    src: templates/ecs_discovery_settings.sh
+    dest: /etc/ooni/ecs_discovery_settings.sh
+    mode: 600
+    owner: root
+    group: root
+
+- name: Add the wrapper script for ecs-discovery
+  tags: monitoring, prometheus
+  template:
+    src: templates/ecs_discovery_wrapper.sh
+    dest: /usr/bin/ecs_discovery_wrapper.sh 
+    mode: 700
+    owner: root
+    group: root
+
 - name: Add cronjob for running the ecs-discovery script (DEV environment)
   tags: monitoring, prometheus, cron
   cron: 
@@ -80,7 +98,7 @@
     day: "*"
     month: "*"
     weekday: "*"
-    job: "ecs-discovery.py --output-file /var/lib/prometheus/file_discovery/targets.json --secret-key {{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_dev')}} --access-key {{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_dev')}} --region eu-central-1"
+    job: "ecs_discovery_wrapper.sh"
     state: present
 
 - name: Installs grafana

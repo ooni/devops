@@ -1,2 +1,7 @@
 enable_log_ingestion: false
-aws_region: eu-central-1
+
+# ECS monitoring 
+ecs_aws_region: eu-central-1
+monitoring_secret_key: "{{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_dev')}}"
+monitoring_access_key: "{{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_dev')}}"
+ecs_targets_file: "/var/lib/prometheus/file_discovery/targets.json"
