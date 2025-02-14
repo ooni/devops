@@ -1,1 +1,2 @@
 enable_log_ingestion: false
+aws_region: eu-central-1

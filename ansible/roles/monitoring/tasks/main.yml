@@ -70,6 +70,19 @@
     owner: root
     group: root
 
+- name: Add cronjob for running the ecs-discovery script (DEV environment)
+  tags: monitoring, prometheus, cron
+  cron: 
+    name: "ECS Service Discovery"
+    user: root # TODO Discuss if it's a good Idea to use the root user for this
+    minute: "*/5"
+    hour: "*"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    job: "ecs-discovery.py --output-file /var/lib/prometheus/file_discovery/targets.json --secret-key {{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_dev')}} --access-key {{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_dev')}} --region eu-central-1"
+    state: present
+
 - name: Installs grafana
   tags: monitoring, grafana
   apt:
