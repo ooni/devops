@@ -189,6 +189,7 @@
       - python3-tables
       - python3-tqdm
       - python3-ujson
+      - python3-boto3
 
 - name: Install jupyter.service
   tags: jupyter
