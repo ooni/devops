@@ -47,7 +47,7 @@ parser.add_argument(
 parser.add_argument(
     "--output-file",
     type=str,
-    help="Where to write json file with targets. If set to 'None', it won't write to disk. Defaults to ./targets.json",
+    help="Where to write json file with targets. If not provided it won't write to disk",
     default="targets.json",
 )
 
@@ -252,7 +252,7 @@ def main(args : argparse.Namespace):
             exit(1)
     
     # If no show and no output file, do nothing 
-    if args.show and args.output_file == "None":
+    if args.show and args.output_file is None:
         return
     
     discovery = ECSDiscovery(region, secret_key, access_key) # type: ignore
@@ -263,7 +263,7 @@ def main(args : argparse.Namespace):
             logging.info(f"[Cluster {service.cluster}] ({service.container_name}) {service.private_ip}:{service.port}")
 
     # Save file to disk
-    if args.output_file != "None":
+    if args.output_file is not None:
         services_json = to_prom_json(services)
         path = Path(args.output_file)
         with path.open("w") as f:
