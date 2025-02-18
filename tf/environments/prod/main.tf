@@ -210,6 +210,10 @@ data "aws_ssm_parameter" "jwt_secret" {
   name = "/oonidevops/secrets/ooni_services/jwt_secret"
 }
 
+data "aws_ssm_parameter" "jwt_legacy_secret" {
+  name = "/oonidevops/secrets/ooni_services/jwt_legacy_secret"
+}
+
 data "aws_ssm_parameter" "oonipg_url" {
   name = "/oonidevops/secrets/ooni-tier0-postgres/postgresql_write_url"
 }
@@ -440,7 +444,7 @@ module "ooniapi_ooniprobe" {
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
-    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
+    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_legacy_secret.arn
     PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
   }
 
