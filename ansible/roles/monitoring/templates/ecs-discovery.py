@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#!/usr/bin/python3
 import argparse
 import dataclasses
 from typing import List, Dict, Any
