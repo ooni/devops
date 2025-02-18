@@ -210,7 +210,7 @@ data "aws_ssm_parameter" "jwt_secret" {
   name = "/oonidevops/secrets/ooni_services/jwt_secret"
 }
 
-data "aws_ssm_parameter" "jwt_legacy_secret" {
+data "aws_ssm_parameter" "jwt_secret_legacy" {
   name = "/oonidevops/secrets/ooni_services/jwt_secret_legacy"
 }
 
