@@ -53,6 +53,64 @@
     mode: 0644
     owner: root
 
+# Prometheus service discovery
+- name: Create service discovery user
+  tags: monitoring, prometheus
+  user:
+    name: "ecs_discovery"
+    comment: "(Created by Ansible) System user that runs the service discovery script to find scrape targets in ECS"
+    shell: "/sbin/nologin"
+    create_home: no
+    system: true
+
+- name: Create file-discovery directory for prometheus
+  tags: monitoring, prometheus
+  file:
+    path: /var/lib/prometheus/file_discovery
+    state: directory
+    owner: ecs_discovery
+    group: ecs_discovery
+
+- name: Add script for ecs-discovery 
+  tags: monitoring, prometheus
+  template: 
+    src: templates/ecs-discovery.py 
+    dest: /usr/bin/
+    mode: '555'
+    owner: ecs_discovery
+    group: ecs_discovery
+
+- name: Add settings file for ecs-discovery
+  tags: monitoring, prometheus
+  template:
+    src: templates/ecs_discovery_settings.sh
+    dest: /etc/ooni/ecs_discovery_settings.sh
+    mode: '400'
+    owner: ecs_discovery
+    group: ecs_discovery
+
+- name: Add the wrapper script for ecs-discovery
+  tags: monitoring, prometheus
+  template:
+    src: templates/ecs_discovery_wrapper.sh
+    dest: /usr/bin/ecs_discovery_wrapper.sh 
+    mode: '500'
+    owner: ecs_discovery
+    group: ecs_discovery
+
+- name: Add cronjob for running the ecs-discovery script (DEV environment)
+  tags: monitoring, prometheus, cron
+  cron: 
+    name: "ECS Service Discovery"
+    user: ecs_discovery
+    minute: "*/5"
+    hour: "*"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    job: "ecs_discovery_wrapper.sh 2>&1 | /usr/bin/logger -t [ECS_DISCOVERY]"
+    state: present
+
 - name: Installs grafana
   tags: monitoring, grafana
   apt:
@@ -141,6 +199,7 @@
       - python3-tables
       - python3-tqdm
       - python3-ujson
+      - python3-boto3
 
 - name: Install jupyter.service
   tags: jupyter
