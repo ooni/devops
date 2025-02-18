@@ -102,7 +102,7 @@
   tags: monitoring, prometheus, cron
   cron: 
     name: "ECS Service Discovery"
-    user: ecs_discovery # TODO Discuss if it's a good Idea to use the root user for this
+    user: ecs_discovery
     minute: "*/5"
     hour: "*"
     day: "*"
