@@ -377,7 +377,7 @@ module "ooniapi_reverseproxy_deployer" {
 
   service_name            = "reverseproxy"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "add-prom-export-rev-proxy"
   buildspec_path          = "ooniapi/services/reverseproxy/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
