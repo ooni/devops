@@ -88,6 +88,13 @@ ssh_users:
     comment: Sadia Nourin
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMPCgwEAxLlpo0tiM+jo4w9d1TmH2xKMJ4xVQc7DzZiQ sadia.nourin@live.com"
+  
+  julia-blues: 
+    login: julia-blues
+    comment: Julia K
+    keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICOM90NI0nUvQPNt/UkJ7TP0aCnwPUqr2FVHLXCopMrc jkempton@g.harvard.edu"]
+
+  
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, hynnot ]
 non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix]
