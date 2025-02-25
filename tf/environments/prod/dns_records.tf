@@ -1029,3 +1029,16 @@ resource "aws_route53_record" "airflow-prod-ooni-io-_a_" {
   type    = "A"
   zone_id = local.dns_zone_ooni_io
 }
+
+resource "aws_route53_record" "_atproto-ooni-org-_TXT_" {
+  name = "_atproto.ooni.org"
+  type = "TXT"
+  zone_id = local.dns_root_zone_ooni_org
+  ttl = "60"
+  records = ["did=did:plc:4ouqb2j2j377siam2gtot6ge"]
+}
+
+# Host: _atproto
+# Type: TXT
+# Value: did=did:plc:4ouqb2j2j377siam2gtot6ge
+# _atproto.ooni.org
