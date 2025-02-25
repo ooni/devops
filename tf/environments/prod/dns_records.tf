@@ -1037,8 +1037,3 @@ resource "aws_route53_record" "_atproto-ooni-org-_TXT_" {
   ttl = "60"
   records = ["did=did:plc:4ouqb2j2j377siam2gtot6ge"]
 }
-
-# Host: _atproto
-# Type: TXT
-# Value: did=did:plc:4ouqb2j2j377siam2gtot6ge
-# _atproto.ooni.org
