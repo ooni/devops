@@ -1,3 +1,3 @@
-prometheus_metrics_password: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/ooni_services/prometheus_metrics_password', profile='oonidevops_user_dev') }}"
+prometheus_metrics_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/ooni_services/prometheus_metrics_password', profile='oonidevops_user_dev') }}"
 admin_usernames: [ art, mehul, norbel, majakomel ]
 non_admin_usernames: [ agrabeli ]
