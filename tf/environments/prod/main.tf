@@ -169,7 +169,7 @@ module "oonipg" {
   # In order to do this we need to change the launch template of the ECS service
   # to deploy them specifically inside of the two allocated subnets as opposed
   # to picking a random IP in side of the full /8
-  allow_cidr_blocks     = [
+  allow_cidr_blocks = [
     "10.0.0.0/8",
     # airflow host
     "142.132.254.225/32",
@@ -659,7 +659,7 @@ module "ooniapi_frontend" {
 
 locals {
   ooniapi_frontend_alternative_domains = {
-    "api.ooni.org" : local.dns_root_zone_ooni_org
+    "api.ooni.org" : local.dns_root_zone_ooni_org,
     "0.th.ooni.org" : local.dns_root_zone_ooni_org,
     "1.th.ooni.org" : local.dns_root_zone_ooni_org,
     "2.th.ooni.org" : local.dns_root_zone_ooni_org,
@@ -667,6 +667,8 @@ locals {
     "4.th.ooni.org" : local.dns_root_zone_ooni_org,
     "5.th.ooni.org" : local.dns_root_zone_ooni_org,
     "6.th.ooni.org" : local.dns_root_zone_ooni_org,
+    "ams-pg.ooni.org" : local.dns_root_zone_ooni_org,
+    "bouncer.ooni.io" : local.dns_root_zone_ooni_io,
     "ooniauth.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "ooniprobe.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "oonirun.${local.environment}.ooni.io" : local.dns_zone_ooni_io,

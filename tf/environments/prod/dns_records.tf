@@ -1,27 +1,3 @@
-resource "aws_route53_record" "ams-pg-ooni-org-_A_" {
-  name    = "ams-pg.ooni.org"
-  records = ["142.93.237.101"]
-  ttl     = "1799"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_org
-}
-
-resource "aws_route53_record" "ams-pg-test-ooni-org-_AAAA_" {
-  name    = "ams-pg-test.ooni.org"
-  records = ["2a03:b0c0:2:d0::d86:1"]
-  ttl     = "1799"
-  type    = "AAAA"
-  zone_id = local.dns_root_zone_ooni_org
-}
-
-resource "aws_route53_record" "ams-pg-test-ooni-org-_A_" {
-  name    = "ams-pg-test.ooni.org"
-  records = ["188.166.93.143"]
-  ttl     = "1799"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_org
-}
-
 resource "aws_route53_record" "ams-slack-1-ooni-org-_A_" {
   name    = "ams-slack-1.ooni.org"
   records = ["37.218.247.98"]
@@ -457,14 +433,6 @@ resource "aws_route53_record" "b-collector-ooni-io-_A_" {
 resource "aws_route53_record" "b-web-connectivity-th-ooni-io-_A_" {
   name    = "b.web-connectivity.th.ooni.io"
   records = ["37.218.245.117"]
-  ttl     = "60"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "bouncer-ooni-io-_A_" {
-  name    = "bouncer.ooni.io"
-  records = ["37.218.245.90"]
   ttl     = "60"
   type    = "A"
   zone_id = local.dns_root_zone_ooni_io
@@ -1031,9 +999,9 @@ resource "aws_route53_record" "airflow-prod-ooni-io-_a_" {
 }
 
 resource "aws_route53_record" "_atproto-ooni-org-_TXT_" {
-  name = "_atproto.ooni.org"
-  type = "TXT"
+  name    = "_atproto.ooni.org"
+  type    = "TXT"
   zone_id = local.dns_root_zone_ooni_org
-  ttl = "60"
+  ttl     = "60"
   records = ["did=did:plc:4ouqb2j2j377siam2gtot6ge"]
 }
