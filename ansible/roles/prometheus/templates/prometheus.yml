@@ -65,7 +65,7 @@ scrape_configs:
     scrape_interval: 5s
     basic_auth:
       username: 'prom'
-      password: '{{ prometheus_metrics_password_prod }}'
+      password: '{{ prometheus_metrics_password }}'
     static_configs:
       - targets:
         - https://data1.htz-fsn.prod.ooni.nu/metrics/node_exporter
@@ -135,7 +135,7 @@ scrape_configs:
     metrics_path: "/metrics/clickhouse"
     basic_auth:
       username: 'prom'
-      password: '{{ prometheus_metrics_password_prod }}'
+      password: '{{ prometheus_metrics_password }}'
     static_configs:
       - targets:
         - data1.htz-fsn.prod.ooni.nu
@@ -165,7 +165,7 @@ scrape_configs:
     metrics_path: "/metrics"
     basic_auth:
       username: 'prom'
-      password: '{{ prometheus_metrics_password_prod }}'
+      password: '{{ prometheus_metrics_password }}'
     static_configs:
       - targets:
         - ooniauth.prod.ooni.io
@@ -188,7 +188,7 @@ scrape_configs:
     metrics_path: "/metrics"
     basic_auth:
       username: 'prom'
-      password: '{{ prometheus_metrics_password_prod }}'
+      password: '{{ prometheus_metrics_password }}'
     static_configs:
       - targets:
         - 0.do.th.prod.ooni.io
@@ -255,7 +255,7 @@ scrape_configs:
     scheme: https
     basic_auth:
       username: 'prom'
-      password: '{{ prometheus_metrics_password_dev }}'
+      password: '{{ prometheus_metrics_password }}'
     file_sd_configs:
       - files: 
         - '/var/lib/prometheus/file_discovery/*.json'

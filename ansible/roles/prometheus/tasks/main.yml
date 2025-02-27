@@ -31,5 +31,4 @@
     - prometheus
     - config
   vars:
-    prometheus_metrics_password_dev: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/ooni_services/prometheus_metrics_password', profile='oonidevops_user_dev') }}"
-    prometheus_metrics_password_prod: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/ooni_services/prometheus_metrics_password', profile='oonidevops_user_prod') }}"
+    prometheus_metrics_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/ooni_services/prometheus_metrics_password', profile='oonidevops_user_dev') }}"
