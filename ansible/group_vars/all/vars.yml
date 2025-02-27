@@ -43,4 +43,4 @@ admin_usernames: [art, mehul, luis, hynnot]
 root_usernames: [art, mehul, luis, hynnot]
 non_admin_usernames: []
 
-prometheus_metrics_password: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/ooni_services/prometheus_metrics_password', profile='oonidevops_user_prod') }}"
+prometheus_metrics_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/ooni_services/prometheus_metrics_password', profile='oonidevops_user_prod') }}"
