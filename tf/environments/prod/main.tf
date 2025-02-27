@@ -223,25 +223,6 @@ data "aws_ssm_parameter" "prometheus_metrics_password" {
   name = "/oonidevops/ooni_services/prometheus_metrics_password"
 }
 
-resource "random_password" "prometheus_metrics_password" {
-  length  = 32
-  special = false
-}
-
-resource "aws_secretsmanager_secret" "prometheus_metrics_password" {
-  name = "oonidevops/ooni_services/prometheus_metrics_password"
-  tags = local.tags
-}
-
-resource "aws_secretsmanager_secret_version" "prometheus_metrics_password" {
-  secret_id     = aws_secretsmanager_secret.prometheus_metrics_password.id
-  secret_string = random_password.prometheus_metrics_password.result
-}
-
-data "aws_secretsmanager_secret_version" "prometheus_metrics_password" {
-  secret_id = aws_secretsmanager_secret.prometheus_metrics_password.id
-}
-
 resource "aws_secretsmanager_secret" "oonipg_url" {
   name = "oonidevops/ooni-tier0-postgres/postgresql_url"
   tags = local.tags
