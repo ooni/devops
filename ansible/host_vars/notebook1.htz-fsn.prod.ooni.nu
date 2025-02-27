@@ -88,6 +88,11 @@ ssh_users:
     comment: Sadia Nourin
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMPCgwEAxLlpo0tiM+jo4w9d1TmH2xKMJ4xVQc7DzZiQ sadia.nourin@live.com"
+  jonath8:
+    login: jonath8
+    comment: Jonathan Nelson
+    keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQD47/1FsCjXpSEqRKRyQcOzGzhxJfCki8LyjXkNKIx2dRZk7RZyD/pt8Wgyynt6VWyrT+O+BMPBeG4GvVreAQT83B3XcuPCKDLM093D7s88yHgjGy5Ncf/rghdhTpxR07NqgmXCZGUGFP0wmK+wj/LCXdLDQ7Nv770OFkluvOh36pcOao6t+/sozFtfL0gYaXBir6wmLUpkAWN8tdaPrh1Y7vPoWvu3N3XFoA4oFoCtbdPgfQLkMK+G4Yb6tRBQtGgJt/bpyDU5Lmb5Uu/SP77gF6zgeEP0AW4JFj/GwDaN+OhNK0O93GbFEZ5yoDtsXAvVi5O1smdF01DajY8vzNp4fD77TrpuXyl9ZNnbB0CGnQX3F/REvgxu3N1Y/7y4R6SUuj4fA1MvpNEVtQoAiubfSBO19HHq8C8q0Xpr4veoe/b+hzWyc99I70APRI4z45TQUWEfXyEgOn7MPGJjfqTQVlVQVd+kZaenjoTIuMf/HMY2MyeH0JM6BaG0yFIPqis= jonathn@uoregon.edu"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, hynnot ]
 non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix]
