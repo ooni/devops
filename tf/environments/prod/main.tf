@@ -431,6 +431,17 @@ module "ooni_clickhouse_proxy" {
   )
 }
 
+resource "aws_route53_record" "clickhouse_proxy_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "clickhouseproxy.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_clickhouse_proxy.aws_instance_public_dns
+  ]
+}
+
 
 ### OONI Services Clusters
 
