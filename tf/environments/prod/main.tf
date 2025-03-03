@@ -294,31 +294,6 @@ module "ooni_th_droplet" {
   dns_zone_ooni_io = local.dns_zone_ooni_io
 }
 
-module "ooni_backendproxy" {
-  source = "../../modules/ooni_backendproxy"
-
-  stage = local.environment
-
-  vpc_id              = module.network.vpc_id
-  subnet_id           = module.network.vpc_subnet_public[0].id
-  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
-  dns_zone_ooni_io    = local.dns_zone_ooni_io
-
-  key_name      = module.adm_iam_roles.oonidevops_key_name
-  instance_type = "t3.micro"
-
-  backend_url        = "https://backend-fsn.ooni.org/"
-  wcth_addresses     = module.ooni_th_droplet.droplet_ipv4_address
-  wcth_domain_suffix = "th.ooni.org"
-  clickhouse_url     = "backend-fsn.ooni.org"
-  clickhouse_port    = "9000"
-
-  tags = merge(
-    local.tags,
-    { Name = "ooni-tier0-backendproxy" }
-  )
-}
-
 module "ooniapi_reverseproxy_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
