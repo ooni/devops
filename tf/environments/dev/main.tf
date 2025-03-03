@@ -196,23 +196,9 @@ data "aws_ssm_parameter" "oonipg_url" {
   name = "/oonidevops/secrets/ooni-tier0-postgres/postgresql_write_url"
 }
 
-resource "random_password" "prometheus_metrics_password" {
-  length  = 32
-  special = false
-}
-
-resource "aws_secretsmanager_secret" "prometheus_metrics_password" {
-  name = "oonidevops/ooni_services/prometheus_metrics_password"
-  tags = local.tags
-}
-
-resource "aws_secretsmanager_secret_version" "prometheus_metrics_password" {
-  secret_id     = aws_secretsmanager_secret.prometheus_metrics_password.id
-  secret_string = random_password.prometheus_metrics_password.result
-}
-
-data "aws_secretsmanager_secret_version" "prometheus_metrics_password" {
-  secret_id = aws_secretsmanager_secret.prometheus_metrics_password.id
+# Manually managed with the AWS console
+data "aws_ssm_parameter" "prometheus_metrics_password" {
+  name = "/oonidevops/ooni_services/prometheus_metrics_password"
 }
 
 resource "aws_secretsmanager_secret" "oonipg_url" {
@@ -281,7 +267,7 @@ module "ooni_th_droplet" {
   instance_size     = "s-1vcpu-1gb"
   droplet_count     = 1
   deployer_key      = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
-  metrics_password  = data.aws_secretsmanager_secret_version.prometheus_metrics_password.secret_string
+  metrics_password  = data.aws_ssm_parameter.prometheus_metrics_password.arn
   ssh_keys = [
     "3d:81:99:17:b5:d1:20:a5:fe:2b:14:96:67:93:d6:34",
     "f6:4b:8b:e2:0e:d2:97:c5:45:5c:07:a6:fe:54:60:0e"
@@ -357,7 +343,7 @@ module "ooniapi_ooniprobe" {
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
-    PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
   }
 
   ooniapi_service_security_groups = [
@@ -377,7 +363,7 @@ module "ooniapi_reverseproxy_deployer" {
 
   service_name            = "reverseproxy"
   repo                    = "ooni/backend"
-  branch_name             = "add-prom-export-rev-proxy"
+  branch_name             = "master"
   buildspec_path          = "ooniapi/services/reverseproxy/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
@@ -405,7 +391,7 @@ module "ooniapi_reverseproxy" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_secrets = {
-    PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
   }
 
   task_environment = {
@@ -529,7 +515,7 @@ module "ooniapi_oonirun" {
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
-    PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
   }
 
   ooniapi_service_security_groups = [
@@ -577,7 +563,7 @@ module "ooniapi_oonifindings" {
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
-    PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
   }
 
@@ -626,7 +612,7 @@ module "ooniapi_ooniauth" {
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
-    PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
 
     AWS_SECRET_ACCESS_KEY = module.ooniapi_user.aws_secret_access_key_arn
     AWS_ACCESS_KEY_ID     = module.ooniapi_user.aws_access_key_id_arn
@@ -693,7 +679,7 @@ module "ooniapi_oonimeasurements" {
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
-    PROMETHEUS_METRICS_PASSWORD = aws_secretsmanager_secret_version.prometheus_metrics_password.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
   }
 
