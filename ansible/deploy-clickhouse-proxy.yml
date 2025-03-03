@@ -2,6 +2,7 @@
 - name: Deploy clickhouse proxy
   hosts:
     - clickhouseproxy.dev.ooni.io
+    - clickhouseproxy.prod.ooni.io
   become: true
   roles:
     - role: bootstrap
@@ -9,6 +10,7 @@
       vars: 
         ssl_domains: 
           - clickhouseproxy.dev.ooni.io
+          - clickhouseproxy.prod.ooni.io
     - role: nginx
       tags: nginx
     - role: clickhouse_proxy
