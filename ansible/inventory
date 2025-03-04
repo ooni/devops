@@ -34,3 +34,4 @@ ams-ps.ooni.nu
 
 [aws-proxy]
 clickhouseproxy.dev.ooni.io
+clickhouseproxy.prod.ooni.io
