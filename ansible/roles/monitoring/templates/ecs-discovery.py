@@ -50,6 +50,12 @@ parser.add_argument(
     help="Where to write json file with targets. If not provided it won't write to disk",
     default="targets.json",
 )
+parser.add_argument(
+    "--env",
+    type=str,
+    help="Which environment are we scraping? dev/prod",
+    default="dev"
+)
 
 
 @dataclasses.dataclass
@@ -213,7 +219,7 @@ class ECSDiscovery:
             private_ip = instances[service.ec2_instance_id]["PrivateIpAddress"]
             service.private_ip = private_ip
 
-def to_prom_json(services : List[ECSService]) -> List[Dict[str, Any]]:
+def to_prom_json(services : List[ECSService], env : str) -> List[Dict[str, Any]]:
     """
     Convert a list of service objects into a prometheus-compatible list of dict
     """
@@ -225,10 +231,11 @@ def to_prom_json(services : List[ECSService]) -> List[Dict[str, Any]]:
                 f"{service.private_ip}:{service.port}"
             ],
             "labels": {
-                "job" : service.container_name,
+                "task_name" : service.container_name,
                 "instance" : service.ec2_instance_id,
                 "task" : service.task_arn,
-                "date_discovered" : service.date_discovered.isoformat()
+                "date_discovered" : service.date_discovered.isoformat(),
+                "env" : env
             }
         })
 
@@ -244,7 +251,7 @@ def main(args : argparse.Namespace):
     access_key = args.access_key or os.environ.get("AWS_ACCESS_KEY_ID")
     region = args.region or os.environ.get("AWS_REGION")
 
-    # Check that all arguments are passed 
+   
     mandatory_args = [('secret key', secret_key), ('access key', access_key), ('region', region)]
     for (arg_name, arg_val) in mandatory_args:
         if arg_val is None:
@@ -263,8 +270,9 @@ def main(args : argparse.Namespace):
             logging.info(f"[Cluster {service.cluster}] ({service.container_name}) {service.private_ip}:{service.port}")
 
     # Save file to disk
+    env = args.env
     if args.output_file is not None:
-        services_json = to_prom_json(services)
+        services_json = to_prom_json(services, env)
         path = Path(args.output_file)
         with path.open("w") as f:
             json.dump(services_json, f)

@@ -98,7 +98,7 @@
     owner: ecs_discovery
     group: ecs_discovery
 
-- name: Add cronjob for running the ecs-discovery script (DEV environment)
+- name: Add cronjob for running the ecs-discovery script 
   tags: monitoring, prometheus, cron
   cron: 
     name: "ECS Service Discovery"
