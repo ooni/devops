@@ -101,14 +101,27 @@
 - name: Add cronjob for running the ecs-discovery script (DEV environment)
   tags: monitoring, prometheus, cron
   cron: 
-    name: "ECS Service Discovery"
+    name: "ECS Service Discovery (dev)"
     user: ecs_discovery
     minute: "*/5"
     hour: "*"
     day: "*"
     month: "*"
     weekday: "*"
-    job: "ecs_discovery_wrapper.sh 2>&1 | /usr/bin/logger -t [ECS_DISCOVERY]"
+    job: "ecs_discovery_wrapper.sh --env dev 2>&1 | /usr/bin/logger -t [ECS_DISCOVERY]"
+    state: present
+
+- name: Add cronjob for running the ecs-discovery script (PROD environment)
+  tags: monitoring, prometheus, cron
+  cron: 
+    name: "ECS Service Discovery (prod)"
+    user: ecs_discovery
+    minute: "*/5"
+    hour: "*"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    job: "ecs_discovery_wrapper.sh --env prod 2>&1 | /usr/bin/logger -t [ECS_DISCOVERY]"
     state: present
 
 - name: Installs grafana
