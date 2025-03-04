@@ -712,6 +712,7 @@ locals {
     "ams-pg.ooni.org" : local.dns_root_zone_ooni_org,
     "bouncer.ooni.io" : local.dns_root_zone_ooni_io,
     "registry.ooni.io" : local.dns_root_zone_ooni_io,
+    "registry.proteus.ooni.io" : local.dns_root_zone_ooni_io,
     "orchestra.ooni.io" : local.dns_root_zone_ooni_io,
     "orchestrate.ooni.io" : local.dns_root_zone_ooni_io,
     "proteus.ooni.io" : local.dns_root_zone_ooni_io,
