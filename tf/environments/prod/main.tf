@@ -802,3 +802,13 @@ module "ansible_controller" {
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
 }
+
+### Ooni monitoring
+
+module "ooni_monitoring" {
+  source      = "../../modules/ooni_monitoring"
+  environment = local.environment
+  aws_region  = var.aws_region
+
+  tags = local.tags
+}

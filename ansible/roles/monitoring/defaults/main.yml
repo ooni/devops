@@ -5,4 +5,7 @@ ecs_aws_region: eu-central-1
 monitoring_secret_key_dev: "{{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_dev')}}"
 monitoring_access_key_dev: "{{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_dev')}}"
 
-ecs_targets_file: "/var/lib/prometheus/file_discovery/targets.json"
+monitoring_secret_key_prod: "{{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_prod')}}"
+monitoring_access_key_prod: "{{lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_prod')}}"
+
+ecs_targets_dir: "/var/lib/prometheus/file_discovery"
