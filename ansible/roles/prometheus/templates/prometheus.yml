@@ -238,20 +238,20 @@ scrape_configs:
       - source_labels: [__address__]
         regex: "([0-9\\.]+):([0-9]+)" # <ip>:<port>
         replacement: "{{clickhouse_proxy_host}}:9200/${1}/${2}/metrics"
-        target_label: "proxy_host"
+        target_label: "__proxy_host"
         action: "replace"
-      - source_labels: [proxy_host, env]
+      - source_labels: [__proxy_host, env]
         separator: ";"
         regex: "([^;]*)ENV([^;]*);(.*)"
         replacement: "$1$3$2"
-        target_label: "proxy_host"
+        target_label: "__proxy_host"
         action: "replace"
-      - source_labels: [proxy_host]
+      - source_labels: [__proxy_host]
         regex: "([^/]*)/(.*)"
         replacement: "$1"
         target_label: "__address__"
         action: "replace"
-      - source_labels: [proxy_host]
+      - source_labels: [__proxy_host]
         regex: "([^/]*)/(.*)"
         replacement: "/$2"
         target_label: "__metrics_path__"
@@ -278,23 +278,23 @@ scrape_configs:
       - source_labels: [__address__]
         regex: "([0-9\\.]+):([0-9]+)" # <ip>:<port>
         replacement: "{{clickhouse_proxy_host}}:9200/${1}/${2}/metrics" # proxy.org:9200/<private_ip>/<port>/metrics
-        target_label: "proxy_host"
+        target_label: "__proxy_host"
         action: "replace"
       # Change the environment part in proxy host
-      - source_labels: [proxy_host, env]
+      - source_labels: [__proxy_host, env]
         separator: ";"
-        regex: "([^;]*)ENV([^;]*);(.*)" # proxy_host;env
+        regex: "([^;]*)ENV([^;]*);(.*)" # __proxy_host;env
         replacement: "$1$3$2"
-        target_label: "proxy_host"
+        target_label: "__proxy_host"
         action: "replace"
       # Change the address where to send the scrape request to
-      - source_labels: [proxy_host]
+      - source_labels: [__proxy_host]
         regex: "([^/]*)/(.*)"
         replacement: "$1"
         target_label: "__address__"
         action: "replace"
       # Change the metrics path to include ip address and /metrics path
-      - source_labels: [proxy_host]
+      - source_labels: [__proxy_host]
         regex: "([^/]*)/(.*)"
         replacement: "/$2"
         target_label: "__metrics_path__"
