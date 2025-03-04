@@ -256,6 +256,8 @@ scrape_configs:
         replacement: "/$2"
         target_label: "__metrics_path__"
         action: "replace"
+      - regex: "date_discovered"
+        action: labeldrop
 
   # Scrape tasks in ECS using file based discovery, useful for application level metrics
   - job_name: "ecs-tasks"
@@ -299,4 +301,6 @@ scrape_configs:
         replacement: "/$2"
         target_label: "__metrics_path__"
         action: "replace"
+      - regex: "date_discovered"
+        action: labeldrop
 ...
