@@ -97,9 +97,14 @@ ssh_users:
     comment: Jonathan Nelson
     keys:
       - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQD47/1FsCjXpSEqRKRyQcOzGzhxJfCki8LyjXkNKIx2dRZk7RZyD/pt8Wgyynt6VWyrT+O+BMPBeG4GvVreAQT83B3XcuPCKDLM093D7s88yHgjGy5Ncf/rghdhTpxR07NqgmXCZGUGFP0wmK+wj/LCXdLDQ7Nv770OFkluvOh36pcOao6t+/sozFtfL0gYaXBir6wmLUpkAWN8tdaPrh1Y7vPoWvu3N3XFoA4oFoCtbdPgfQLkMK+G4Yb6tRBQtGgJt/bpyDU5Lmb5Uu/SP77gF6zgeEP0AW4JFj/GwDaN+OhNK0O93GbFEZ5yoDtsXAvVi5O1smdF01DajY8vzNp4fD77TrpuXyl9ZNnbB0CGnQX3F/REvgxu3N1Y/7y4R6SUuj4fA1MvpNEVtQoAiubfSBO19HHq8C8q0Xpr4veoe/b+hzWyc99I70APRI4z45TQUWEfXyEgOn7MPGJjfqTQVlVQVd+kZaenjoTIuMf/HMY2MyeH0JM6BaG0yFIPqis= jonathn@uoregon.edu"
+  johnbauer:
+    login: johnbauer
+    comment: John Bauer
+    keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCwOXC37V9BEsNrwo6sZERtdX81It92bsJymJKiXFBjSIMGUqYfWYhhgh/28rkaohlml299RkVwmVPFQ5TKJ5tmpYnPNjssmiG+PaEkFHG6S9tMzaLeIvIcR5a2e2Nlyv5I7B4yqaLA0U4s5oyQsl1tZqJ+NB4fEMkptby7a17sQ32hqHnNxTR43lw8WnfrkalpLyoTPl9biWLmXGkDlZdeR6KVGnyDervgIeZppx8qqqLnBsGSfMouwLAMJ82yO4bYf/bTh6H4A18nlZ210BkRF00XfkTN2Q/52jV0R2IBK+3oENztDk6rzViWKdC9dDGkLE0GA06cKMYCTfc+O+YjjH9ge4/4eH+Yfyop25mmjut8aketk3nP4xf5fyzmJww30vLmCKhrcpJClfZ8CNbhLN/UL6FupAuzQ21t5Jhy2jTbMMTKdiUgIXDZfhCYB+cDDtDOOdoVdQybxdaJH68b1/ImDTPn4lDUmHmrhmJgY45haJZ0N8uB+bMJtpatKoU="
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, hynnot ]
-non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8]
+non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
