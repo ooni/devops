@@ -812,6 +812,10 @@ module "ansible_controller" {
   key_name  = module.adm_iam_roles.oonidevops_key_name
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
+
+  tags = {
+    Environment = local.environment
+  }
 }
 
 ### Ooni monitoring
