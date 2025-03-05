@@ -800,6 +800,9 @@ module "codesigning" {
   subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
   subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
   key_name           = module.adm_iam_roles.oonidevops_key_name
+  tags = {
+    Environment = local.environment
+  }
 }
 
 ## Ansible controller setup
