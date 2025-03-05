@@ -1,12 +1,15 @@
 locals {
-  name                 = "ooni-tier0-api-frontend"
   direct_domain_suffix = "${var.stage}.ooni.io"
 }
 
 resource "aws_alb" "ooniapi" {
-  name            = local.name
+  name            = "ooni-api-frontend"
   subnets         = var.subnet_ids
   security_groups = var.ooniapi_service_security_groups
+
+  lifecycle {
+    create_before_destroy = true
+  }
 
   tags = var.tags
 }
