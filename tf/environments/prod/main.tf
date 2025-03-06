@@ -817,6 +817,8 @@ module "ansible_controller" {
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
 
+  monitoring_sg_ids = [module.ooni_clickhouse_proxy.ec2_sg_id]
+
   tags = {
     Environment = local.environment
   }
