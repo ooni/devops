@@ -26,9 +26,3 @@ variable "tags" {
   default     = {}
   type        = map(string)
 }
-
-variable "monitoring_sg_ids" {
-  description = "Ids of the security groups used for monitoring"
-  default = []
-  type = list(string)
-}
