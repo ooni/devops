@@ -800,6 +800,7 @@ module "codesigning" {
   subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
   subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
   key_name           = module.adm_iam_roles.oonidevops_key_name
+  monitoring_sg_ids = [module.ooni_clickhouse_proxy.ec2_sg_id]
   tags = {
     Environment = local.environment
   }
@@ -815,6 +816,8 @@ module "ansible_controller" {
   key_name  = module.adm_iam_roles.oonidevops_key_name
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
+
+  monitoring_sg_ids = [module.ooni_clickhouse_proxy.ec2_sg_id]
 
   tags = {
     Environment = local.environment

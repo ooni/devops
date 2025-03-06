@@ -11,6 +11,13 @@ resource "aws_security_group" "ansible_ctrl_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    protocol = "tcp"
+    from_port = 9100
+    to_port = 9100
+    security_groups = var.monitoring_sg_ids
+  }
+
   egress {
     from_port = 0
     to_port   = 0

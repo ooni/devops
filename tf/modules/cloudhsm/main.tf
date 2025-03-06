@@ -26,6 +26,13 @@ resource "aws_security_group" "hsm" {
     cidr_blocks = var.subnet_cidr_blocks
   }
 
+  ingress {
+    protocol = "tcp"
+    from_port = 9100
+    to_port = 9100
+    security_groups = var.monitoring_sg_ids
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

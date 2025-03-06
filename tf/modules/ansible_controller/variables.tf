@@ -25,3 +25,8 @@ variable "dns_zone_ooni_io" {
   description = "id of the DNS zone for ooni_io"
 }
 
+variable "monitoring_sg_ids" {
+  description = "Ids of the security groups used for monitoring"
+  default = []
+  type = list(string)
+}
