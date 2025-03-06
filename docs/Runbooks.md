@@ -1153,3 +1153,22 @@ ENGINE = ReplicatedReplacingMergeTree(
 PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx) ORDER BY (measurement_uid, observation_idx, measurement_start_time, hostname) SETTINGS index_granularity = 8192
 ```
+
+### Adding users to notebook server
+
+In order to add new users to the jupyterlab notebook server hosted
+`notebook.ooni.org` the steps are:
+
+1. Open a PR adding an entry to this list:
+   https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook1.htz-fsn.prod.ooni.nu (we need ssh key, email and username)
+2. An OONI core team member will run:
+```
+./play deploy-bootstrap.yml -l notebook1.htz-fsn.prod.ooni.nu --diff -i inventory
+```
+3. An OONI core team member logs into `notebook1.htz-fsn.prod.ooni.nu` and runs:
+```
+sudo passwd NEWUSERNAME
+```
+and sets the password of the new user to a randomly generated password prefixed with the string `CHANGEME`
+4. This password is sent privately to the new user and they are told to login via ssh using their key to update the password
+5. This user is now able to login with the password they have chosen via https://notebook.ooni.org/
