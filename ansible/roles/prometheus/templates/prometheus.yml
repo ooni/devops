@@ -269,6 +269,9 @@ scrape_configs:
         secret_key: "{{prometheus_aws_secret_key_prod}}"
         region: "eu-central-1"
         port: 9100  
+        filters:
+          - name: instance-state-name
+            values: ['running']
     relabel_configs: # Change the host to the proxy host with relabeling
       *ec2_relabeling
 
