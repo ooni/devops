@@ -70,3 +70,9 @@ variable "monitoring_sg_ids" {
 variable "node_exporter_port" {
   default = "9100"
 }
+
+variable "monitoring_active" {
+  description = "If the monitoring system should consider cluster machines. Set it to 'true' to activate it, anything else to deactivate it"
+  default = "true"
+  type = string
+}

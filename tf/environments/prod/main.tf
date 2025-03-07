@@ -803,6 +803,7 @@ module "codesigning" {
   tags = {
     Environment = local.environment
   }
+  monitoring_active = "false"
 }
 
 ## Ansible controller setup
@@ -821,6 +822,8 @@ module "ansible_controller" {
   tags = {
     Environment = local.environment
   }
+
+  monitoring_active = "false"
 }
 
 ### Ooni monitoring

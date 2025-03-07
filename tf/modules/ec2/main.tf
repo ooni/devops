@@ -89,7 +89,7 @@ resource "aws_instance" "ooni_ec2" {
     create_before_destroy = true
   }
 
-  tags = var.tags
+  tags = merge(var.tags, {MonitoringActive = var.monitoring_active})
 }
 
 resource "aws_alb_target_group" "ooni_ec2" {

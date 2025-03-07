@@ -228,6 +228,8 @@ scrape_configs:
         filters: &instance_filters
           - name: instance-state-name
             values: ['running']
+          - name: tag:MonitoringActive
+            values: ['true']
     relabel_configs: &ec2_relabeling # Change the host to the proxy host with relabeling
       - source_labels: [__meta_ec2_tag_Environment] # take environment from tags
         target_label: env

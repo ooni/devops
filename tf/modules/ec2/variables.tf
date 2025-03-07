@@ -63,3 +63,9 @@ variable "egress_rules" {
 variable "tg_prefix" {
     description = "target group prefix. Will be prefixed with `oo`, example: bkprx -> oobkprx"
 }
+
+variable "monitoring_active" {
+  description = "If the monitoring system should consider this machine. Set it to 'true' to activate it, anything else to deactivate it"
+  default = "true"
+  type = string
+}
