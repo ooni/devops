@@ -216,18 +216,19 @@ scrape_configs:
         - backend-hel.ooni.org:444
 
   # EC2 instances monitoring: 
-  - job_name: 'ooni-aws-ec2'
+  - job_name: 'ooni-aws-ec2-dev'
     scrape_interval: 5s
     scheme: https 
     metrics_path: "/metrics" 
-
-    # Node level metrics for cluster nodes
     ec2_sd_configs:
       - access_key: "{{prometheus_aws_access_key_dev}}" 
         secret_key: "{{prometheus_aws_secret_key_dev}}"
         region: "eu-central-1"
-        port: 9100 # should be the proxy 
-    relabel_configs: # Change the host to the proxy host with relabeling
+        port: 9100  
+        filters: &instance_filters
+          - name: instance-state-name
+            values: ['running']
+    relabel_configs: &ec2_relabeling # Change the host to the proxy host with relabeling
       - source_labels: [__meta_ec2_tag_Environment] # take environment from tags
         target_label: env
       - source_labels: [__address__]
@@ -240,7 +241,7 @@ scrape_configs:
         replacement: "{{clickhouse_proxy_host}}:9200/${1}/${2}/metrics"
         target_label: "__proxy_host"
         action: "replace"
-      - source_labels: [__proxy_host, env]
+      - source_labels: [__proxy_host, env] # Change ENV substr to value of env, find clickhouse proxy host
         separator: ";"
         regex: "([^;]*)ENV([^;]*);(.*)"
         replacement: "$1$3$2"
@@ -256,8 +257,26 @@ scrape_configs:
         replacement: "/$2"
         target_label: "__metrics_path__"
         action: "replace"
+      - source_labels: [job]
+        target_label: job
+        replacement: "ooni-aws-ec2"
+        action: "replace"
       - regex: "date_discovered"
         action: labeldrop
+
+  - job_name: 'ooni-aws-ec2-prod'
+    scrape_interval: 5s
+    scheme: https 
+    metrics_path: "/metrics" 
+    ec2_sd_configs:
+      - access_key: "{{prometheus_aws_access_key_prod}}" 
+        secret_key: "{{prometheus_aws_secret_key_prod}}"
+        region: "eu-central-1"
+        port: 9100  
+        filters: 
+          *instance_filters
+    relabel_configs: # Change the host to the proxy host with relabeling
+      *ec2_relabeling
 
   # Scrape tasks in ECS using file based discovery, useful for application level metrics
   - job_name: "ecs-tasks"
