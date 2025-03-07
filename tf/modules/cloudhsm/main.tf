@@ -58,7 +58,7 @@ resource "aws_instance" "codesign_box" {
                 rm cloudhsm-pkcs11.rpm
                 EOF
 
-  tags = merge(var.tags, { Name = "codesign-box" })
+  tags = merge(var.tags, { Name = "codesign-box" , MonitoringActive = var.monitoring_active})
 
   // NOTE: remove the ignore_changes rule to deploy 
   lifecycle {
@@ -88,6 +88,7 @@ resource "aws_launch_template" "codesign_box_template" {
 
     tags = {
       Name = "codesign-box"
+      MonitoringActive = var.monitoring_active
     }
   }
 

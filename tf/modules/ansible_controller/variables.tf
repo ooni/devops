@@ -30,3 +30,9 @@ variable "monitoring_sg_ids" {
   default = []
   type = list(string)
 }
+
+variable "monitoring_active" {
+  description = "If the monitoring system should consider the ansible controller machine. Set it to 'true' to activate it, anything else to deactivate it"
+  default = "true"
+  type = string
+}
