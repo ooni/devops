@@ -201,6 +201,13 @@ resource "aws_codepipeline" "ooniapi" {
     aws_codebuild_project.ooniapi
   ]
 
+  trigger {
+    provider_type         = "CodeStarSourceConnection"
+    git_configuration {
+      source_action_name = "Source"
+    }
+  }
+
   stage {
     action {
 
