@@ -183,7 +183,12 @@ resource "aws_launch_template" "container_host" {
 
   tag_specifications {
     resource_type = "instance"
-    tags          = var.tags
+    tags = merge(
+      {
+        MonitoringActive : var.monitoring_active
+      },
+      var.tags
+    )
   }
 }
 

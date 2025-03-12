@@ -26,3 +26,9 @@ variable "tags" {
   default     = {}
   type        = map(string)
 }
+
+variable "monitoring_active" {
+  description = "If the monitoring system should consider the HSM machine. Set it to 'true' to activate it, anything else to deactivate it"
+  default = "true"
+  type = string
+}

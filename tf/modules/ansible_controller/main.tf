@@ -64,7 +64,7 @@ resource "aws_instance" "ansible_controller" {
 
   vpc_security_group_ids = [aws_security_group.ansible_ctrl_sg.id]
 
-  tags = merge(var.tags, { Name = "ansible-controller" })
+  tags = merge({ Name = "ansible-controller", MonitoringActive = var.monitoring_active}, var.tags)
 }
 
 resource "aws_route53_record" "oonith_service_alias" {
