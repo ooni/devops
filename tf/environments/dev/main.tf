@@ -365,6 +365,7 @@ module "ooniapi_reverseproxy_deployer" {
   service_name            = "reverseproxy"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  trigger_path            = "ooniapi/services/reverseproxy"
   buildspec_path          = "ooniapi/services/reverseproxy/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
@@ -539,6 +540,7 @@ module "ooniapi_oonifindings_deployer" {
   service_name            = "oonifindings"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  trigger_path            = "ooniapi/services/oonifindings"
   buildspec_path          = "ooniapi/services/oonifindings/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
@@ -655,6 +657,7 @@ module "ooniapi_oonimeasurements_deployer" {
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  trigger_path            = "ooniapi/services/oonimeasurements"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
