@@ -22,6 +22,10 @@ variable "branch_name" {
   default = "main"
 }
 
+variable "trigger_tag" {
+  description = "tag filters to use to trigger pipeline eg. release-1.0"
+}
+
 variable "repo" {
   default = "ooni/backend"
 }

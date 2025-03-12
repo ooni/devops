@@ -202,9 +202,20 @@ resource "aws_codepipeline" "ooniapi" {
   ]
 
   trigger {
-    provider_type         = "CodeStarSourceConnection"
+    provider_type = "CodeStarSourceConnection"
+
     git_configuration {
       source_action_name = "Source"
+      
+      push {
+        branches {
+          includes = [var.branch_name]
+        }
+        file_paths {
+          includes = [var.trigger_path]
+          excludes = ["**/README.md"]
+        }
+      }
     }
   }
 
