@@ -1,0 +1,13 @@
+---
+ssl_domain: backend-hel.ooni.org
+collector_id: 2
+clickhouse_url: "" # fetch from aws secrets
+bucket_name: ooni-data-eu-fra-test
+public_bucket_name: ooni-data-eu-fra-test
+collectors: 
+  - "backend-hel.ooni.org"
+fastpath_version: 0.86~pr831-395
+analysis_version: 1.12~pr836-413
+deb_bucket_name: ooni-internal-deb
+deb_server_name: deb-ci.ooni.org
+apt_cache_valid_time: 28800 # 8h

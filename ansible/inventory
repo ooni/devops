@@ -1,2 +1,37 @@
-[all]
+[all:children]
+htz_fsn
+ghs_ams
+
+## Role tags
+
+[clickhouse]
+notebook1.htz-fsn.prod.ooni.nu
+data1.htz-fsn.prod.ooni.nu
+data3.htz-fsn.prod.ooni.nu
+
+[airflow]
+data1.htz-fsn.prod.ooni.nu
+
+## Location tags
+
+[htz_fsn]
 monitoring.ooni.org
+notebook1.htz-fsn.prod.ooni.nu
+data1.htz-fsn.prod.ooni.nu
+data3.htz-fsn.prod.ooni.nu
+#backend-fsn.ooni.org
+
+[htz_hel]
+backend-hel.ooni.org
+
+[ghs_ams]
+openvpn-server1.ooni.io
+ams-slack-1.ooni.org
+ams-ps.ooni.nu
+# currently disabled due to them not supporting ed25519 keys
+#mia-echoth.ooni.nu
+#mia-httpth.ooni.nu
+
+[aws-proxy]
+clickhouseproxy.dev.ooni.io
+clickhouseproxy.prod.ooni.io

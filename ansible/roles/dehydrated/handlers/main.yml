@@ -1,0 +1,15 @@
+- name: reload nginx
+  service:
+    name: nginx
+    state: reloaded
+
+- name: reload nftables
+  service: 
+    name: nftables
+    state: reloaded
+
+- name: restart dehydrated
+  service:
+    name: dehydrated
+    state: restarted
+    enabled: yes

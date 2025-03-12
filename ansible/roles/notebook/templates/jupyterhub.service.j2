@@ -1,0 +1,17 @@
+# JupyterHub systemd service
+[Unit]
+
+[Service]
+User=root
+Restart=always
+WorkingDirectory={{ jupyterhub_runtime_dir}}/state
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+# Run upgrade-db before starting, in case Hub version has changed
+# This is a no-op when no db exists or no upgrades are needed
+ExecStart={{ miniconda_install_dir }}/bin/python -m jupyterhub.app -f {{ jupyterhub_config_dir }}/config.py --upgrade-db
+
+[Install]
+# Start service when system boots
+WantedBy=multi-user.target

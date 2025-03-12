@@ -1,0 +1,85 @@
+- name: write bashrc template
+  ansible.builtin.template:
+    src: bashrc
+    dest: /etc/skel/.bashrc
+    owner: root
+    group: root
+    mode: u=rw,g=r,o=r
+
+- ansible.builtin.include_role:
+    name: ssh_users
+  tags:
+    - ssh_users
+
+- name: Set the hostname to inventory_hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Install common packages
+  ansible.builtin.apt:
+    name:
+      - bash-completion
+      - ca-certificates
+      - curl
+      - chrony
+      - file
+      - git
+      - htop
+      - iotop
+      - lsof
+      - lvm2
+      - man-db
+      - mtr
+      - net-tools
+      - nvme-cli
+      - openssl
+      - python3-passlib
+      - rsync
+      - screen
+      - strace
+      - tcpdump
+      - tmux
+      - vim
+    state: latest
+    update_cache: yes
+    install_recommends: no
+
+- name: Set timezone
+  community.general.timezone:
+    name: Etc/UTC
+  notify:
+    - Restart chrony
+
+- ansible.builtin.include_role:
+    name: nftables
+  tags:
+    - nftables
+
+- name: Configure journald
+  tags:
+    - journald
+  template:
+    src: templates/journald.conf
+    dest: /etc/systemd/journald.conf
+    mode: 0644
+    owner: root
+  notify:
+    - Restart systemd-journald
+
+- name: install systemd-resolved
+  tags: resolved
+  ignore_errors: yes # some ubuntu hosts do not have the systemd-resolved package
+  ansible.builtin.apt:
+    install_recommends: no
+    cache_valid_time: 86400
+    name:
+      - systemd-resolved
+
+- name: configure systemd-resolved
+  tags: resolved
+  ansible.builtin.template:
+    src: resolved.conf
+    dest: /etc/systemd/resolved.conf
+  notify:
+    - Restart systemd-resolved
+    - Test systemd-resolved

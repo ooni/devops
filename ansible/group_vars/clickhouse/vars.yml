@@ -1,0 +1,219 @@
+nftables_clickhouse_allow:
+  - fqdn: data1.htz-fsn.prod.ooni.nu
+    ip: 142.132.254.225
+  - fqdn: data2.htz-fsn.prod.ooni.nu
+    ip: 88.198.54.12
+  - fqdn: data3.htz-fsn.prod.ooni.nu
+    ip: 168.119.7.188
+  - fqdn: notebook1.htz-fsn.prod.ooni.nu
+    ip: 138.201.19.39
+  - fqdn: backend-hel.ooni.org
+    ip: 65.108.192.151
+  - fqdn: clickhouseproxy.dev.ooni.io
+    ip: "{{ lookup('dig', 'clickhouseproxy.dev.ooni.io/A') }}"
+
+nftables_zookeeper_allow:
+  - fqdn: data1.htz-fsn.prod.ooni.nu
+    ip: 142.132.254.225
+  - fqdn: data2.htz-fsn.prod.ooni.nu
+    ip: 88.198.54.12
+  - fqdn: data3.htz-fsn.prod.ooni.nu
+    ip: 168.119.7.188
+  - fqdn: notebook1.htz-fsn.prod.ooni.nu
+    ip: 138.201.19.39
+
+clickhouse_version: 24.8.6.70
+
+clickhouse_config:
+  max_connections: 4096
+  keep_alive_timeout: 3
+  max_concurrent_queries: 100
+  max_server_memory_usage: 0
+  max_thread_pool_size: 10000
+  max_server_memory_usage_to_ram_ratio: 0.9
+  total_memory_profiler_step: 4194304
+  total_memory_tracker_sample_probability: 0
+  uncompressed_cache_size: 8589934592
+  mark_cache_size: 5368709120
+  # max_open_files: 262144
+  mmap_cache_size: 1000
+  compiled_expression_cache_size: 134217728
+  compiled_expression_cache_elements_size: 10000
+  # tmp_policy: tmp
+  default_profile: default
+  custom_settings_prefixes: ""
+  system_profile: write
+  # buffer_profile: default
+  default_database: default
+  # timezone:
+  # umask: 027
+  mlock_executable: true
+  remap_executable: true
+  builtin_dictionaries_reload_interval: 3600
+  max_session_timeout: 3600
+  default_session_timeout: 60
+  # regions_hierarchy_file: /opt/geo/regions_hierarchy.txt
+  # regions_names_files_path: /opt/geo/
+  # top_level_domains_path: /var/lib/clickhouse/top_level_domains/
+  # top_level_domains:  # Path to the list is under top_level_domains_path
+  #   - domain:
+  #     name: example_name
+  #     path: /path/to/example_name.dat
+  dictionaries_config: "*_dictionary.xml"
+  user_defined_executable_functions_config: "*_function.xml"
+  # max_table_size_to_drop: 0
+  # max_partition_size_to_drop: 0
+  format_schema_path: /var/lib/clickhouse/format_schemas/
+  # disable_internal_dns_cache: 1
+
+clickhouse_keeper:
+  tcp_port: 9181
+  log_storage_path: /var/lib/clickhouse/coordination/log
+  snapshot_storage_path: /var/lib/clickhouse/coordination/snapshots
+  coordination_settings:
+    operation_timeout_ms: 10000
+    session_timeout_ms: 30000
+    raft_logs_level: trace
+  keeper_servers:
+  - keeper_server:
+    server: data1.htz-fsn.prod.ooni.nu
+    id: 1
+    hostname: clickhouse1.prod.ooni.io
+    port: 9234
+
+  #- keeper_server:
+  #  server: data2.htz-fsn.prod.ooni.nu
+  #  id: 2
+  #  hostname: clickhouse2.prod.ooni.io
+  #  port: 9234
+
+  - keeper_server:
+    server: data3.htz-fsn.prod.ooni.nu
+    id: 3
+    hostname: clickhouse3.prod.ooni.io
+    port: 9234
+
+  - keeper_server:
+    server: notebook1.htz-fsn.prod.ooni.nu
+    id: 4
+    hostname: notebook1.htz-fsn.prod.ooni.nu
+    port: 9234
+
+clickhouse_zookeeper:
+  - node:
+    host: clickhouse1.prod.ooni.io
+    port: 9181
+  - node:
+    host: clickhouse3.prod.ooni.io
+    port: 9181
+  - node:
+    host: notebook1.htz-fsn.prod.ooni.nu
+    port: 9181
+
+clickhouse_remote_servers:
+  - server:
+    servername: oonidata_cluster
+    secret: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/clickhouse_oonidata_cluster_secret', profile='oonidevops_user_prod') }}"
+    shards:
+      - shard:
+        internal_replication: true
+        replicas:
+          - replica:
+            host: clickhouse1.prod.ooni.io
+            port: 9000
+          #- replica:
+          #  host: clickhouse2.prod.ooni.io
+          #  port: 9000
+          - replica:
+            host: clickhouse3.prod.ooni.io
+            port: 9000
+
+clickhouse_macros:
+  - macro: |
+      <shard>01</shard>
+      <replica>01</replica>
+    server:
+      - data1.htz-fsn.prod.ooni.nu
+  - macro: |
+      <shard>01</shard>
+      <replica>02</replica>
+    server:
+      - data2.htz-fsn.prod.ooni.nu
+  - macro: |
+      <shard>01</shard>
+      <replica>03</replica>
+    server:
+      - data3.htz-fsn.prod.ooni.nu
+  - macro: |
+      <cluster>oonidata_cluster</cluster>
+
+clickhouse_distributed_ddl:
+  path: "/clickhouse/task_queue/ddl"
+  profile: "write"
+  pool_size: 1
+  task_max_lifetime: 604800
+  cleanup_delay_period: 60
+  max_tasks_in_queue: 1000
+
+clickhouse_default_profiles:
+  default:
+    readonly: 2
+    max_memory_usage: 11001001000
+    use_uncompressed_cache: 0
+    load_balancing: random
+    max_partitions_per_insert_block: 100
+  readonly:
+    readonly: 1
+  write:
+    readonly: 0
+    max_memory_usage: 61001001000
+
+clickhouse_listen_hosts:
+  - "::"
+
+clickhouse_default_users:
+  - user:
+    name: default
+    password:
+    networks:
+      - "127.0.0.1"
+    profile: default
+    quota: default
+  - user:
+    name: readonly
+    password_sha256_hex: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_readonly_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "0.0.0.0/0"
+    profile: readonly
+    quota: default
+  - user:
+    name: write
+    password_sha256_hex: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_write_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "0.0.0.0/0"
+    profile: write
+    quota: default
+
+clickhouse_default_quotas:
+  - quota:
+    name: default
+    duration: 3600
+    queries: 0
+    errors: 0
+    result_rows: 0
+    read_rows: 0
+    execution_time: 0
+
+clickhouse_prometheus:
+  endpoint: "/metrics"
+  port: 9363
+  metrics: true
+  events: true
+  asynchronous_metrics: true
+  status_info: true
+
+prometheus_nginx_proxy_config:
+  - location: /metrics/node_exporter
+    proxy_pass: http://127.0.0.1:8100/metrics
+  - location: /metrics/clickhouse
+    proxy_pass: http://127.0.0.1:9363/metrics

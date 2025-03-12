@@ -1,0 +1,59 @@
+apt:
+  sources:
+    ooni.list:
+      source: "deb [trusted=yes] https://ooni-internal-deb.s3.eu-central-1.amazonaws.com unstable main"
+      key: |
+        -----BEGIN PGP PUBLIC KEY BLOCK-----
+
+        mDMEYGISFRYJKwYBBAHaRw8BAQdA4VxoR0gSsH56BbVqYdK9HNQ0Dj2YFVbvKIIZ
+        JKlaW920Mk9PTkkgcGFja2FnZSBzaWduaW5nIDxjb250YWN0QG9wZW5vYnNlcnZh
+        dG9yeS5vcmc+iJYEExYIAD4WIQS1oI8BeW5/UhhhtEk3LR/ycfLdUAUCYGISFQIb
+        AwUJJZgGAAULCQgHAgYVCgkICwIEFgIDAQIeAQIXgAAKCRA3LR/ycfLdUFk+AQCb
+        gsUQsAQGxUFvxk1XQ4RgEoh7wy2yTuK8ZCkSHJ0HWwD/f2OAjDigGq07uJPYw7Uo
+        Ih9+mJ/ubwiPMzUWF6RSdgu4OARgYhIVEgorBgEEAZdVAQUBAQdAx4p1KerwcIhX
+        HfM9LbN6Gi7z9j4/12JKYOvr0d0yC30DAQgHiH4EGBYIACYWIQS1oI8BeW5/Uhhh
+        tEk3LR/ycfLdUAUCYGISFQIbDAUJJZgGAAAKCRA3LR/ycfLdUL4cAQCs53fLphhy
+        6JMwVhRs02LXi1lntUtw1c+EMn6t7XNM6gD+PXpbgSZwoV3ZViLqr58o9fZQtV3s
+        oN7jfdbznrWVigE=
+        =PtYb
+        -----END PGP PUBLIC KEY BLOCK-----
+package_update: true
+packages:
+  - oohelperd
+  - nginx
+
+write_files:
+  - path: /etc/nginx/sites-available/default
+    content: |
+      proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=thcache:100M
+                      max_size=5g inactive=24h use_temp_path=off;
+
+      server {
+        listen 80;
+        server_name _;
+        gzip on;
+        resolver 127.0.0.1;
+        # local test helper
+        location / {
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 900;
+            proxy_pass http://127.0.0.1:8080;
+
+            proxy_cache thcache;
+            proxy_cache_min_uses 1;
+            proxy_cache_lock on;
+            proxy_cache_lock_timeout 30;
+            proxy_cache_lock_age 30;
+            proxy_cache_use_stale error timeout invalid_header updating;
+            # Cache POST without headers set by the test helper!
+            proxy_cache_methods POST;
+            proxy_cache_key "$request_uri|$request_body";
+            proxy_cache_valid 200 10m;
+            proxy_cache_valid any 0;
+            add_header X-Cache-Status $upstream_cache_status;
+
+        }
+      }
+
+runcmd:
+  - service nginx restart

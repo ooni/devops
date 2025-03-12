@@ -79,12 +79,15 @@ resource "aws_key_pair" "oonidevops" {
 }
 
 resource "aws_secretsmanager_secret" "oonidevops_deploy_key" {
-  name = "oonidevops/deploy_key/ssh_key_private"
+  name = "oonidevops/deploy_key"
   tags = var.tags
 }
 
 resource "aws_secretsmanager_secret_version" "oonidevops_deploy_key" {
-  secret_id     = aws_secretsmanager_secret.oonidevops_deploy_key.id
-  secret_string = tls_private_key.oonidevops.private_key_openssh
+  secret_id = aws_secretsmanager_secret.oonidevops_deploy_key.id
+  secret_string = jsonencode({
+    private_key = tls_private_key.oonidevops.private_key_openssh,
+    public_key  = tls_private_key.oonidevops.public_key_openssh,
+  })
 }
 

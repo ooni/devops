@@ -1,0 +1,12 @@
+---
+- name: Deploy monitoring host
+  hosts: monitoring.ooni.org
+  become: true
+  tags:
+    - monitoring
+  roles:
+    - monitoring
+  vars:
+    monitoring_htpasswd: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/monitoring_htpasswd', profile='oonidevops_user_prod') }}"
+
+- ansible.builtin.import_playbook: deploy-monitoring-config.yml

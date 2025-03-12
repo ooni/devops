@@ -1,0 +1,7 @@
+---
+- hosts: all:!no_ssh_users
+  become: yes
+  vars:
+    admin_group_name: adm
+  roles:
+    - ssh_users

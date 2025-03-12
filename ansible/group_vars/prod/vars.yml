@@ -1,0 +1,7 @@
+prometheus_metrics_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/ooni_services/prometheus_metrics_password', profile='oonidevops_user_prod') }}"
+tailscale_authkey: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/tailscale_authkey_devops', profile='oonidevops_user_prod') }}"
+tailscale_tags:
+  - "devops-prod"
+tailscale_oauth_ephemeral: false
+admin_usernames: [ art, mehul ]
+non_admin_usernames: [ ]

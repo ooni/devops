@@ -1,0 +1,26 @@
+---
+- name: Gather facts from 'all' hosts in inventory
+  hosts: all
+  vars:
+    ansible_host_key_checking: false
+    ansible_ssh_extra_args: '-o UserKnownHostsFile=/dev/null'
+  tasks:
+    - name: Get network info
+      ansible.builtin.setup:
+        gather_subset: network
+
+- name: Add public keys to known_hosts file
+  hosts: localhost
+  connection: local
+  vars:
+    ssh_known_hosts_file: "{{ lookup('env','HOME') + '/.ssh/known_hosts' }}"
+    ssh_known_hosts: "{{ groups['all'] }}"
+  tasks:
+    - name: Add to known_hosts
+      ansible.builtin.known_hosts:
+        path: '{{ ssh_known_hosts_file }}'
+        name: '{{ item }}'
+        key: "{{ lookup('pipe', 'ssh-keyscan -T 10 ' + item + ',' + lookup('dig', item)) }}"
+        state: present
+      with_items: '{{ ssh_known_hosts }}'
+      become: false

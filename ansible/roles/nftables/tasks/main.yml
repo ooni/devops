@@ -1,0 +1,48 @@
+---
+- name: Install nftables
+  ansible.builtin.apt:
+    cache_valid_time: 86400
+    name: nftables
+  tags:
+    - nftables
+
+- name: create config dir
+  ansible.builtin.file:
+    path: /etc/ooni/nftables/tcp
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  tags:
+    - nftables
+
+- name: "write nft config for item"
+  ansible.builtin.template:
+    src: "rule.nft.j2"
+    dest: "/etc/ooni/nftables/tcp/{{ item.name }}.nft"
+  vars:
+    rules: "{{ item.rules }}"
+  loop: "{{ nft_rules_tcp }}"
+  notify:
+    - Reload nftables
+  tags:
+    - nftables
+
+- name: Overwrite nftables.conf
+  ansible.builtin.template:
+    src: templates/nftables.conf
+    dest: /etc/nftables.conf
+    mode: 0755
+    owner: root
+  notify:
+    - Reload nftables
+  tags:
+    - nftables
+
+- name: enable nftables service
+  ansible.builtin.systemd_service:
+    name: nftables
+    enabled: yes
+    state: started
+  tags:
+    - nftables

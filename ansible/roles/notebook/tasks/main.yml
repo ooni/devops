@@ -1,0 +1,62 @@
+---
+- name: create oonipipeline user
+  ansible.builtin.user:
+    name: oonipipeline
+    state: present
+    shell: /bin/false
+    createhome: no
+  tags:
+    - oonidata
+    - oonipipeline
+    - jupyterhub
+
+- ansible.builtin.include_role:
+    name: miniconda
+  tags:
+    - oonidata
+    - conda
+
+- ansible.builtin.import_tasks: jupyterhub.yml
+  tags:
+    - oonidata
+    - jupyterhub
+
+- name: Install apt packages
+  ansible.builtin.apt:
+    name: "{{ apt_packages }}"
+  tags:
+    - oonidata
+    - oonipipeline
+    - packages
+
+- name: "install conda packages"
+  ansible.builtin.shell:
+    cmd: "{{ miniconda_install_dir }}/bin/conda install -y {{ item }}"
+    chdir: "{{ miniconda_install_dir }}"
+  loop: "{{ conda_packages }}"
+  become_user: miniconda
+  tags:
+    - oonidata
+    - oonipipeline
+    - packages
+
+- name: Install conda-forge packages
+  ansible.builtin.shell:
+    cmd: "{{ miniconda_install_dir }}/bin/conda install -c conda-forge -y {{ item }}"
+    chdir: "{{ miniconda_install_dir }}"
+  loop: "{{ conda_forge_packages }}"
+  become_user: miniconda
+  tags:
+    - oonidata
+    - packages
+
+- name: "Install pip packages"
+  ansible.builtin.shell:
+    cmd: "{{ miniconda_install_dir }}/bin/pip install {{ item }}"
+    chdir: "{{ miniconda_install_dir }}"
+  loop: "{{ pip_packages }}"
+  become_user: miniconda
+  tags:
+    - oonidata
+    - oonipipeline
+    - packages

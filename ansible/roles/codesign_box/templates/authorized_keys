@@ -1,0 +1,8 @@
+# managed by ansible
+# see roles/ssh_users/templates/authorized_keys
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA6QK3Q5Hxtnf0o0wqMS47W/ewlHf5ZhQrn4vOR5HaUO oonidevops
+{% for user in codesign_usernames %}
+{% for k in ssh_users[user]['keys'] %}
+{{ k }}
+{% endfor %}
+{% endfor %}

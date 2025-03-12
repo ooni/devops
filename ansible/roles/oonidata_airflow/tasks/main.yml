@@ -1,0 +1,77 @@
+- name: Ensure Airflow group
+  ansible.builtin.group:
+    name: "airflow"
+  become: true
+
+# TODO: uncomment this section if you want to redeploy it
+# this was added after the user had already been created by the airflow_role
+# and so it's failing because it's trying to modify the user.
+#- name: Ensure Airflow user
+#  ansible.builtin.user:
+#    name: "airflow"
+#    group: "airflow"
+#    system: true
+#    shell: "/usr/sbin/nologin"
+#    createhome: "yes"
+#    home: "/opt/airflow"
+#  become: true
+
+- name: Checkout oonidata repo
+  become_user: airflow
+  become: true
+  ansible.builtin.git:
+    repo: "https://github.com/ooni/data.git"
+    dest: /opt/airflow/oonidata
+    version: main
+
+- name: Install airflow
+  ansible.builtin.include_role:
+    name: ooni.airflow_role
+  tags:
+    - oonidata
+    - airflow
+  vars:
+    airflow_app_home: /opt/airflow
+    airflow_dags_folder: /opt/airflow/oonidata/dags/
+    airflow_webserver_host: "127.0.0.1"
+    airflow_webserver_port: 8080
+    airflow_webserver_base_url: "https://{{ airflow_public_fqdn }}"
+    airflow_environment_extra_vars:
+      - name: AIRFLOW_VAR_DATA_DIR
+        value: "{{ airflow_app_home }}/data_dir"
+    airflow_extra_packages:
+      - postgres
+      - virtualenv
+    airflow_services:
+      airflow_webserver:
+        service_name: airflow-webserver
+        enabled: true
+        running: true
+        state: started
+        path: airflow-webserver.service.j2
+      airflow_scheduler:
+        service_name: airflow-scheduler
+        enabled: true
+        running: true
+        state: started
+        path: airflow-scheduler.service.j2
+
+- name: Set correct permissions on oonidata repo dir
+  ansible.builtin.file:
+    path: /opt/oonidata
+    state: directory
+    mode: "0755"
+    owner: airflow
+    recurse: true
+
+- name: Setup airflow nginx config
+  ansible.builtin.template:
+    src: nginx-airflow.j2
+    dest: /etc/nginx/sites-enabled/02-airflow
+    owner: root
+    mode: "0655"
+  notify:
+    - Reload nginx
+  tags:
+    - oonidata
+    - config

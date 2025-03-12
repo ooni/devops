@@ -1,0 +1,84 @@
+---
+- name: install base deps
+  ansible.builtin.apt:
+    name:
+      - "awscli"
+      - "etckeeper"
+      - "git"
+      - "python3-dnspython"
+      - "python3-boto3"
+      - "tmux"
+      - "vim"
+      - "acl"
+    state: "latest"
+    update_cache: "yes"
+
+- name: set the hostname
+  ansible.builtin.hostname:
+    name: "ansible-controller"
+
+- name: create ansible roles directory
+  ansible.builtin.file:
+    state: directory
+    path: /etc/ansible/roles
+    recurse: yes
+    owner: ubuntu
+    group: admin
+    mode: "u=rwX,g=rwX,o=r"
+
+- name: clone devops repo into /srv/devops
+  ansible.builtin.git:
+    repo: "https://github.com/ooni/devops.git"
+    dest: /srv/devops
+
+- name: Set permissions on /src/devops
+  ansible.builtin.file:
+    path: /srv/devops
+    state: directory
+    recurse: yes
+    owner: ubuntu
+    group: admin
+    mode: "u=rwX,g=rwX,o=r"
+
+- name: Install ansible galaxy dependencies
+  become: yes
+  become_user: ubuntu
+  ansible.builtin.shell:
+    cmd: ansible-galaxy install -p /etc/ansible/roles -r requirements.yml
+    chdir: /srv/devops/ansible
+
+- name: set global gitconfig for each user
+  ansible.builtin.copy:
+    dest: "/home/{{ item }}/.gitconfig"
+    content: |
+      # Do not edit! ansible managed via ooni/devops
+      [safe]
+        directory = /srv/devops
+  with_items: "{{ non_admin_usernames | union(admin_usernames) }}"
+
+- name: setup .ssh config for user
+  ansible.builtin.copy:
+    dest: "/home/{{ item }}/.ssh/config"
+    content: |
+      # Do not edit! ansible managed via ooni/devops
+      UserKnownHostsFile ~/.ssh/known_hosts /srv/devops/ansible/known_hosts /srv/devops/ansible/known_hosts_legacy
+      IdentitiesOnly yes
+  with_items: "{{ non_admin_usernames | union(admin_usernames) }}"
+
+- name: Create config.d directory for each user
+  ansible.builtin.file:
+    path: "/home/{{ item }}/.ssh/config.d/"
+    state: directory
+    owner: "{{ item }}"
+    mode: "700"
+  with_items: "{{ non_admin_usernames | union(admin_usernames) }}"
+
+- name: Include per-user custom config
+  ansible.builtin.copy:
+    dest: "/home/{{ item }}/.ssh/config"
+    content: |
+      # Do not edit! ansible managed via ooni/devops
+      UserKnownHostsFile ~/.ssh/known_hosts /srv/devops/ansible/known_hosts /srv/devops/ansible/known_hosts_legacy
+      IdentitiesOnly yes
+      Include config.d/*
+  with_items: "{{ non_admin_usernames | union(admin_usernames) }}"

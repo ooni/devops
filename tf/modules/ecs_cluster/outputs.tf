@@ -13,3 +13,7 @@ output "cluster_id" {
 output "web_security_group_id" {
   value = aws_security_group.web.id
 }
+
+output "container_security_group_id" {
+  value = aws_security_group.container_host.id
+}

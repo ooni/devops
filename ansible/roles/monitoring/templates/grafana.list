@@ -1,0 +1,1 @@
+deb [signed-by=/etc/apt/grafana.asc] https://apt.grafana.com stable main

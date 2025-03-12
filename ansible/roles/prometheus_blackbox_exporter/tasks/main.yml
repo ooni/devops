@@ -7,10 +7,16 @@
     mode: 0644
   notify:
     - restart blackbox_exporter
-  tags: blackbox_exporter
+  tags:
+    - monitoring
+    - blackbox_exporter
+    - config
 
 - name: Setcap
   command: setcap cap_net_raw=ep /usr/bin/prometheus-blackbox-exporter
-  tags: blackbox_exporter
+  tags:
+    - monitoring
+    - blackbox_exporter
+    - config
   notify:
     - restart blackbox_exporter

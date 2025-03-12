@@ -1,0 +1,14 @@
+---
+- name: Ensure miniconda user exists
+  ansible.builtin.user:
+    name: miniconda
+    shell: /bin/false
+    home: "{{ miniconda_install_dir }}"
+
+- name: Check if Miniconda is installed
+  ansible.builtin.stat:
+    path: "{{ miniconda_install_dir }}/bin/conda"
+  register: miniconda_bin
+
+- include_tasks: install.yml
+  when: not miniconda_bin.stat.exists

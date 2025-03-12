@@ -1,0 +1,23 @@
+---
+- name: Ensure miniconda directory exists
+  ansible.builtin.file:
+    path: "{{ miniconda_install_dir }}"
+    state: directory
+    owner: miniconda
+    group: "{{ admin_group_name }}"
+
+- name: Download the miniconda installer
+  ansible.builtin.get_url:
+    url: "https://repo.anaconda.com/miniconda/Miniconda3-py312_24.7.1-0-Linux-x86_64.sh"
+    dest: "{{ miniconda_install_dir }}/miniconda.sh"
+    checksum: "sha256:33442cd3813df33dcbb4a932b938ee95398be98344dff4c30f7e757cd2110e4f"
+    mode: "0700"
+
+- name: Run the miniconda installer
+  ansible.builtin.shell: |
+    bash {{ miniconda_install_dir }}/miniconda.sh -b -u -p {{ miniconda_install_dir }}
+
+- name: Delete installer
+  ansible.builtin.file:
+    path: "{{ miniconda_install_dir }}/miniconda.sh"
+    state: absent

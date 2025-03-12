@@ -1,0 +1,15 @@
+---
+- name: Deploy airflow frontend host
+  hosts:
+    - data1.htz-fsn.prod.ooni.nu
+  become: true
+  roles:
+    - nginx
+    - dehydrated
+    - oonidata_airflow
+  vars:
+    airflow_public_fqdn: "airflow.prod.ooni.io"
+    tls_cert_dir: /var/lib/dehydrated/certs
+    ssl_domains:
+      - "data1.htz-fsn.prod.ooni.nu"
+      - "airflow.prod.ooni.io"

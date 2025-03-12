@@ -38,6 +38,16 @@
     {
       "Effect": "Allow",
       "Action": [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParameterHistory",
+          "ssm:GetParametersByPath"
+      ],
+      "Resource": "arn:aws:ssm:*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
         "ec2:Describe*",
         "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
         "elasticloadbalancing:DeregisterTargets",

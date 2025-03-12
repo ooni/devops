@@ -1,24 +1,20 @@
 dom0_hosts:
   - ams-ps.ooni.nu
   - ams-slack-1.ooni.org
-  - ams-wcth2.ooni.nu
-  - ams-wcth3.ooni.nu
-  - amsmatomo.ooni.nu
-  - db-1.proteus.ooni.io
   - doams1-countly.ooni.nu
   - mia-echoth.ooni.nu
   - mia-httpth.ooni.nu
 
 blackbox_jobs:
-  - name: "ooni web_connectivity test helpers"
-    module: "ooni_web_connectivity_ok"
-    targets:
-      # - "https://a.web-connectivity.th.ooni.io/status"
-      - "https://wcth.ooni.io/status"
-      - "https://ams-wcth2.ooni.nu/status"
-      - "https://a.web-connectivity.th.ooni.io/status" # "https://ams-wcth3.ooni.nu/status"
-      # cloudfront
-      - "https://d33d1gs9kpq1c5.cloudfront.net/status"
+  # TODO add these records to the ALB config
+  #- name: "ooni web_connectivity test helpers"
+  #  module: "ooni_web_connectivity_ok"
+  #  targets:
+  #    # - "https://a.web-connectivity.th.ooni.io/status"
+  #    #- "https://wcth.ooni.io/status"
+  #    #- "https://ams-wcth2.ooni.nu/status"
+  #    #- "https://a.web-connectivity.th.ooni.io/status" # "https://ams-wcth3.ooni.nu/status"
+  #    # cloudfront
 
   - name: "new test helpers"
     module: "new_test_helper_health"
@@ -28,6 +24,9 @@ blackbox_jobs:
       - "https://2.th.ooni.org/"
       - "https://3.th.ooni.org/"
       - "https://4.th.ooni.org/"
+      - "https://5.th.ooni.org/"
+      - "https://6.th.ooni.org/"
+      - "https://d33d1gs9kpq1c5.cloudfront.net/status"
 
   - name: "ooni collector"
     module: "ooni_collector_ok"
@@ -73,22 +72,50 @@ blackbox_jobs:
     module: "http_2xx"
     targets:
       - "https://api.ooni.io/api/v1/measurements"
-      - "https://ams-pg-test.ooni.org/api/v1/measurements"
+      - "https://api.ooni.org/api/v1/measurements"
 
   - name: "ooni API test-list urls"
     module: "https_2xx_json_meta"
     targets:
       - "https://api.ooni.io/api/v1/test-list/urls?country_code=US"
+      - "https://api.ooni.org/api/v1/test-list/urls?country_code=US"
 
   - name: "ooni API test-helpers"
     module: "https_2xx_json"
     targets:
       - "https://api.ooni.io/api/v1/test-helpers"
+      - "https://api.ooni.org/api/v1/test-helpers"
 
   - name: "ooni API priv global overview"
     module: "https_2xx_json"
     targets:
       - "https://api.ooni.io/api/_/global_overview"
+      - "https://api.ooni.org/api/_/global_overview"
+
+  - name: "ooni API findings listing"
+    module: "https_2xx_json"
+    targets:
+      - "https://api.ooni.io/api/v1/incidents/search"
+      - "https://api.ooni.org/api/v1/incidents/search"
+
+  # Note: this always returns true by design
+  - name: "OONI API check_report_id"
+    module: "https_2xx_json"
+    targets:
+      - "https://api.ooni.io/api/_/check_report_id?report_id=RANDOM"
+      - "https://api.ooni.org/api/_/check_report_id?report_id=RANDOM"
+
+  - name: "OONI API raw_measurement"
+    module: "https_2xx_json"
+    targets:
+      - "https://api.ooni.io/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
+      - "https://api.ooni.org/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
+
+  - name: "OONI Run v2 API"
+    module: "https_2xx_json"
+    targets:
+      - "https://api.ooni.org/api/v2/oonirun/links/10009"
+      - "https://api.ooni.org/api/v2/oonirun/links/10009/revisions"
 
   # end of API #
 
@@ -108,13 +135,6 @@ blackbox_jobs:
       - "https://ooni.torproject.org"
       - "https://ooni.org"
 
-  # Make sure that we can still access the .well-known/acme-challenge dir
-  # TODO(bassosimone): we should monitor all hosts here.
-  - name: "check for .well-known/acme-challenge availability"
-    module: "http_2xx"
-    targets:
-      - http://ams-pg-test.ooni.org/.well-known/acme-challenge/ooni-acme-canary
-
   - name: "orchestrate"
     module: "ooni_orchestrate"
     targets: ["https://orchestrate.ooni.io:443/api/v1/test-list/urls?limit=10"]
@@ -130,3 +150,12 @@ blackbox_jobs:
   - name: icmp
     module: icmp
     targets: "{{ dom0_hosts | list }}"
+
+prometheus_aws_access_key_dev: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_dev') }}"
+prometheus_aws_secret_key_dev: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_dev') }}"
+
+prometheus_aws_access_key_prod: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/access_key', profile='oonidevops_user_prod') }}"
+prometheus_aws_secret_key_prod: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_prod') }}"
+
+# We replace the env from relabeling configs
+clickhouse_proxy_host: "clickhouseproxy.ENV.ooni.io"

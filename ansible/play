@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -ue
+
+## ansible-playbook is a wrapper script used to send a notification to slack
+# whenever a new ansible deploy is triggered
+
+ANSIBLE_SLACK_CMD=`printf "%q " "$0" "$@"`
+ANSIBLE_SLACK_CMD="${ANSIBLE_SLACK_CMD% }" # strip trailing whitespace
+export ANSIBLE_SLACK_CMD
+
+# Check if --check or -C is present in the arguments
+if [[ ! " $* " =~ " --check " && ! " $* " =~ " -C " ]]; then
+    ansible localhost --module-name include_role --args name=notify-slack --vault-password-file password-pipe
+fi
+ansible-playbook --vault-password-file password-pipe "$@"

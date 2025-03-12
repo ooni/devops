@@ -1,0 +1,5 @@
+# managed by ansible
+# see roles/ssh_users/templates/authorized_keys
+{% for k in ssh_users[item]['keys'] %}
+{{ k }}
+{% endfor %}

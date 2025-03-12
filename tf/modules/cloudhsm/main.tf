@@ -34,29 +34,9 @@ resource "aws_security_group" "hsm" {
   }
 }
 
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*"]
-  }
-
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-
-}
-
 resource "aws_instance" "codesign_box" {
-  ami = data.aws_ami.amazon_linux.id
+  # Amazon linux
+  ami = "ami-03bb61bfa8e4d149e"
 
   key_name      = var.key_name
   instance_type = "t3.micro"
@@ -84,4 +64,32 @@ resource "aws_instance" "codesign_box" {
   lifecycle {
     ignore_changes = all
   }
+}
+
+resource "aws_launch_template" "codesign_box_template" {
+  name = "codesign-box"
+  # Ubuntu 22.04
+  image_id = "ami-0a43b9fc420cabb27"
+
+  instance_type = "t3.micro"
+
+  key_name = var.key_name
+
+  network_interfaces {
+    subnet_id                   = var.subnet_ids[0]
+    security_groups             = [aws_security_group.hsm.id]
+    associate_public_ip_address = true
+  }
+
+  update_default_version = true
+
+  tag_specifications {
+    resource_type = "instance"
+
+    tags = {
+      Name = "codesign-box"
+    }
+  }
+
+  tags = merge(var.tags, { Name = "codesign-box-template" })
 }

@@ -1,0 +1,38 @@
+- ansible.builtin.include_role:
+    name: idealista.clickhouse_role
+  tags:
+    - oonidata
+    - clickhouse
+
+- name: Create nftables rule for clickhouse native port
+  set_fact:
+    ch_nft_rule: '{{ ch_nft_rule | default([]) + [''add rule inet filter input ip saddr '' + item.ip + '' tcp dport 9000 counter accept comment "incoming clickhouse from '' + item.fqdn + ''"''] }}'
+  loop: "{{ nftables_clickhouse_allow | rejectattr('fqdn', 'eq', inventory_hostname) | list }}"
+
+- name: Create nftables rule for clickhouse inter-server communication
+  set_fact:
+    is_nft_rule: '{{ is_nft_rule | default([]) + [''add rule inet filter input ip saddr '' + item.ip + '' tcp dport 9009 counter accept comment "incoming clickhouse from '' + item.fqdn + ''"''] }}'
+  loop: "{{ nftables_clickhouse_allow | rejectattr('fqdn', 'eq', inventory_hostname) | list }}"
+
+- name: Create nftables rule for zookeeper
+  set_fact:
+    zk_nft_rule: '{{ zk_nft_rule | default([]) + [''add rule inet filter input ip saddr '' + item.ip + '' tcp dport 9181 counter accept comment "incoming zookeeper from '' + item.fqdn + ''"''] }}'
+  loop: "{{ nftables_zookeeper_allow | rejectattr('fqdn', 'eq', inventory_hostname) | list }}"
+
+- name: Create nftables rule for raft port
+  set_fact:
+    raft_nft_rule: '{{ raft_nft_rule | default([]) + [''add rule inet filter input ip saddr '' + item.ip + '' tcp dport 9234 counter accept comment "incoming raft from '' + item.fqdn + ''"''] }}'
+  loop: "{{ nftables_zookeeper_allow | rejectattr('fqdn', 'eq', inventory_hostname) | list }}"
+
+- ansible.builtin.include_role:
+    name: nftables
+  vars:
+    nft_rules_tcp:
+      - name: 9000
+        rules: "{{ ch_nft_rule }}"
+      - name: 9009
+        rules: "{{ is_nft_rule }}"
+      - name: 9181
+        rules: "{{ zk_nft_rule }}"
+      - name: 9234
+        rules: "{{ raft_nft_rule }}"

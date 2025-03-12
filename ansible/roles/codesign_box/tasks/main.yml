@@ -1,0 +1,72 @@
+---
+- name: Create .ssh/authorized_keys in ubuntu home
+  ansible.builtin.template:
+    src: authorized_keys
+    dest: "/home/ubuntu/.ssh/authorized_keys"
+    owner: "ubuntu"
+    mode: "0400"
+
+- name: Install cloudhsm-cli
+  ansible.builtin.apt:
+    deb: https://s3.amazonaws.com/cloudhsmv2-software/CloudHsmClient/Jammy/cloudhsm-cli_latest_u22.04_amd64.deb
+    update_cache: true
+
+- name: Install cloudhsm-pkcs11
+  ansible.builtin.apt:
+    deb: https://s3.amazonaws.com/cloudhsmv2-software/CloudHsmClient/Jammy/cloudhsm-pkcs11_latest_u22.04_amd64.deb
+
+- name: Install cloudhsm-pkcs11
+  ansible.builtin.apt:
+    name:
+      - libengine-pkcs11-openssl
+      - awscli
+
+- name: Write customerCA.crt
+  ansible.builtin.template:
+    src: customerCA.crt
+    dest: /opt/cloudhsm/etc/customerCA.crt
+    owner: root
+    group: adm
+    mode: "u=rwx,g=rx"
+
+- name: Write Cert_bundle.pem
+  ansible.builtin.template:
+    src: Cert_bundle.pem
+    dest: /opt/cloudhsm/etc/Cert_bundle.pem
+    owner: root
+    group: adm
+    mode: "u=rwx,g=rx"
+
+- name: Write delete-hsms.sh command
+  ansible.builtin.template:
+    src: delete-hsms.sh
+    dest: /usr/bin/delete-hsms.sh
+    owner: root
+    group: adm
+    mode: "u=rwx,g=rx"
+
+- name: Write create-hsms.sh command
+  ansible.builtin.template:
+    src: create-hsms.sh
+    dest: /usr/bin/create-hsms.sh
+    owner: root
+    group: adm
+    mode: "u=rwx,g=rx"
+
+- name: Ensure .hsmcredentials file exists
+  ansible.builtin.copy:
+    dest: /home/ubuntu/.hsmcredentials
+    content: |
+      HSM_PASSWORD=
+    owner: ubuntu
+    group: adm
+    mode: "u=rw,g=,o="
+    force: false
+
+- name: Write sign-windows-exe.sh command
+  ansible.builtin.template:
+    src: sign-windows-exe.sh
+    dest: /usr/bin/sign-windows-exe.sh
+    owner: root
+    group: adm
+    mode: "u=rwx,g=rx"

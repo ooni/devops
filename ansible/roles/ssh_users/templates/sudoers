@@ -1,0 +1,4 @@
+# ansible-managed in roles/ssh_users/templates/sudoers
+{% for username in admin_usernames %}
+{{ ssh_users[username].login }} ALL=(ALL:ALL) NOPASSWD: ALL
+{% endfor %}

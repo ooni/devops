@@ -1,0 +1,29 @@
+miniconda_install_dir: /opt/miniconda
+jupyterhub_config_dir: /etc/jupyterhub
+jupyterhub_runtime_dir: /srv/jupyterhub
+oonipipeline_runtime_dir: /srv/oonipipeline
+tls_cert_dir: /var/lib/dehydrated/certs
+admin_group_name: admin
+clickhouse_url: "clickhouse://localhost"
+notebook_domain: "{{ inventory_hostname }}"
+ssl_domains:
+  - "{{ inventory_hostname }}"
+conda_forge_packages:
+  - seaborn
+  - dask
+  - statsmodels
+conda_packages:
+  - pandas
+  - numpy
+  - altair
+  - bokeh
+pip_packages:
+  - "-e 'git+https://github.com/ooni/data#egg=oonipipeline&subdirectory=oonipipeline'"
+  - "clickhouse-driver"
+  - pomegranate
+  - pgmpy
+apt_packages:
+  - net-tools
+  - curl
+  - git
+  - socat

@@ -17,3 +17,8 @@ override.tf.json
 
 # Ignore generated docs
 /dist
+
+/.vscode
+
+# Macos
+.DS_Store

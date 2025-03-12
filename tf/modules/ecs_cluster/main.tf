@@ -115,9 +115,18 @@ resource "aws_security_group" "container_host" {
     from_port = 32768
     to_port   = 61000
 
-    security_groups = [
+    security_groups = concat([
       aws_security_group.web.id,
-    ]
+    ], 
+    var.monitoring_sg_ids)
+  }
+
+  ingress {
+    protocol = "tcp"
+    from_port = 9100
+    to_port = 9100
+
+    security_groups = var.monitoring_sg_ids
   }
 
   egress {
@@ -145,6 +154,7 @@ resource "aws_launch_template" "container_host" {
   user_data = base64encode(templatefile("${path.module}/templates/ecs-setup.sh", {
     ecs_cluster_name = var.name,
     ecs_cluster_tags = var.tags
+    node_exporter_port = var.node_exporter_port
   }))
 
   update_default_version               = true
@@ -157,7 +167,6 @@ resource "aws_launch_template" "container_host" {
   network_interfaces {
     associate_public_ip_address = true
     delete_on_termination       = true
-    ipv6_address_count          = 1
     security_groups = [
       aws_security_group.container_host.id,
     ]

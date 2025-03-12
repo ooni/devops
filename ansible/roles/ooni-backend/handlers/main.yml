@@ -1,0 +1,22 @@
+---
+- name: reload nftables
+  tags: api, webserv
+  service: name=nftables state=reloaded
+
+- name: test nginx config
+  command: nginx -t
+  listen:
+    - restart nginx
+    - reload nginx
+
+- name: restart nginx
+  tags: webserv
+  service:
+    name: nginx
+    state: restarted
+
+- name: reload nginx
+  tags: api, deb_ooni, webserv
+  service:
+    name: nginx
+    state: reloaded

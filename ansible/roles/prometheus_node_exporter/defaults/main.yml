@@ -1,0 +1,16 @@
+prometheus_nginx_proxy_config:
+  - location: /metrics/node_exporter
+    proxy_pass: http://127.0.0.1:8100/metrics
+
+node_exporter_version: '1.8.2'
+node_exporter_arch: 'amd64'
+node_exporter_download_url: https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}.tar.gz
+
+node_exporter_bin_path: /usr/local/bin/node_exporter
+node_exporter_host: 'localhost'
+node_exporter_port: 8100
+node_exporter_options: ''
+
+node_exporter_state: started
+node_exporter_enabled: true
+node_exporter_restart: on-failure

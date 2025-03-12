@@ -1,0 +1,13 @@
+nft_rules_tcp:
+  - name: 22
+    rules:
+      - add rule inet filter input tcp dport 22 counter accept comment "Incoming SSH"
+  - name: 80
+    rules:
+      - add rule inet filter input tcp dport 80 counter accept comment "incoming HTTP"
+  - name: 443
+    rules:
+      - add rule inet filter input tcp dport 443 counter accept comment "incoming HTTPS"
+  - name: 9100
+    rules:
+      - add rule inet filter input ip saddr 5.9.112.244 tcp dport 9100 counter accept comment "clickhouse prometheus from monitoring.ooni.org"

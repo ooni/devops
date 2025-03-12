@@ -4,7 +4,7 @@ locals {
   # vocals are stripped.
   stripped_name = replace(replace(var.service_name, "ooni", ""), "[aeiou]", "")
   # Short prefix should be less than 5 characters
-  short_prefix = "oo${substr(var.service_name, 0, 3)}"
+  short_prefix = "O${substr(local.stripped_name, 0, 3)}"
 }
 
 resource "aws_iam_role" "ooniapi_service_task" {
@@ -40,11 +40,6 @@ resource "aws_cloudwatch_log_group" "ooniapi_service" {
   name = "ooni-ecs-group/${local.name}"
 }
 
-
-locals {
-  container_port = 80
-}
-
 // This is done to retrieve the image name of the current task definition
 // It's important to keep aligned the container_name and task_definitions
 data "aws_ecs_container_definition" "ooniapi_service_current" {
@@ -55,22 +50,21 @@ data "aws_ecs_container_definition" "ooniapi_service_current" {
 
 resource "aws_ecs_task_definition" "ooniapi_service" {
   family       = "${local.name}-td"
-  network_mode = "awsvpc"
+  network_mode = "bridge"
 
   container_definitions = jsonencode([
     {
-      cpu       = var.task_cpu,
-      essential = true,
+      memoryReservation = var.task_memory,
+      essential         = true,
       image = try(
         data.aws_ecs_container_definition.ooniapi_service_current[0].image,
         var.default_docker_image_url
       ),
-      memory = var.task_memory,
-      name   = local.name,
+      name = local.name,
 
       portMappings = [
         {
-          containerPort = local.container_port,
+          containerPort = 80
         }
       ],
 
@@ -100,44 +94,6 @@ resource "aws_ecs_task_definition" "ooniapi_service" {
   track_latest       = true
 }
 
-resource "aws_security_group" "ooniapi_service_ecs" {
-  name_prefix = "ooniapi-service"
-  description = "Allow all traffic"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    ipv6_cidr_blocks = ["::/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    ipv6_cidr_blocks = ["::/0"]
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
 resource "aws_ecs_service" "ooniapi_service" {
   name            = local.name
   cluster         = var.ecs_cluster_id
@@ -158,141 +114,30 @@ resource "aws_ecs_service" "ooniapi_service" {
   }
 
   load_balancer {
-    target_group_arn = aws_alb_target_group.ooniapi_service_direct.id
+    target_group_arn = aws_alb_target_group.ooniapi_service.id
     container_name   = local.name
     container_port   = "80"
   }
 
-  load_balancer {
-    target_group_arn = aws_alb_target_group.ooniapi_service_mapped.id
-    container_name   = local.name
-    container_port   = "80"
+  lifecycle {
+    create_before_destroy = true
   }
-
-  network_configuration {
-    subnets         = var.private_subnet_ids
-    security_groups = [aws_security_group.ooniapi_service_ecs.id]
-  }
-
-  depends_on = [
-    aws_alb_listener.ooniapi_service_http,
-  ]
 
   force_new_deployment = true
 
   tags = var.tags
 }
 
-# The direct target group is used for the direct domain name mapping
-resource "aws_alb_target_group" "ooniapi_service_direct" {
-  name_prefix = "${local.short_prefix}D"
+resource "aws_alb_target_group" "ooniapi_service" {
+  name_prefix = "${local.short_prefix}M-"
   port        = 80
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
-  target_type = "ip"
+  target_type = "instance"
 
   lifecycle {
     create_before_destroy = true
   }
 
   tags = var.tags
-}
-
-# The mapped target group is used for mapping it in the main API load balancer
-resource "aws_alb_target_group" "ooniapi_service_mapped" {
-  name_prefix = "${local.short_prefix}M"
-  port        = 80
-  protocol    = "HTTP"
-  vpc_id      = var.vpc_id
-  target_type = "ip"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  tags = var.tags
-}
-
-resource "aws_alb" "ooniapi_service" {
-  name            = local.name
-  subnets         = var.public_subnet_ids
-  security_groups = var.ooniapi_service_security_groups
-
-  tags = var.tags
-}
-
-resource "aws_alb_listener" "ooniapi_service_http" {
-  load_balancer_arn = aws_alb.ooniapi_service.id
-  port              = "80"
-  protocol          = "HTTP"
-
-  default_action {
-    target_group_arn = aws_alb_target_group.ooniapi_service_direct.id
-    type             = "forward"
-  }
-
-  tags = var.tags
-}
-
-resource "aws_alb_listener" "front_end_https" {
-  load_balancer_arn = aws_alb.ooniapi_service.id
-  port              = "443"
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = aws_acm_certificate.ooniapi_service.arn
-
-  default_action {
-    target_group_arn = aws_alb_target_group.ooniapi_service_direct.id
-    type             = "forward"
-  }
-
-  tags = var.tags
-}
-
-resource "aws_route53_record" "ooniapi_service" {
-  zone_id = var.dns_zone_ooni_io
-  name    = "${var.service_name}.api.${var.stage}.ooni.io"
-  type    = "A"
-
-  alias {
-    name                   = aws_alb.ooniapi_service.dns_name
-    zone_id                = aws_alb.ooniapi_service.zone_id
-    evaluate_target_health = true
-  }
-}
-
-resource "aws_acm_certificate" "ooniapi_service" {
-  domain_name       = "${var.service_name}.api.${var.stage}.ooni.io"
-  validation_method = "DNS"
-
-  tags = var.tags
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_route53_record" "ooniapi_service_validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.ooniapi_service.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
-    }
-  }
-
-  allow_overwrite = true
-  name            = each.value.name
-  records         = [each.value.record]
-  ttl             = 60
-  type            = each.value.type
-  zone_id         = var.dns_zone_ooni_io
-}
-
-resource "aws_acm_certificate_validation" "ooniapi_service" {
-  certificate_arn         = aws_acm_certificate.ooniapi_service.arn
-  validation_record_fqdns = [for record in aws_route53_record.ooniapi_service_validation : record.fqdn]
-  depends_on = [
-    aws_route53_record.ooniapi_service
-  ]
 }

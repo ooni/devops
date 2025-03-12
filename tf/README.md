@@ -9,9 +9,17 @@ Terraform is used for managing the OONI infrastructure as code.
 
 ```
 [oonidevops_user]
-aws_access_key_id = XXXX
-aws_secret_access_key = YYYY
-role_arn = arn:aws:iam::OONI_ORG_ID:role/oonidevops
+aws_access_key_id = YYYY
+aws_secret_access_key = ZZZ
+region = eu-central-1
+[oonidevops_user_dev]
+role_arn = arn:aws:iam::905418398257:role/oonidevops
+source_profile = oonidevops_user
+region = eu-central-1
+[oonidevops_user_prod]
+role_arn = arn:aws:iam::471112720364:role/oonidevops
+source_profile = oonidevops_user
+region = eu-central-1
 ```
 
 Where you replace OONI_ORG_ID with the ID of the ORG you are deploying to (dev,

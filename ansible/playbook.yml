@@ -1,22 +1,9 @@
 ---
-- name: ClickHouse servers
-  hosts: clickhouse_servers
-  user: admin
-  become: yes
-  vars:
-    clickhouse_reader_password: "{{ lookup('env', 'CLICKHOUSE_READER_PASSWORD') }}"
-  roles:
-    - clickhouse
-  handlers:
-    - name: restart clickhouse-server
-      service:
-        name: clickhouse-server
-        state: restarted
+- name: Include bootstrap playbook
+  ansible.builtin.import_playbook: deploy-bootstrap.yml
 
-- name: Update monitoring config
-  hosts: monitoring.ooni.org
-  become: yes
-  roles:
-    - prometheus
-    - prometheus_blackbox_exporter
-    - prometheus_alertmanager
+- name: Include tier0 playbook
+  ansible.builtin.import_playbook: deploy-tier0.yml
+
+- name: Include tier2 playbook
+  ansible.builtin.import_playbook: deploy-tier2.yml

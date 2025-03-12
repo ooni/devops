@@ -1,0 +1,12 @@
+airflow_admin_users:
+  - name: OONI Admin
+    username: admin
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/airflow_admin_password', profile='oonidevops_user_prod') }}"
+    role: Admin
+    firstname: Open
+    lastname: Observatory
+    email: admin@ooni.org
+airflow_fernet_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/airflow_fernet_key', profile='oonidevops_user_prod') }}"
+airflow_webserver_secret_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/airflow_webserver_secret_key', profile='oonidevops_user_prod') }}"
+airflow_executor: "LocalExecutor"
+airflow_database_conn: "postgresql+psycopg2://airflow:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/airflow_postgresql_password', profile='oonidevops_user_prod') }}@ooni-tier0-postgres.c7mgscca82no.eu-central-1.rds.amazonaws.com/airflow"

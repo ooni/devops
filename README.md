@@ -1,37 +1,26 @@
 # OONI Devops
 
-## Infrastructure Tiers
+At a glance below is the overall architecture of OONI Infrastructure across our various locations:
 
-We divide our infrastructure components into 3 tiers:
+```mermaid
+flowchart TB
+    apiorg([api.ooni.org])-->alb
+    apiio([api.ooni.io])-->backend
+    ecs[Backend API ECS]<-->ch[(Clickhouse Cluster)]
+    subgraph Hetzner
+        backend[OONI Backend Monolith]<-->ch
+        monitoring[Monitoring host]
+        pipeline[Pipeline v5]
+    end
+    subgraph AWS
+    alb[API Load Balancer]<-->ecs
+    alb-->backend
+    ecs<-->s3[(OONI S3 Buckets)]
+    s3<-->backend
+    end
+    subgraph Digital Ocean
+        th[Web Connectivity Test helper]<-->alb
+    end
+```
 
-- **Tier 0: Critical**: These are mission critical infrastructure components. If these become unavailable or have significant disruption, it will have a major impact.
-
-- **Tier 1: Essential**: These components are important, but not as critical as
-  tier 0. They are part of our core operations, but if they become unavailable
-  the impact is important, but not major.
-
-- **Tier 2: Non-Essential**: These are auxiliary components. Their
-  unavailability does not have a major impact.
-
-### Tier 0 (Critical) components
-
-- Probe Services (collector specifically)
-- Fastpath (part responsible for storing post-cans)
-- DNS configuration
-- Monitoring
-- OONI bridges
-- OONI.org website
-
-### Tier 1 (Essential) components
-
-- OONI API measurement listing
-- OONI Explorer
-- OONI Run
-- OONI Data analysis pipeline
-- Website analytics
-
-### Tier 2 (Non-Essential) components
-
-- Test list editor
-- Jupyter notebooks
-- Countly
+For more details [Infrastructure docs](https://docs.ooni.org/devops/infrastructure/)

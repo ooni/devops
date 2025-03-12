@@ -123,10 +123,10 @@ modules:
   ooni_registry:
     prober: http
     http:
-      valid_status_codes: [404]
+      valid_status_codes: [405]
       method: GET
       fail_if_body_not_matches_regexp:
-      - "404 page not found"
+      - "Method Not Allowed"
 
   https_2xx_json:
     http:

@@ -1,5 +1,8 @@
 - name: Installs packages
-  tags: monitoring, alertmanager
+  tags:
+    - monitoring
+    - alertmanager
+    - config
   apt:
     install_recommends: no
     cache_valid_time: 86400
@@ -7,7 +10,10 @@
       - prometheus-alertmanager
 
 - name: Configure Alertmanager templates
-  tags: monitoring, alertmanager
+  tags:
+    - monitoring
+    - alertmanager
+    - config
   notify:
     - reload alertmanager
   copy:
@@ -20,14 +26,20 @@
     - templates/*.tmpl
 
 - name: Configure Alertmanager
-  tags: alertmanager
+  tags:
+    - monitoring
+    - alertmanager
+    - config
   lineinfile:
     path: /etc/default/prometheus-alertmanager
     regexp: "^ARGS="
     line: ARGS='--cluster.listen-address= --web.listen-address="127.0.0.1:9093" --web.external-url="https://grafana.ooni.org"'
 
 - name: Reload Alertmanager
-  tags: alertmanager
+  tags:
+    - monitoring
+    - alertmanager
+    - config
   notify:
     - reload alertmanager
   template:

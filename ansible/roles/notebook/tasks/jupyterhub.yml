@@ -1,0 +1,119 @@
+---
+- name: Install jupyterhub
+  ansible.builtin.shell:
+    cmd: "{{ miniconda_install_dir }}/bin/conda install -c conda-forge -y jupyterhub"
+  become_user: miniconda
+  tags:
+    - oonidata
+    - jupyterhub
+
+- name: Install jupyterlab and notebook
+  ansible.builtin.shell:
+    cmd: "{{ miniconda_install_dir }}/bin/conda install -y jupyterlab notebook"
+  become_user: miniconda
+  tags:
+    - oonidata
+    - jupyterhub
+
+- name: Install jupyterhub packages
+  ansible.builtin.apt:
+    name:
+      - npm
+  tags:
+    - oonidata
+    - jupyterhub
+
+- name: Install configurable-http-proxy
+  ansible.builtin.shell:
+    cmd: "npm install -g configurable-http-proxy"
+  tags:
+    - oonidata
+    - jupyterhub
+
+- name: Create jupyterhub directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ jupyterhub_config_dir }}"
+    - "{{ jupyterhub_runtime_dir }}"
+    - "{{ jupyterhub_runtime_dir }}/state"
+  tags:
+    - oonidata
+    - jupyterhub
+
+- name: Write jupyterhub config
+  ansible.builtin.template:
+    src: jupyterhub_config.py.j2
+    dest: "{{ jupyterhub_config_dir }}/config.py"
+    owner: root
+    mode: "0640"
+  notify:
+    - Restart jupyterhub
+  tags:
+    - oonidata
+    - jupyterhub
+    - config
+
+- name: Write jupyterhub service
+  ansible.builtin.template:
+    src: jupyterhub.service.j2
+    dest: "/etc/systemd/system/jupyterhub.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Restart jupyterhub
+  tags:
+    - oonidata
+    - jupyterhub
+
+- name: Ensure the JupyterHub service is started with daemon-reload
+  ansible.builtin.systemd:
+    name: jupyterhub
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags:
+    - oonidata
+    - jupyterhub
+    - config
+
+
+- name: Write htaccess file
+  ansible.builtin.template:
+    src: htaccess_click
+    dest: /etc/nginx/htaccess_click
+    owner: oonipipeline
+    mode: "0655"
+  notify:
+    - Reload nginx
+  tags:
+    - oonidata
+    - jupyterhub
+    - config
+
+- name: Setup oonidata nginx config
+  ansible.builtin.template:
+    src: nginx-jupyterhub.j2
+    dest: /etc/nginx/sites-enabled/01-jupyterhub
+    owner: oonipipeline
+    mode: "0655"
+  notify:
+    - Reload nginx
+  tags:
+    - oonidata
+    - jupyterhub
+    - config
+
+- ansible.builtin.include_role:
+    name: nginx
+  tags:
+    - oonidata
+    - nginx
+
+- ansible.builtin.include_role:
+    name: dehydrated
+  tags:
+    - oonidata
+    - dehydrated
