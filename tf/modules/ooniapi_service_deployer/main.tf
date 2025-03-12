@@ -209,7 +209,7 @@ resource "aws_codepipeline" "ooniapi" {
       
       push {
         branches {
-          includes = ["master"]
+          includes = [var.branch_name]
         }
         file_paths {
           includes = [var.trigger_path]
