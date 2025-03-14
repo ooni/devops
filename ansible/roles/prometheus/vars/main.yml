@@ -1,5 +1,4 @@
 dom0_hosts:
-  - ams-ps.ooni.nu
   - ams-slack-1.ooni.org
   - doams1-countly.ooni.nu
   - mia-echoth.ooni.nu
