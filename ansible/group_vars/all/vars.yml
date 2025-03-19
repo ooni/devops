@@ -13,11 +13,6 @@ ssh_users:
       [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJsibU0nsQFFIdolD1POzXOws4VetV0ZNByINRzY8Hx0 arturo@ooni.org",
       ]
-  hynnot:
-    login: hynnot
-    comment: Tony Morella
-    keys:
-      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBTiOgr4PenzkF03NqFTGgacZ1BUWLkdCS1xNba4iLfP hynnot"
   majakomel:
     login: majakomel
     comment: Maja Komel
@@ -39,8 +34,8 @@ ssh_users:
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHc04zv+G8vGOS/znLy6xd3lB0/B07uaFjgyh4UgqUMA luis@openobservatory.org"
 
-admin_usernames: [art, mehul, luis, hynnot]
-root_usernames: [art, mehul, luis, hynnot]
+admin_usernames: [art, mehul, luis]
+root_usernames: [art, mehul, luis]
 non_admin_usernames: []
 
 prometheus_metrics_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/ooni_services/prometheus_metrics_password', profile='oonidevops_user_prod') }}"
