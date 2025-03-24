@@ -107,9 +107,14 @@ ssh_users:
     comment: Toomore Chiang
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHNIq5cvGr998xyW1uylgzLvD4JQ6/9SOds2LZ5Jbm9R toomore@ocf.tw"
+  imap:
+    login: imap
+    comment: iMAP partners (only for training by Siti/Sinar Project)
+    keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, hynnot ]
-non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore]
+non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, imap]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
