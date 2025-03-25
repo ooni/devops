@@ -740,7 +740,6 @@ locals {
   }
   ooniapi_frontend_main_domain_name         = "api.${local.environment}.ooni.io"
   ooniapi_frontend_main_domain_name_zone_id = local.dns_zone_ooni_io
-
 }
 
 resource "aws_route53_record" "ooniapi_frontend_main" {
