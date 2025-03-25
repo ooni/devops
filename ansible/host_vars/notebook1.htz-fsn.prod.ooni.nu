@@ -113,7 +113,7 @@ ssh_users:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHNIq5cvGr998xyW1uylgzLvD4JQ6/9SOds2LZ5Jbm9R toomore@ocf.tw"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, hynnot ]
-non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore]
+non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
