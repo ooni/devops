@@ -224,6 +224,10 @@ data "aws_ssm_parameter" "clickhouse_readonly_url" {
   name = "/oonidevops/secrets/clickhouse_readonly_url"
 }
 
+data "aws_ssm_parameter" "clickhouse_readonly_test_url" {
+  name = "/oonidevops/secrets/clickhouse_readonly_test_url"
+}
+
 resource "random_id" "artifact_id" {
   byte_length = 4
 }
@@ -349,7 +353,7 @@ module "ooniapi_ooniprobe" {
   }
 
   ooniapi_service_security_groups = [
-    module.ooniapi_cluster.web_security_group_id
+    # module.ooniapi_cluster.web_security_group_id
   ]
 
   tags = merge(
