@@ -128,7 +128,7 @@ resource "aws_route53_record" "netdata-ooni-org-_CNAME_" {
 
 resource "aws_route53_record" "ooni-org-_A_" {
   name    = "ooni.org"
-  records = ["75.2.60.5"]
+  records = ["76.76.21.21"]
   ttl     = "300"
   type    = "A"
   zone_id = local.dns_root_zone_ooni_org
@@ -328,7 +328,7 @@ resource "aws_route53_record" "url-prioritization-ooni-org-_CNAME_" {
 
 resource "aws_route53_record" "www-ooni-org-_CNAME_" {
   name    = "www.ooni.org"
-  records = ["ooni.netlify.com"]
+  records = ["cname.vercel-dns.com"]
   ttl     = "300"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_org
