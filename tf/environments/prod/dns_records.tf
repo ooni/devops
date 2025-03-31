@@ -819,5 +819,5 @@ resource "aws_route53_record" "openvpn1-htz-fsn-prod-ooni-nu-_A_" {
   records = ["49.12.5.142"]
   ttl     = "60"
   type    = "A"
-  zone_id = local.dns_root_zone_ooni_nu
+  zone_id = local.dns_zone_ooni_nu
 }
