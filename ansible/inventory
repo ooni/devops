@@ -20,6 +20,7 @@ notebook1.htz-fsn.prod.ooni.nu
 data1.htz-fsn.prod.ooni.nu
 data3.htz-fsn.prod.ooni.nu
 openvpn1.htz-fsn.prod.ooni.nu
+openvpn2.htz-fsn.prod.ooni.nu
 #backend-fsn.ooni.org
 
 [htz_hel]
@@ -35,3 +36,7 @@ ams-ps.ooni.nu
 [aws-proxy]
 clickhouseproxy.dev.ooni.io
 clickhouseproxy.prod.ooni.io
+
+[openvpn]
+openvpn1.htz-fsn.prod.ooni.nu
+openvpn2.htz-fsn.prod.ooni.nu

@@ -1,6 +1,6 @@
 ---
 - name: Deploy openvpn endpoint
-  hosts: openvpn1.htz-fsn.prod.ooni.nu
+  hosts: openvpn
   become: true
   vars:
     init_openvpn_pki: no
