@@ -1,0 +1,27 @@
+- name: Restart OpenVPN UDP container
+  community.docker.docker_container:
+    name: openvpn-udp
+    image: "{{image}}"
+    state: started
+    restart: true
+    capabilities:
+      - net_admin
+    volumes:
+      - "{{data}}:/etc/openvpn"
+      - "{{home}}/files/openvpn/openvpn_udp.conf:/etc/openvpn/openvpn.conf"
+    ports:
+      - "1194:1194/udp"
+
+- name: Restart OpenVPN TCP container
+  community.docker.docker_container:
+    name: openvpn-tcp
+    image: "{{image}}"
+    state: started
+    restart: true
+    capabilities:
+      - net_admin
+    volumes:
+      - "{{data}}:/etc/openvpn"
+      - "{{home}}/files/openvpn/openvpn_tcp.conf:/etc/openvpn/openvpn.conf"
+    ports:
+      - "1194:1194/tcp"

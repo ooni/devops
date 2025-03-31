@@ -19,13 +19,13 @@ monitoring.ooni.org
 notebook1.htz-fsn.prod.ooni.nu
 data1.htz-fsn.prod.ooni.nu
 data3.htz-fsn.prod.ooni.nu
+openvpn1.htz-fsn.prod.ooni.nu
 #backend-fsn.ooni.org
 
 [htz_hel]
 backend-hel.ooni.org
 
 [ghs_ams]
-openvpn-server1.ooni.io
 ams-slack-1.ooni.org
 ams-ps.ooni.nu
 # currently disabled due to them not supporting ed25519 keys
