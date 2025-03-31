@@ -1,8 +1,8 @@
 #!/bin/sh
 # TODO: change to 100+
 NUMCERTS=5
-OVPN_DATA=ovpn_data
-IMAGE=openvpn-docker
+OVPN_DATA="{{ data }}"
+IMAGE="{{ image }}"
 
 for i in $(seq 1 $NUMCERTS)
 do

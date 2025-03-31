@@ -1,7 +1,7 @@
 #!/bin/sh
-OVPN_DATA=ovpn_data
-ENDPOINT=openvpn-server1.ooni.io
-IMAGE=openvpn-docker
+OVPN_DATA="{{ data }}"
+ENDPOINT="{{ endpoint }}"
+IMAGE="{{ image }}"
 ALPINE=alpine:latest
 
 #

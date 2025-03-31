@@ -3,7 +3,7 @@
 # besides, they should be exported in the PKI dump.
 # In any case, it's useful for being able to pick particular ranges
 # so I'm adding it here.
-OVPN_DATA=ovpn_data
+OVPN_DATA="{{ data }}"
 CERTDIR=~/backups/certs
 
 # TODO: change to 100

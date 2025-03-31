@@ -9,8 +9,8 @@
     state: directory
 
 - name: Copy "openvpn_*.conf" files 
-  ansible.builtin.copy:
-    src: "files/openvpn/openvpn_{{item}}.conf"
+  ansible.builtin.template:
+    src: "templates/openvpn/openvpn_{{item}}.conf"
     dest: "{{home}}/files/openvpn/openvpn_{{item}}.conf"
     owner: "{{username}}"
     group: "{{username}}"
@@ -21,32 +21,32 @@
     - tcp
 
 - name: Copy "init-pki.sh" 
-  ansible.builtin.copy:
-    src: files/openvpn/init-pki.sh
+  ansible.builtin.template:
+    src: templates/openvpn/init-pki.sh
     dest: "{{home}}/files/openvpn/"
     owner: "{{username}}"
     group: "{{username}}"
     mode: '0744'
 
 - name: Copy "backup-pki.sh" 
-  ansible.builtin.copy:
-    src: files/openvpn/backup-pki.sh
+  ansible.builtin.template:
+    src: templates/openvpn/backup-pki.sh
     dest: "{{home}}/files/openvpn/"
     owner: "{{username}}"
     group: "{{username}}"
     mode: '0744'
 
 - name: Copy "gen-cert-pool.sh" 
-  ansible.builtin.copy:
-    src: files/openvpn/gen-cert-pool.sh
+  ansible.builtin.template:
+    src: templates/openvpn/gen-cert-pool.sh
     dest: "{{home}}/files/openvpn/"
     owner: "{{username}}"
     group: "{{username}}"
     mode: '0744'
 
 - name: Copy "fetch-cert-pool.sh" 
-  ansible.builtin.copy:
-    src: files/openvpn/fetch-cert-pool.sh
+  ansible.builtin.template:
+    src: templates/openvpn/fetch-cert-pool.sh
     dest: "{{home}}/files/openvpn/"
     owner: "{{username}}"
     group: "{{username}}"
