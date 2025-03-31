@@ -1,0 +1,5 @@
+home: /home/vpnadmin
+image: ooni/openvpn-test
+data: ovpn_data
+username: vpnadmin
+init_openvpn_pki: false

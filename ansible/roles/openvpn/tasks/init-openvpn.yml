@@ -1,0 +1,57 @@
+- name: Ensure miniconda user exists
+  ansible.builtin.user:
+    name: "{{ username }}"
+    home: "{{ home }}"
+
+- name: create openvpn dir
+  ansible.builtin.file:
+    path: "{{home}}/files/openvpn"
+    state: directory
+
+- name: Copy "openvpn_*.conf" files 
+  ansible.builtin.copy:
+    src: "files/openvpn/openvpn_{{item}}.conf"
+    dest: "{{home}}/files/openvpn/openvpn_{{item}}.conf"
+    owner: "{{username}}"
+    group: "{{username}}"
+    mode: '0644'
+    backup: yes
+  loop:
+    - udp
+    - tcp
+
+- name: Copy "init-pki.sh" 
+  ansible.builtin.copy:
+    src: files/openvpn/init-pki.sh
+    dest: "{{home}}/files/openvpn/"
+    owner: "{{username}}"
+    group: "{{username}}"
+    mode: '0744'
+
+- name: Copy "backup-pki.sh" 
+  ansible.builtin.copy:
+    src: files/openvpn/backup-pki.sh
+    dest: "{{home}}/files/openvpn/"
+    owner: "{{username}}"
+    group: "{{username}}"
+    mode: '0744'
+
+- name: Copy "gen-cert-pool.sh" 
+  ansible.builtin.copy:
+    src: files/openvpn/gen-cert-pool.sh
+    dest: "{{home}}/files/openvpn/"
+    owner: "{{username}}"
+    group: "{{username}}"
+    mode: '0744'
+
+- name: Copy "fetch-cert-pool.sh" 
+  ansible.builtin.copy:
+    src: files/openvpn/fetch-cert-pool.sh
+    dest: "{{home}}/files/openvpn/"
+    owner: "{{username}}"
+    group: "{{username}}"
+    mode: '0744'
+
+- name: Create empty openvpn docker volume
+  docker_volume:
+    name: ovpn_data
