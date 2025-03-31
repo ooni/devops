@@ -1,6 +1,6 @@
 home: /home/vpnadmin
 image: ooni/openvpn-test
-data: ovpn_data
+data: /home/vpnadmin/ovpn_data
 endpoint: openvpn1.htz-fsn.prod.ooni.nu
 username: vpnadmin
 init_openvpn_pki: false

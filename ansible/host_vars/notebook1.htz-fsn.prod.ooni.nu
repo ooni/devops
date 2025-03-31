@@ -78,11 +78,6 @@ ssh_users:
     comment: Luis Diaz
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHc04zv+G8vGOS/znLy6xd3lB0/B07uaFjgyh4UgqUMA luis@openobservatory.org"
-  hynnot:
-    login: hynnot
-    comment: Tony Morella
-    keys:
-      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBTiOgr4PenzkF03NqFTGgacZ1BUWLkdCS1xNba4iLfP hynnot"
   snourin:
     login: snourin
     comment: Sadia Nourin
@@ -103,7 +98,7 @@ ssh_users:
     keys:
       - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCwOXC37V9BEsNrwo6sZERtdX81It92bsJymJKiXFBjSIMGUqYfWYhhgh/28rkaohlml299RkVwmVPFQ5TKJ5tmpYnPNjssmiG+PaEkFHG6S9tMzaLeIvIcR5a2e2Nlyv5I7B4yqaLA0U4s5oyQsl1tZqJ+NB4fEMkptby7a17sQ32hqHnNxTR43lw8WnfrkalpLyoTPl9biWLmXGkDlZdeR6KVGnyDervgIeZppx8qqqLnBsGSfMouwLAMJ82yO4bYf/bTh6H4A18nlZ210BkRF00XfkTN2Q/52jV0R2IBK+3oENztDk6rzViWKdC9dDGkLE0GA06cKMYCTfc+O+YjjH9ge4/4eH+Yfyop25mmjut8aketk3nP4xf5fyzmJww30vLmCKhrcpJClfZ8CNbhLN/UL6FupAuzQ21t5Jhy2jTbMMTKdiUgIXDZfhCYB+cDDtDOOdoVdQybxdaJH68b1/ImDTPn4lDUmHmrhmJgY45haJZ0N8uB+bMJtpatKoU="
 
-admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, hynnot ]
+admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis]
 non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
