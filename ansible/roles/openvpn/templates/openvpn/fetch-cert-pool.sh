@@ -8,7 +8,7 @@ CERTDIR=~/backups/certs
 
 # TODO: change to 100
 NUMCERTS=5
-IMAGE=openvpn-docker
+IMAGE="{{ image }}"
 
 mkdir -p $CERTDIR
 for i in $(seq 1 $NUMCERTS)
