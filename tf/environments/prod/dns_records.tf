@@ -821,3 +821,11 @@ resource "aws_route53_record" "openvpn1-htz-fsn-prod-ooni-nu-_A_" {
   type    = "A"
   zone_id = local.dns_zone_ooni_nu
 }
+
+resource "aws_route53_record" "openvpn2-htz-fsn-prod-ooni-nu-_A_" {
+  name    = "openvpn2.htz-fsn.prod.ooni.nu"
+  records = ["128.140.123.158"]
+  ttl     = "60"
+  type    = "A"
+  zone_id = local.dns_zone_ooni_nu
+}
