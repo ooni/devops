@@ -3,4 +3,3 @@
 - include_tasks: init-openvpn-pki.yml
   when: init_openvpn_pki
 - include_tasks: run-openvpn-containers.yml
-main.yml
