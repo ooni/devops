@@ -3,6 +3,6 @@
   hosts: openvpn1.htz-fsn.prod.ooni.nu
   become: true
   vars:
-    init_openvpn_pki: yes
+    init_openvpn_pki: no
   roles:
     - openvpn
