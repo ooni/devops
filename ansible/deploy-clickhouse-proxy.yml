@@ -9,8 +9,7 @@
     - role: dehydrated
       vars: 
         ssl_domains: 
-          - clickhouseproxy.dev.ooni.io
-          - clickhouseproxy.prod.ooni.io
+          - "{{ inventory_hostname }}"
     - role: nginx
       tags: nginx
     - role: clickhouse_proxy
