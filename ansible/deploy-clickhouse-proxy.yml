@@ -12,15 +12,15 @@
           - "{{ inventory_hostname }}"
     - role: nginx
       tags: nginx
+    - role: dehydrated
+      vars:
+        ssl_domains: "clickhouseproxy.dev.ooni.io"
+        tls_cert_dir: /var/lib/dehydrated/certs
     - role: clickhouse_proxy
       vars: 
         clickhouse_url: "clickhouse3.prod.ooni.io"
         clickhouse_port: 9000
         clickhouse_proxy_public_fqdn: "{{ inventory_hostname }}"
-    - role: dehydrated
-      vars:
-        ssl_domains: "clickhouseproxy.dev.ooni.io"
-        tls_cert_dir: /var/lib/dehydrated/certs
     - role: prometheus_node_exporter
       vars:
         node_exporter_port: 9100
