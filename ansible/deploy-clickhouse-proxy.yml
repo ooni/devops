@@ -6,15 +6,12 @@
   become: true
   roles:
     - role: bootstrap
+    - role: nginx
+      tags: nginx
     - role: dehydrated
       vars: 
         ssl_domains: 
           - "{{ inventory_hostname }}"
-    - role: nginx
-      tags: nginx
-    - role: dehydrated
-      vars:
-        ssl_domains: "clickhouseproxy.dev.ooni.io"
         tls_cert_dir: /var/lib/dehydrated/certs
     - role: clickhouse_proxy
       vars: 

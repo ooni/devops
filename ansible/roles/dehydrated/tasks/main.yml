@@ -42,8 +42,10 @@
     dest: /var/lib/dehydrated/acme-challenges/ooni-acme-canary
     mode: "0644"
     owner: root
-  notify:
-    - reload nginx
+
+- name: Restart nginx
+  tags: dehydrated
+  shell: systemctl restart nginx
 
 - name: reload nftables service
   tags: dehydrated
