@@ -163,6 +163,7 @@ module "oonipg" {
   db_instance_class        = "db.t3.micro"
   db_storage_type          = "gp3"
   db_allocated_storage     = "50"
+  db_engine_version        = "16.4"
   db_max_allocated_storage = null
 
   # TODO: fix this to further restrict to only our subnets
