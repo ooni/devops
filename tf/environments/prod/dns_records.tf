@@ -137,7 +137,7 @@ resource "aws_route53_record" "ooni-org-_A_" {
 resource "aws_route53_record" "ooni-org-_MX_" {
   name    = "ooni.org"
   records = ["1 ASPMX.L.GOOGLE.COM", "10 ASPMX2.GOOGLEMAIL.COM", "10 ASPMX3.GOOGLEMAIL.COM", "5 ALT1.ASPMX.L.GOOGLE.COM", "5 ALT2.ASPMX.L.GOOGLE.COM"]
-  ttl     = "60"
+  ttl     = "3600"
   type    = "MX"
   zone_id = local.dns_root_zone_ooni_org
 }
@@ -329,7 +329,7 @@ resource "aws_route53_record" "url-prioritization-ooni-org-_CNAME_" {
 resource "aws_route53_record" "www-ooni-org-_CNAME_" {
   name    = "www.ooni.org"
   records = ["cname.vercel-dns.com"]
-  ttl     = "300"
+  ttl     = "60"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_org
 }
