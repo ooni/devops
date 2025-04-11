@@ -510,11 +510,11 @@ resource "aws_route53_record" "jupyter-ooni-io-_A_" {
   zone_id = local.dns_root_zone_ooni_io
 }
 
-resource "aws_route53_record" "labs-ooni-io-_A_" {
+resource "aws_route53_record" "labs-ooni-io-_CNAME_" {
   name    = "labs.ooni.io"
-  records = ["104.198.14.52"]
+  records = ["cname.vercel-dns.com"]
   ttl     = "300"
-  type    = "A"
+  type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_io
 }
 
@@ -536,7 +536,7 @@ resource "aws_route53_record" "measurements-beta-ooni-io-_CNAME_" {
 
 resource "aws_route53_record" "msg-ooni-io-_CNAME_" {
   name    = "msg.ooni.io"
-  records = ["ooni.netlify.com"]
+  records = ["cname.vercel-dns.com"]
   ttl     = "1799"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_io
@@ -552,7 +552,7 @@ resource "aws_route53_record" "notify-proteus-ooni-io-_A_" {
 
 resource "aws_route53_record" "ooni-io-_A_" {
   name    = "ooni.io"
-  records = ["104.198.14.52"]
+  records = ["76.76.21.21"]
   ttl     = "300"
   type    = "A"
   zone_id = local.dns_root_zone_ooni_io
@@ -664,7 +664,7 @@ resource "aws_route53_record" "test-ooni-io-_NS_" {
 
 resource "aws_route53_record" "www-ooni-io-_CNAME_" {
   name    = "www.ooni.io"
-  records = ["ooni.netlify.com"]
+  records = ["cname.vercel-dns.com"]
   ttl     = "300"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_io
