@@ -1,0 +1,8 @@
+---
+- name: Deploy openvpn endpoint
+  hosts: openvpn
+  become: true
+  vars:
+    init_openvpn_pki: no
+  roles:
+    - openvpn

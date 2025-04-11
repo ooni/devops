@@ -813,3 +813,19 @@ resource "aws_route53_record" "_atproto-ooni-org-_TXT_" {
   ttl     = "60"
   records = ["did=did:plc:4ouqb2j2j377siam2gtot6ge"]
 }
+
+resource "aws_route53_record" "openvpn1-htz-fsn-prod-ooni-nu-_A_" {
+  name    = "openvpn1.htz-fsn.prod.ooni.nu"
+  records = ["49.12.5.142"]
+  ttl     = "60"
+  type    = "A"
+  zone_id = local.dns_zone_ooni_nu
+}
+
+resource "aws_route53_record" "openvpn2-htz-fsn-prod-ooni-nu-_A_" {
+  name    = "openvpn2.htz-fsn.prod.ooni.nu"
+  records = ["128.140.123.158"]
+  ttl     = "60"
+  type    = "A"
+  zone_id = local.dns_zone_ooni_nu
+}

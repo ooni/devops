@@ -1,0 +1,27 @@
+# this one will fail if it's already initialized
+- name: Initialize OpenVPN PKI
+  ansible.builtin.shell: "{{home}}/files/openvpn/init-pki.sh"
+
+- name: Generate a client certificate pool
+  ansible.builtin.shell: "{{home}}/files/openvpn/gen-cert-pool.sh"
+
+- name: Fetch the client certificate pool into its dir
+  ansible.builtin.shell: "{{home}}/files/openvpn/fetch-cert-pool.sh"
+
+- name: Backup OpenVPN PKI
+  ansible.builtin.shell: "{{home}}/files/openvpn/backup-pki.sh"
+
+- name: Modify permissions to the backup
+  ansible.builtin.file:
+    path: ~/backups/openvpn-pki.tar.gz
+    mode: '0600'
+
+- name: Save the backup PKI state to local file
+  fetch:
+    src: "~/backups/openvpn-pki.tar.gz"
+    dest: state/
+
+- name: Save the backup certs state to local file
+  fetch:
+    src: "~/backups/client-certs.tar.gz"
+    dest: state/
