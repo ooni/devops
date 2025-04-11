@@ -87,6 +87,10 @@ ssh_users:
     login: julia-blues
     comment: Julia K
     keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICOM90NI0nUvQPNt/UkJ7TP0aCnwPUqr2FVHLXCopMrc jkempton@g.harvard.edu"]
+  lex:
+    login: lex
+    comment: Alexandra Dirksen
+    keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPmA8InNNPo3o1n/NPqAUI6YDZa4qDTeL+fT31/EZCOU a.dirksen@tu-braunschweig.de"]
   jonath8:
     login: jonath8
     comment: Jonathan Nelson
@@ -97,9 +101,14 @@ ssh_users:
     comment: John Bauer
     keys:
       - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCwOXC37V9BEsNrwo6sZERtdX81It92bsJymJKiXFBjSIMGUqYfWYhhgh/28rkaohlml299RkVwmVPFQ5TKJ5tmpYnPNjssmiG+PaEkFHG6S9tMzaLeIvIcR5a2e2Nlyv5I7B4yqaLA0U4s5oyQsl1tZqJ+NB4fEMkptby7a17sQ32hqHnNxTR43lw8WnfrkalpLyoTPl9biWLmXGkDlZdeR6KVGnyDervgIeZppx8qqqLnBsGSfMouwLAMJ82yO4bYf/bTh6H4A18nlZ210BkRF00XfkTN2Q/52jV0R2IBK+3oENztDk6rzViWKdC9dDGkLE0GA06cKMYCTfc+O+YjjH9ge4/4eH+Yfyop25mmjut8aketk3nP4xf5fyzmJww30vLmCKhrcpJClfZ8CNbhLN/UL6FupAuzQ21t5Jhy2jTbMMTKdiUgIXDZfhCYB+cDDtDOOdoVdQybxdaJH68b1/ImDTPn4lDUmHmrhmJgY45haJZ0N8uB+bMJtpatKoU="
+  toomore:
+    login: toomore
+    comment: Toomore Chiang
+    keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHNIq5cvGr998xyW1uylgzLvD4JQ6/9SOds2LZ5Jbm9R toomore@ocf.tw"
 
-admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis]
-non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer]
+admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis ]
+non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
