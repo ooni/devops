@@ -92,6 +92,10 @@ ssh_users:
     login: julia-blues
     comment: Julia K
     keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICOM90NI0nUvQPNt/UkJ7TP0aCnwPUqr2FVHLXCopMrc jkempton@g.harvard.edu"]
+  lex:
+    login: lex
+    comment: Alexandra Dirksen
+    keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPmA8InNNPo3o1n/NPqAUI6YDZa4qDTeL+fT31/EZCOU a.dirksen@tu-braunschweig.de"]
   jonath8:
     login: jonath8
     comment: Jonathan Nelson
@@ -114,7 +118,7 @@ ssh_users:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, hynnot ]
-non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, imap]
+non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex, imap]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
