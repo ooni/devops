@@ -45,6 +45,10 @@
   notify:
     - reload nginx
 
+- name: Restart nginx
+  tags: dehydrated
+  shell: systemctl restart nginx
+
 - name: reload nftables service
   tags: dehydrated
   shell: systemctl reload nftables.service
