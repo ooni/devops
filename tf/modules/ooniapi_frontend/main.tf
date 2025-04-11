@@ -153,7 +153,9 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule" {
         "/api/v2/ooniprobe/*",
         "/api/v1/login",
         "/api/v1/register",
-        "/api/v1/update/*"
+        "/api/v1/update/*",
+        # Activate this when the DB is connected in prod
+        # "/api/v1/check-in*" 
       ]
     }
   }

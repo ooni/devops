@@ -9,15 +9,14 @@
     - role: dehydrated
       vars: 
         ssl_domains: 
-          - clickhouseproxy.dev.ooni.io
-          - clickhouseproxy.prod.ooni.io
+          - "{{ inventory_hostname }}"
     - role: nginx
       tags: nginx
     - role: clickhouse_proxy
       vars: 
         clickhouse_url: "clickhouse3.prod.ooni.io"
         clickhouse_port: 9000
-        clickhouse_proxy_public_fqdn: "clickhouseproxy.dev.ooni.io"
+        clickhouse_proxy_public_fqdn: "{{ inventory_hostname }}"
     - role: dehydrated
       vars:
         ssl_domains: "clickhouseproxy.dev.ooni.io"

@@ -3,23 +3,23 @@
   hosts: backend-hel.ooni.org
   become: true
   roles:
-    # - role: bootstrap
-      # vars:
-        # admin_group_name: adm
-    # - role: base-backend
-    # - role: nftables
-    # - role: nginx
-      # tags: nginx
-      # vars:
-        # nginx_user: "www-data"
-    # - role: dehydrated
-      # tags: dehydrated
-      # expand: yes
-      # vars: 
-        # ssl_domains:
-          # # with dehydrated the first entry is the cert FQDN
-          # # and the other ones are alternative names
-          # - "backend-hel.ooni.org"
+    - role: bootstrap
+      vars:
+        admin_group_name: adm
+    - role: base-backend
+    - role: nftables
+    - role: nginx
+      tags: nginx
+      vars:
+        nginx_user: "www-data"
+    - role: dehydrated
+      tags: dehydrated
+      expand: yes
+      vars: 
+        ssl_domains:
+          # with dehydrated the first entry is the cert FQDN
+          # and the other ones are alternative names
+          - "backend-hel.ooni.org"
     - role: ooni-backend
       vars: 
         ssl_domain: backend-hel.ooni.org
