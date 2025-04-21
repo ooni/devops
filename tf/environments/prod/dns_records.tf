@@ -128,8 +128,8 @@ resource "aws_route53_record" "netdata-ooni-org-_CNAME_" {
 
 resource "aws_route53_record" "ooni-org-_A_" {
   name    = "ooni.org"
-  records = ["75.2.60.5"]
-  ttl     = "300"
+  records = ["76.76.21.21"]
+  ttl     = "60"
   type    = "A"
   zone_id = local.dns_root_zone_ooni_org
 }
@@ -328,8 +328,8 @@ resource "aws_route53_record" "url-prioritization-ooni-org-_CNAME_" {
 
 resource "aws_route53_record" "www-ooni-org-_CNAME_" {
   name    = "www.ooni.org"
-  records = ["ooni.netlify.com"]
-  ttl     = "300"
+  records = ["cname.vercel-dns.com"]
+  ttl     = "60"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_org
 }
@@ -510,11 +510,11 @@ resource "aws_route53_record" "jupyter-ooni-io-_A_" {
   zone_id = local.dns_root_zone_ooni_io
 }
 
-resource "aws_route53_record" "labs-ooni-io-_A_" {
+resource "aws_route53_record" "labs-ooni-io-_CNAME_" {
   name    = "labs.ooni.io"
-  records = ["104.198.14.52"]
+  records = ["cname.vercel-dns.com"]
   ttl     = "300"
-  type    = "A"
+  type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_io
 }
 
@@ -536,7 +536,7 @@ resource "aws_route53_record" "measurements-beta-ooni-io-_CNAME_" {
 
 resource "aws_route53_record" "msg-ooni-io-_CNAME_" {
   name    = "msg.ooni.io"
-  records = ["ooni.netlify.com"]
+  records = ["cname.vercel-dns.com"]
   ttl     = "1799"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_io
@@ -552,7 +552,7 @@ resource "aws_route53_record" "notify-proteus-ooni-io-_A_" {
 
 resource "aws_route53_record" "ooni-io-_A_" {
   name    = "ooni.io"
-  records = ["104.198.14.52"]
+  records = ["76.76.21.21"]
   ttl     = "300"
   type    = "A"
   zone_id = local.dns_root_zone_ooni_io
@@ -664,7 +664,7 @@ resource "aws_route53_record" "test-ooni-io-_NS_" {
 
 resource "aws_route53_record" "www-ooni-io-_CNAME_" {
   name    = "www.ooni.io"
-  records = ["ooni.netlify.com"]
+  records = ["cname.vercel-dns.com"]
   ttl     = "300"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_io
@@ -812,4 +812,20 @@ resource "aws_route53_record" "_atproto-ooni-org-_TXT_" {
   zone_id = local.dns_root_zone_ooni_org
   ttl     = "60"
   records = ["did=did:plc:4ouqb2j2j377siam2gtot6ge"]
+}
+
+resource "aws_route53_record" "openvpn1-htz-fsn-prod-ooni-nu-_A_" {
+  name    = "openvpn1.htz-fsn.prod.ooni.nu"
+  records = ["49.12.5.142"]
+  ttl     = "60"
+  type    = "A"
+  zone_id = local.dns_zone_ooni_nu
+}
+
+resource "aws_route53_record" "openvpn2-htz-fsn-prod-ooni-nu-_A_" {
+  name    = "openvpn2.htz-fsn.prod.ooni.nu"
+  records = ["128.140.123.158"]
+  ttl     = "60"
+  type    = "A"
+  zone_id = local.dns_zone_ooni_nu
 }

@@ -14,7 +14,7 @@
           - "{{ inventory_hostname }}"
         tls_cert_dir: /var/lib/dehydrated/certs
     - role: clickhouse_proxy
-      vars: 
+      vars:
         clickhouse_url: "clickhouse3.prod.ooni.io"
         clickhouse_port: 9000
         clickhouse_proxy_public_fqdn: "{{ inventory_hostname }}"
