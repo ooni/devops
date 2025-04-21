@@ -6,8 +6,6 @@
   become: true
   roles:
     - role: bootstrap
-    - role: nginx
-      tags: nginx
     - role: dehydrated
       vars: 
         ssl_domains: 
