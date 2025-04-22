@@ -1,5 +1,7 @@
 ---
 # For prometheus scrape requests
+- name: Flush all handlers 
+  meta: flush_handlers
 - name: Allow traffic on port 9200
   tags: prometheus-proxy
   blockinfile:
@@ -7,6 +9,17 @@
     create: yes
     block: |
       add rule inet filter input tcp dport 9200 counter accept comment "prometheus"
+  notify:
+    - reload nftables  
+
+# TODO remove this task when the monitoring proxy is deployed
+- name: Allow traffic on port 9100
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9100.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
   notify:
     - reload nftables  
 

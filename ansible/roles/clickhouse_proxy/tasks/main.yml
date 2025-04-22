@@ -20,6 +20,16 @@
   notify:
     - reload nftables  
 
+- name: Allow traffic on port 9100
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9100.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 9100 counter accept comment "monitoring server"
+  notify:
+    - reload nftables  
+
 - name: Create the modules-enabled directory if not exists
   tags: webserv
   ansible.builtin.file:
