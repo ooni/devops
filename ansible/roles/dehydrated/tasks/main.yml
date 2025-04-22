@@ -42,12 +42,6 @@
     dest: /var/lib/dehydrated/acme-challenges/ooni-acme-canary
     mode: "0644"
     owner: root
-  notify:
-    - reload nginx
-
-- name: Restart nginx
-  tags: dehydrated
-  shell: systemctl restart nginx
 
 - name: reload nftables service
   tags: dehydrated
@@ -90,5 +84,4 @@
   notify:
     # creates:
     # /var/lib/dehydrated/certs/<name>/chain.pem cert.pem privkey.pem fullchain.pem
-    - restart dehydrated
-    - reload nginx
+    - reload nginx and restart dehydrated
