@@ -1,4 +1,7 @@
 ---
+- name: Flush all handlers now
+  meta: flush_handlers
+
 - name: Allow traffic on port 9000
   tags: clickhouse-proxy
   blockinfile:
