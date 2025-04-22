@@ -299,7 +299,8 @@ module "ooniapi_cluster" {
     # The clickhouse proxy has an nginx configuration
     # to proxy requests from the monitoring server
     # to the cluster instances
-    module.ooni_clickhouse_proxy.ec2_sg_id
+    module.ooni_clickhouse_proxy.ec2_sg_id,
+    module.ooni_monitoring_proxy.ec2_sg_id
   ]
 
   tags = merge(
@@ -419,6 +420,14 @@ data "dns_a_record_set" "monitoring_host" {
   host = "monitoring.ooni.org"
 }
 
+data "dns_a_record_set" "monitoringproxy_host" {
+  host = "monitoringproxy.${local.environment}.ooni.io"
+}
+
+data "dns_a_record_set" "clickhouseproxy_host" {
+  host = "clickhouseproxy.${local.environment}.ooni.io"
+}
+
 module "ooni_clickhouse_proxy" {
   source = "../../modules/ec2"
 
@@ -454,6 +463,11 @@ module "ooni_clickhouse_proxy" {
     to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
+  }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoringproxy_host.*.addrs) : "${tostring(ip)}/32"]
   }]
 
   egress_rules = [{
@@ -519,6 +533,12 @@ module "ooni_monitoring_proxy" {
     to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
+  }, {
+    // TODO remove this rule when the monitoring proxy is deployed
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.clickhouseproxy_host.*.addrs) : "${tostring(ip)}/32"]
   }]
 
   egress_rules = [{
