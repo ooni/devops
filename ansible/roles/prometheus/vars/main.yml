@@ -157,4 +157,4 @@ prometheus_aws_access_key_prod: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/se
 prometheus_aws_secret_key_prod: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_monitoring/secret_key', profile='oonidevops_user_prod') }}"
 
 # We replace the env from relabeling configs
-clickhouse_proxy_host: "clickhouseproxy.ENV.ooni.io"
+clickhouse_proxy_host: "monitoringproxy.ENV.ooni.io"

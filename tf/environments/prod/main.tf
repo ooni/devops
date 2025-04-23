@@ -385,7 +385,12 @@ module "ooni_clickhouse_proxy" {
     to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
-  }]
+    }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    }]
 
   egress_rules = [{
     from_port   = 0,
@@ -419,6 +424,70 @@ resource "aws_route53_record" "clickhouse_proxy_alias" {
   ]
 }
 
+#### Monitoring Proxy
+module "ooni_monitoring_proxy" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.nano"
+
+  name = "oonimnprx"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 80,
+    to_port     = 80,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    // For the prometheus proxy:
+    from_port   = 9200,
+    to_port     = 9200,
+    protocol    = "tcp"
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"]
+  }]
+
+  sg_prefix = "oomnprx"
+  tg_prefix = "mnpr"
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier1-monitoringproxy" }
+  )
+}
+
+resource "aws_route53_record" "monitoring_proxy_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "monitoringproxy.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_monitoring_proxy.aws_instance_public_dns
+  ]
+}
 
 ### OONI Services Clusters
 
@@ -441,7 +510,8 @@ module "ooniapi_cluster" {
     # The clickhouse proxy has an nginx configuration
     # to proxy requests from the monitoring server
     # to the cluster instances
-    module.ooni_clickhouse_proxy.ec2_sg_id
+    module.ooni_clickhouse_proxy.ec2_sg_id,  
+    module.ooni_monitoring_proxy.ec2_sg_id
   ]
 
   tags = merge(
@@ -823,7 +893,10 @@ module "ansible_controller" {
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
 
-  monitoring_sg_ids = [module.ooni_clickhouse_proxy.ec2_sg_id]
+  monitoring_sg_ids = [
+    module.ooni_clickhouse_proxy.ec2_sg_id,  
+    module.ooni_monitoring_proxy.ec2_sg_id
+  ]
 
   tags = {
     Environment = local.environment
