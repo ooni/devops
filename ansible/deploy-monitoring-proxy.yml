@@ -2,7 +2,7 @@
 - name: Deploy monitoring proxy
   hosts:
     - monitoringproxy.dev.ooni.io
-    # - monitoringproxy.prod.ooni.io not yet implemented
+    - monitoringproxy.prod.ooni.io
   become: true
   roles:
     - role: bootstrap
