@@ -350,6 +350,10 @@ data "dns_a_record_set" "monitoring_host" {
   host = "monitoring.ooni.org"
 }
 
+data "dns_a_record_set" "clickhouseproxy_host" {
+  host = "clickhouseproxy.${local.environment}.ooni.io"
+}
+
 module "ooni_clickhouse_proxy" {
   source = "../../modules/ec2"
 
@@ -419,7 +423,66 @@ resource "aws_route53_record" "clickhouse_proxy_alias" {
   ]
 }
 
-# TODO Change this to the actual monitoring proxy when it's deployed in prod
+#### Monitoring Proxy
+module "ooni_monitoring_proxy" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.nano"
+
+  name = "oonimnprx"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 80,
+    to_port     = 80,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    // For the prometheus proxy:
+    from_port   = 9200,
+    to_port     = 9200,
+    protocol    = "tcp"
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
+  }, {
+    // TODO remove this rule when the monitoring proxy is deployed
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.clickhouseproxy_host.*.addrs) : "${tostring(ip)}/32"]
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"]
+  }]
+
+  sg_prefix = "oomnprx"
+  tg_prefix = "mnpr"
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier1-monitoringproxy" }
+  )
+}
+
 resource "aws_route53_record" "monitoring_proxy_alias" {
   zone_id = local.dns_zone_ooni_io
   name    = "monitoringproxy.${local.environment}.ooni.io"
@@ -427,7 +490,7 @@ resource "aws_route53_record" "monitoring_proxy_alias" {
   ttl     = 300
 
   records = [
-    module.ooni_clickhouse_proxy.aws_instance_public_dns
+    module.ooni_monitoring_proxy.aws_instance_public_dns
   ]
 }
 
