@@ -420,10 +420,6 @@ data "dns_a_record_set" "monitoring_host" {
   host = "monitoring.ooni.org"
 }
 
-data "dns_a_record_set" "clickhouseproxy_host" {
-  host = "clickhouseproxy.${local.environment}.ooni.io"
-}
-
 module "ooni_clickhouse_proxy" {
   source = "../../modules/ec2"
 
