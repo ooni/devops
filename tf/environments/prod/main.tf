@@ -389,7 +389,12 @@ module "ooni_clickhouse_proxy" {
     to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
-  }]
+    }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    }]
 
   egress_rules = [{
     from_port   = 0,
@@ -515,7 +520,8 @@ module "ooniapi_cluster" {
     # The clickhouse proxy has an nginx configuration
     # to proxy requests from the monitoring server
     # to the cluster instances
-    module.ooni_clickhouse_proxy.ec2_sg_id
+    module.ooni_clickhouse_proxy.ec2_sg_id,  
+    module.ooni_monitoring_proxy.ec2_sg_id
   ]
 
   tags = merge(
@@ -897,7 +903,10 @@ module "ansible_controller" {
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
 
-  monitoring_sg_ids = [module.ooni_clickhouse_proxy.ec2_sg_id]
+  monitoring_sg_ids = [
+    module.ooni_clickhouse_proxy.ec2_sg_id,  
+    module.ooni_monitoring_proxy.ec2_sg_id
+  ]
 
   tags = {
     Environment = local.environment

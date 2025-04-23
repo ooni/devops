@@ -420,10 +420,6 @@ data "dns_a_record_set" "monitoring_host" {
   host = "monitoring.ooni.org"
 }
 
-data "dns_a_record_set" "monitoringproxy_host" {
-  host = "monitoringproxy.${local.environment}.ooni.io"
-}
-
 data "dns_a_record_set" "clickhouseproxy_host" {
   host = "clickhouseproxy.${local.environment}.ooni.io"
 }
@@ -467,7 +463,7 @@ module "ooni_clickhouse_proxy" {
     from_port   = 9100,
     to_port     = 9100,
     protocol    = "tcp"
-    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoringproxy_host.*.addrs) : "${tostring(ip)}/32"]
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
   }]
 
   egress_rules = [{
@@ -533,12 +529,6 @@ module "ooni_monitoring_proxy" {
     to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
-  }, {
-    // TODO remove this rule when the monitoring proxy is deployed
-    from_port   = 9100,
-    to_port     = 9100,
-    protocol    = "tcp"
-    cidr_blocks = [for ip in flatten(data.dns_a_record_set.clickhouseproxy_host.*.addrs) : "${tostring(ip)}/32"]
   }]
 
   egress_rules = [{
