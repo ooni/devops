@@ -87,6 +87,7 @@ resource "aws_instance" "ooni_ec2" {
 
   lifecycle {
     create_before_destroy = true
+    ignore_changes = [ user_data ]
   }
 
   tags = merge(var.tags, {MonitoringActive = var.monitoring_active})
