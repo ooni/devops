@@ -207,13 +207,13 @@ scrape_configs:
 
 
   # See ansible/roles/ooni-backend/tasks/main.yml for the scraping targets
-  - job_name: 'haproxy'
-    scrape_interval: 5s
-    scheme: https
-    metrics_path: "/__haproxy_prom_metrics"
-    static_configs:
-      - targets:
-        - backend-hel.ooni.org:444
+  #- job_name: 'haproxy'
+  #  scrape_interval: 5s
+  #  scheme: https
+  #  metrics_path: "/__haproxy_prom_metrics"
+  #  static_configs:
+  #    - targets:
+  #      - backend-hel.ooni.org:444
 
   # EC2 instances monitoring: 
   - job_name: 'ooni-aws-ec2-dev'
