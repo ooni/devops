@@ -20,14 +20,13 @@
   notify:
     - reload nftables  
 
-# For prometheus scrape requests
-- name: Allow traffic on port 9200
+- name: Allow traffic on port 9100
   tags: prometheus-proxy
   blockinfile:
-    path: /etc/ooni/nftables/tcp/9200.nft
+    path: /etc/ooni/nftables/tcp/9100.nft
     create: yes
     block: |
-      add rule inet filter input tcp dport 9200 counter accept comment "prometheus"
+      add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
   notify:
     - reload nftables  
 
@@ -45,17 +44,6 @@
   template:
     src: templates/99-stream.conf
     dest: /etc/nginx/modules-enabled/99-stream.conf
-    mode: 0755
-    owner: root
-  notify:
-    - reload nginx
-    - restart nginx
-
-- name: Add prometheus proxy nginx config
-  tags: webserv
-  template:
-    src: templates/prometheus-proxy.conf
-    dest: /etc/nginx/conf.d/prometheus-proxy.conf
     mode: 0755
     owner: root
   notify:
