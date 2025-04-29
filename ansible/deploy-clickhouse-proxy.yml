@@ -11,8 +11,6 @@
         ssl_domains: 
           - "{{ inventory_hostname }}"
         tls_cert_dir: /var/lib/dehydrated/certs
-    - role: nginx
-      tags: nginx
     - role: clickhouse_proxy
       vars:
         clickhouse_url: "clickhouse3.prod.ooni.io"

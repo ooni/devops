@@ -13,3 +13,10 @@
     name: dehydrated
     state: restarted
     enabled: yes
+
+- name: reload nginx and restart dehydrated
+  service: 
+    name: nginx
+    state: reloaded
+  notify:
+    restart dehydrated
