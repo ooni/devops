@@ -1,4 +1,12 @@
 ---
+# Flushing all handlers ensures that dehydrated and nginx are properly set up before proceeding 
+# with the installation. Check deploy-clickhouse-proxy.yml to see the dehydrated setup
+# 
+# This playbook generates new nginx rules that depends on the certificate file from dehydrated, 
+# so if we restart nginx before dehydrated is properly set up this playbook will crash and 
+# it will require manual intervention. 
+#
+# See: https://github.com/ooni/devops/pull/235#discussion_r2052289154
 - name: Flush all handlers now
   meta: flush_handlers
 
