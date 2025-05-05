@@ -612,6 +612,17 @@ module "ooni_fastpath" {
   )
 }
 
+resource "aws_route53_record" "fastpath_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "fastpath.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_monitoring_proxy.aws_instance_public_dns
+  ]
+}
+
 #### OONI Run service
 
 module "ooniapi_oonirun_deployer" {
