@@ -619,7 +619,7 @@ resource "aws_route53_record" "fastpath_alias" {
   ttl     = 300
 
   records = [
-    module.ooni_monitoring_proxy.aws_instance_public_dns
+    module.ooni_fastpath.aws_instance_public_dns
   ]
 }
 

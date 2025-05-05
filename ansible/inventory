@@ -42,3 +42,7 @@ monitoringproxy.prod.ooni.io
 [openvpn]
 openvpn1.htz-fsn.prod.ooni.nu
 openvpn2.htz-fsn.prod.ooni.nu
+
+[aws-backend]
+fastpath.dev.ooni.io
+# fastpath.prod.ooni.io
