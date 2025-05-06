@@ -14,6 +14,18 @@
   notify:
    - reload nftables  
 
+# For incoming fastpath traffic
+- name: Allow traffic on port 8472
+  become: true
+  tags: fastpath
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/8472.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 8472 counter accept comment "fastpath"
+  notify:
+   - reload nftables  
+
 # Docker seems to have problems with nftables, so this command will translate all iptables
 # commands to nftables commands
 - name: Update alternatives for iptables 
