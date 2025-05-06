@@ -1,1 +1,4 @@
 tls_cert_dir: /var/lib/dehydrated/certs
+fastpath_user: fastpath
+fastpath_home: "/opt/{{ fastpath_user }}"
+fastpath_shell: /bin/bash

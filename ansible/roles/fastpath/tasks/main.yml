@@ -12,3 +12,40 @@
       add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
   notify:
     - reload nftables  
+
+### Create fastpath user 
+- name: Ensure the fastpath group exists
+  ansible.builtin.group:
+    name: "{{ fastpath_user }}"
+    state: present
+  become: yes
+- name: Create the fastpath user
+  ansible.builtin.user:
+    name: "{{ fastpath_user }}"
+    home: "{{ fastpath_home }}"
+    shell: "{{ fastpath_shell }}"
+    group: "{{ fastpath_user }}"
+    create_home: yes
+    system: yes
+  become: yes
+- name: Set ownership of the fastpath directory
+  ansible.builtin.file:
+    path: "{{ fastpath_home }}"
+    owner: "{{ fastpath_user }}"
+    group: "{{ fastpath_user }}"
+    state: directory
+    mode: '0755'
+  become: yes
+
+
+  # We could also create an ECR docker image and use that, but this is a bit simpler 
+- name: Clone backend repo
+  become: yes
+  ansible.builtin.git:
+    repo: 'https://github.com/ooni/backend'
+    dest: "/opt/{{fastpath_user}}/backend"
+    version: master  
+    force: yes     
+
+
+
