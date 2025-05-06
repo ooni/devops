@@ -4,6 +4,7 @@
   meta: flush_handlers
 
 - name: Allow traffic on port 9100
+  become: true
   tags: prometheus-proxy
   blockinfile:
     path: /etc/ooni/nftables/tcp/9100.nft
@@ -19,6 +20,8 @@
   tags: docker
   become: yes
   ansible.builtin.command: "update-alternatives --set iptables /usr/sbin/iptables-nft"
+  notify: 
+   - restart docker
 
 - name: Update alternatives for iptables 
   tags: docker
