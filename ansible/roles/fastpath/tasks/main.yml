@@ -11,7 +11,32 @@
     block: |
       add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
   notify:
-    - reload nftables  
+   - reload nftables  
+
+# Docker seems to have problems with nftables, so this command will translate all iptables
+# commands to nftables commands
+- name: Update alternatives for iptables 
+  tags: docker
+  become: yes
+  ansible.builtin.command: "update-alternatives --set iptables /usr/sbin/iptables-nft"
+
+- name: Update alternatives for iptables 
+  tags: docker
+  become: yes
+  ansible.builtin.command: "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft"
+  notify: 
+   - restart docker
+
+- name: Flush all handlers # Required to apply iptables settings before docker runs
+  meta: flush_handlers
+
+### Install make to build fastpath
+- name: Install make
+  ansible.builtin.apt:
+    name: make
+    state: present
+    update_cache: yes  
+  become: yes
 
 ### Create fastpath user 
 - name: Ensure the fastpath group exists
@@ -39,13 +64,28 @@
 
 
   # We could also create an ECR docker image and use that, but this is a bit simpler 
+  # Install fastpath
 - name: Clone backend repo
   become: yes
   ansible.builtin.git:
     repo: 'https://github.com/ooni/backend'
     dest: "/opt/{{fastpath_user}}/backend"
-    version: master  
+    # TODO Change to `master` when https://github.com/ooni/backend/pull/935 is merged
+    version: support-deploying-fastpath-as-docker-container  
     force: yes     
 
+- name: Create configuration file
+  tags: fastpath
+  template:
+    src: templates/fastpath.conf
+    dest: "/opt/{{fastpath_user}}/backend/fastpath/fastpath.conf"
+    mode: 0444
+    owner: "{{fastpath_user}}"
+  become: yes
 
+- name: Run docker container
+  tags: fastpath
+  ansible.builtin.command: "make docker-all" # TODO Change to `make docker` when clickhouse is migrated
+  args:
+    chdir: "/opt/{{fastpath_user}}/backend/fastpath"
 
