@@ -1,0 +1,20 @@
+---
+- name: Deploy fastpath
+  hosts:
+    - fastpath.dev.ooni.io
+  become: true
+  roles:
+    - role: bootstrap
+    - role: dehydrated
+      vars: 
+        ssl_domains: 
+          - "{{ inventory_hostname }}"
+        tls_cert_dir: /var/lib/dehydrated/certs
+    - role: prometheus_node_exporter
+      vars:
+        node_exporter_port: 9100
+        node_exporter_host: "0.0.0.0"
+        prometheus_nginx_proxy_config: 
+          - location: /metrics/node_exporter
+            proxy_pass: http://127.0.0.1:9100/metrics
+    - role: fastpath
