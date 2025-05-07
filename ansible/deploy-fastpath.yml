@@ -21,5 +21,6 @@
       docker_install_compose: true
       docker_users:
         - fastpath
+        - ubuntu
       docker_package_state: latest
     - role: fastpath
