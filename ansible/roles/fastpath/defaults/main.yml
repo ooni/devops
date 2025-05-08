@@ -3,7 +3,6 @@ tls_cert_dir: /var/lib/dehydrated/certs
 # Fastpath user
 fastpath_user: fastpath
 fastpath_home: "/opt/{{ fastpath_user }}"
-fastpath_shell: /bin/bash
 
 # Fastpath settings
 # TODO Update this to the actual clickhouse host when we have migrated it 

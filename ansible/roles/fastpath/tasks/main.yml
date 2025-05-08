@@ -63,7 +63,7 @@
   ansible.builtin.user:
     name: "{{ fastpath_user }}"
     home: "{{ fastpath_home }}"
-    shell: "{{ fastpath_shell }}"
+    shell: "/bin/bash"
     group: "{{ fastpath_user }}"
     create_home: yes
     system: yes
