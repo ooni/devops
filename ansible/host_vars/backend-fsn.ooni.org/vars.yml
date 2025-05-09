@@ -8,3 +8,4 @@ base_url: "https://backend-fsn.ooni.org"
 tor_targets: "{{ vault_tor_targets }}"
 psiphon_config: "{{ vault_orchestra_psiphon_config_file_content }}"
 digital_ocean_token: "{{ vault_digital_ocean_token }}"
+admin_group_name: adm
