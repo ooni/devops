@@ -1,4 +1,8 @@
 ssh_users:
+  sloncocs:
+    login: sloncocs
+    comment: Elizaveta 
+    keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMlol+UQauDLLMB//CpGBiigJftQmqk5Wm2c1TXk9RNz elizaveta@openobservatory.org"]
   agrabeli:
     login: agrabeli
     comment: Maria Xynou
@@ -113,7 +117,7 @@ ssh_users:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis ]
-non_admin_usernames: [ ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex, imap]
+non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex, imap, sloncocs]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
