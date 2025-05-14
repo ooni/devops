@@ -148,6 +148,12 @@
     src: analysis.conf
     dest: /etc/ooni/analysis.conf
 
+- name: Add analysis environment variables
+  tags: analysis-conf
+  template:
+    src: analysis.env
+    dest: /etc/ooni/analysis.env
+
 ## DB backup ##
 
 - name: Run DB backup
