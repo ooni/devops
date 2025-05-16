@@ -30,6 +30,6 @@
         collectors: 
           - "backend-hel.ooni.org"
         fastpath_version: 0.86~pr831-395
-        analysis_version: 1.12~pr836-412
+        analysis_version: 1.13~pr959-583
         deb_bucket_name: ooni-internal-deb
         deb_server_name: deb-cli.ooni.org
