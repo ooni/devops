@@ -9,6 +9,8 @@ nftables_clickhouse_allow:
     ip: 138.201.19.39
   - fqdn: backend-hel.ooni.org
     ip: 65.108.192.151
+  - fqdn: backend-fsn.ooni.org
+    ip: 162.55.247.208
   - fqdn: clickhouseproxy.dev.ooni.io
     ip: "{{ lookup('dig', 'clickhouseproxy.dev.ooni.io/A') }}"
 
