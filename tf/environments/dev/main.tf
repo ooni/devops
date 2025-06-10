@@ -566,7 +566,7 @@ module "ooniapi_oonirun_deployer" {
 
   service_name            = "oonirun"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "oonirun-v2-1"
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
   trigger_path            = "ooniapi/services/oonirun/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
