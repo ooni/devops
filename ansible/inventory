@@ -21,7 +21,7 @@ data1.htz-fsn.prod.ooni.nu
 data3.htz-fsn.prod.ooni.nu
 openvpn1.htz-fsn.prod.ooni.nu
 openvpn2.htz-fsn.prod.ooni.nu
-#backend-fsn.ooni.org
+backend-fsn.ooni.org
 
 [htz_hel]
 backend-hel.ooni.org
