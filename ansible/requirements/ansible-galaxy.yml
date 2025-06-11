@@ -13,3 +13,5 @@
 - src: https://github.com/ooni/airflow-role.git
   scm: git
   name: ooni.airflow_role
+- src: geerlingguy.docker
+  version: 7.4.7
