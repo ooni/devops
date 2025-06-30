@@ -624,6 +624,23 @@ resource "aws_route53_record" "fastpath_alias" {
   ]
 }
 
+module "fastpath_builder" {
+  source = "../../modules/ooni_docker_build"
+  trigger_tag = ""
+
+  service_name            = "fastpath"
+  repo                    = "ooni/backend"
+  branch_name             = "fastpath-dockerhub"
+  buildspec_path          = "fastpath/buildspec.yml"
+  trigger_path            = "fastpath/**"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_service_name = module.ooniapi_oonirun.ecs_service_name
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+}
+
 #### OONI Run service
 
 module "ooniapi_oonirun_deployer" {
