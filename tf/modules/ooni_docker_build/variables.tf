@@ -34,11 +34,6 @@ variable "ecs_cluster_name" {
   description = "id of the cluster to deploy into"
 }
 
-variable "ecs_service_name" {
-  description = "id of the service in the cluster to deploy"
-}
-
-
 variable "trigger_path" {
   description = "path filter for push changes which trigger the codepipeline eg. ooniapi/services/oonirun/**"
 }

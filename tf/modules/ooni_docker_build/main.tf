@@ -36,7 +36,7 @@ resource "aws_iam_policy" "codebuild" {
       ],
       "Effect": "Allow",
       "Resource": [
-        "arn:aws:s3:::codepipeline-oonidkr-${var.aws_region}-*"
+        "arn:aws:s3:::codepipeline-ooniapi-${var.aws_region}-*"
       ]
     },
     {
