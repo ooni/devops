@@ -45,14 +45,6 @@
 - name: Flush all handlers # Required to apply iptables settings before docker runs
   meta: flush_handlers
 
-### Install make to build fastpath
-- name: Install make
-  ansible.builtin.apt:
-    name: make
-    state: present
-    update_cache: yes  
-  become: yes
-
 ### Create fastpath user 
 - name: Ensure the fastpath group exists
   ansible.builtin.group:
@@ -77,17 +69,14 @@
     mode: '0755'
   become: yes
 
-
-  # We could also create an ECR docker image and use that, but this is a bit simpler 
-  # Install fastpath
-- name: Clone backend repo
-  become: yes
-  ansible.builtin.git:
-    repo: 'https://github.com/ooni/backend'
-    dest: "/opt/{{fastpath_user}}/backend"
-    # TODO Change to `master` when https://github.com/ooni/backend/pull/935 is merged
-    version: support-deploying-fastpath-as-docker-container  
-    force: yes     
+### Run fastpath
+- name: Make sure that the fastpath configuration directory exists
+  ansible.builtin.file:
+    path: /opt/{{fastpath_user}}/backend/fastpath/
+    state: directory
+    mode: '0700'
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
 
 - name: Create configuration file
   tags: fastpath
@@ -100,7 +89,7 @@
 
 - name: Run docker container
   tags: fastpath
-  ansible.builtin.command: "make docker-all" # TODO Change to `make docker` when clickhouse is migrated
+  ansible.builtin.command: docker run -d -v /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf --name fastpath -p 5000:5000 -p 8472:8472 ooni/fastpath:latest
   args:
     chdir: "/opt/{{fastpath_user}}/backend/fastpath"
 
