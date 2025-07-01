@@ -1,0 +1,86 @@
+---
+# For prometheus scrape requests
+- name: Flush all handlers 
+  meta: flush_handlers
+
+- name: Allow traffic on port 9100
+  become: true
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9100.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
+  notify:
+   - reload nftables  
+
+# For incoming fastpath traffic
+- name: Allow traffic on port 8472
+  become: true
+  tags: fastpath
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/8472.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 8472 counter accept comment "fastpath"
+  notify:
+   - reload nftables  
+
+# Docker seems to have problems with nftables, so this command will translate all iptables
+# commands to nftables commands
+- name: Update alternatives for iptables 
+  tags: docker
+  become: yes
+  ansible.builtin.command: "update-alternatives --set iptables /usr/sbin/iptables-nft"
+  notify: 
+   - restart docker
+
+- name: Update alternatives for iptables 
+  tags: docker
+  become: yes
+  ansible.builtin.command: "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft"
+  notify: 
+   - restart docker
+
+- name: Flush all handlers # Required to apply iptables settings before docker runs
+  meta: flush_handlers
+
+### Create fastpath user 
+- name: Ensure the fastpath group exists
+  ansible.builtin.group:
+    name: "{{ fastpath_user }}"
+    state: present
+  become: yes
+- name: Create the fastpath user
+  ansible.builtin.user:
+    name: "{{ fastpath_user }}"
+    home: "{{ fastpath_home }}"
+    shell: "/bin/bash"
+    group: "{{ fastpath_user }}"
+    create_home: yes
+    system: yes
+  become: yes
+- name: Set ownership of the fastpath directory
+  ansible.builtin.file:
+    path: "{{ fastpath_home }}"
+    owner: "{{ fastpath_user }}"
+    group: "{{ fastpath_user }}"
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Create configuration file
+  tags: fastpath
+  template:
+    src: templates/fastpath.conf
+    dest: "/opt/{{fastpath_user}}/backend/fastpath/fastpath.conf"
+    mode: 0444
+    owner: "{{fastpath_user}}"
+  become: yes
+
+- name: Run docker container
+  tags: fastpath
+  ansible.builtin.command: "make docker-all" # TODO Change to `make docker` when clickhouse is migrated
+  args:
+    chdir: "/opt/{{fastpath_user}}/backend/fastpath"
+
