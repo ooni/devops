@@ -69,3 +69,9 @@ variable "monitoring_active" {
   default = "true"
   type = string
 }
+
+variable "disk_size" {
+  description = "Available disk space for this machine, in GB. Defaults to 8gb"
+  default = 8
+  type = number
+}

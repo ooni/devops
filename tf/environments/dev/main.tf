@@ -607,6 +607,8 @@ module "ooni_fastpath" {
   sg_prefix = "oonifastpath"
   tg_prefix = "fstp"
 
+  disk_size = 20
+
   tags = merge(
     local.tags,
     { Name = "ooni-tier0-fastpath" }
