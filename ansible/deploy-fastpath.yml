@@ -18,9 +18,11 @@
           - location: /metrics/node_exporter
             proxy_pass: http://127.0.0.1:9100/metrics
     - role: geerlingguy.docker
-      docker_install_compose: true
       docker_users:
         - fastpath
         - ubuntu
       docker_package_state: latest
     - role: fastpath
+      vars:
+        # TODO Make it reusable in prod as well
+        clickhouse_url: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_readonly_url', profile='oonidevops_user_dev') }}"
