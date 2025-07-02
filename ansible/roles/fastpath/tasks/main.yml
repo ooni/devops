@@ -87,6 +87,14 @@
     owner: "{{fastpath_user}}"
   become: yes
 
+- name: Ensure ooniapi directory existence 
+  ansible.builtin.file:
+    path: /var/lib/ooniapi
+    state: directory
+    mode: '0700'
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
+
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
@@ -97,3 +105,4 @@
       - "8472:8472"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
+      - /var/lib/ooniapi:/var/lib/ooniapi
