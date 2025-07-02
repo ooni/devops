@@ -448,7 +448,7 @@ module "ooni_clickhouse_proxy" {
     from_port   = 9000,
     to_port     = 9000,
     protocol    = "tcp",
-    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, [format("%s/32", module.ooni_fastpath.aws_instance_public_ip)]),
     }, {
     // For the prometheus proxy:
     from_port   = 9200,
