@@ -14,8 +14,8 @@ roles:
   - src: https://github.com/ooni/airflow-role.git
     scm: git
     name: ooni.airflow_role
-  - src: geerlingguy.docker
+  - src: geerlingguy.docker # installs docker
     version: 7.4.7
 collections: 
-  - name: community.docker
+  - name: community.docker # manages containers
     version: 4.6.1
