@@ -109,8 +109,22 @@
 
 ### API Uploader set up
 - name: configure api uploader using s3 bucket
-  tags: api
+  tags: uploader
   template:
     src: templates/api-uploader.conf
     dest: /etc/ooni/api-uploader.conf
 
+- name: Install measurement uploader script
+  tags: uploader
+  template:
+    src: templates/ooni_api_uploader.py
+    dest: /usr/bin/ooni_api_uploader.py
+
+- name: Install ujson (uploader dep)
+  tags: uploader
+  become: true
+  apt: 
+    name: python3-ujson
+    state: present
+    update_cache: true
+  
