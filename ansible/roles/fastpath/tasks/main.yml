@@ -119,6 +119,9 @@
   template:
     src: templates/ooni_api_uploader.py
     dest: /usr/bin/ooni_api_uploader.py
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
+    mode: "0755"
 
 - name: Install ujson (uploader dep)
   tags: uploader
