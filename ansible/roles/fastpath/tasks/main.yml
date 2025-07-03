@@ -151,3 +151,26 @@
     name: python3-statsd
     state: present
     update_cache: true
+
+- name: Install uploder service
+  tags: uploader
+  template:
+    src: templates/ooni-api-uploader.service 
+    dest: /etc/systemd/system/ooni-api-uploader.service
+    mode: 0644
+    owner: root
+
+- name: Install uploader timer
+  tags: uploader
+  template:
+    src: templates/ooni-api-uploader.timer
+    dest: /etc/systemd/system/ooni-api-uploader.timer
+    mode: 0644
+    owner: root
+
+- name: Ensure uploader timer runs
+  tags: uploader
+  systemd:
+    name: ooni-api-uploader.timer
+    state: started
+    enabled: yes
