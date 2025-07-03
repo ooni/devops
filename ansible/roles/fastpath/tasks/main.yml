@@ -101,7 +101,6 @@
     image: ooni/fastpath:latest
     state: started
     published_ports: 
-      - "5000:5000"
       - "8472:8472"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
