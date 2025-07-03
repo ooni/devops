@@ -123,6 +123,14 @@
     group: "{{fastpath_user}}"
     mode: "0755"
 
+- name: Install clickhouse driver (uploader dep)
+  tags: uploader
+  become: true
+  apt: 
+    name: python3-clickhouse-driver
+    state: present
+    update_cache: true
+
 - name: Install ujson (uploader dep)
   tags: uploader
   become: true
