@@ -128,3 +128,23 @@
     state: present
     update_cache: true
   
+- name: Install Systemd 
+  tags: uploader
+  apt:
+    name: python3-systemd
+    state: present
+    update_cache: true
+
+- name: Install boto3
+  tags: uploader
+  apt:
+    name: python3-boto3
+    state: present
+    update_cache: true
+
+- name: Install Statsd
+  tags: uploader
+  apt:
+    name: python3-statsd
+    state: present
+    update_cache: true
