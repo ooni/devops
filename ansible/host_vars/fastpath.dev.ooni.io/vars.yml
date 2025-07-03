@@ -1,0 +1,4 @@
+s3_ooni_open_data_access_key: "{{ vault_s3_ooni_open_data_access_key }}"
+clickhouse_url: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_readonly_url', profile='oonidevops_user_dev') }}"
+bucket_name: "ooni-data-eu-fra-test"
+collector_id: "2"
