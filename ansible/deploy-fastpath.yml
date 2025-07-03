@@ -23,10 +23,3 @@
         - ubuntu
       docker_package_state: latest
     - role: fastpath
-      vars:
-        # TODO Make it reusable in prod as well
-        clickhouse_url: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_readonly_url', profile='oonidevops_user_dev') }}"
-        # TODO provide s3 bucket details:
-        s3_ooni_open_data_access_key: "" 
-        bucket_name: ""
-        collector_id: ""
