@@ -654,6 +654,8 @@ module "ooniapi_oonifindings" {
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
+  service_desired_count = 2
+
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
