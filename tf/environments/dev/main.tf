@@ -232,6 +232,10 @@ resource "random_id" "artifact_id" {
   byte_length = 4
 }
 
+resource "aws_s3_bucket" "ooniprobe_failed_reports" {
+  bucket = "ooniprobe-failed-reports-${var.aws_region}"
+}
+
 resource "aws_s3_bucket" "ooniapi_codepipeline_bucket" {
   bucket = "codepipeline-ooniapi-${var.aws_region}-${random_id.artifact_id.hex}"
 }
@@ -318,7 +322,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "bg-geoip-update"
+  branch_name             = "report-to-ecs"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -351,6 +355,8 @@ module "ooniapi_ooniprobe" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    FAILED_REPORTS_BUCKET       = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    FASTPATH_URL                = ""
   }
 
   ooniapi_service_security_groups = [
