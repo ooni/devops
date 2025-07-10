@@ -355,7 +355,10 @@ module "ooniapi_ooniprobe" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
-    FASTPATH_URL                = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+  }
+
+  task_environment = {
+    FASTPATH_URL                = format("http://fastpath.%s.ooni.io:8472", local.environment)  
     FAILED_REPORTS_BUCKET       = aws_s3_bucket.ooniprobe_failed_reports.bucket
   }
 
