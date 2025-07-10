@@ -317,13 +317,34 @@ module "ooniapi_cluster" {
 
 #### OONI Probe service
 
+# For accessing the s3 bucket
+resource "aws_iam_role_policy" "ooniprobe_role" {
+  name = "${local.name}-task-role"
+  role = module.ooniapi_cluster.container_host_role.name
+
+  policy = format(<<EOF
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "",
+			"Effect": "Allow",
+			"Action": "s3:PutObject",
+			"Resource": "%s/*"
+		}
+	]
+}
+EOF
+  , aws_s3_bucket.ooniprobe_failed_reports.arn)
+}
+
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  service_name            = "ooniprobe"
-  repo                    = "ooni/backend"
+  service_name = "ooniprobe"
+  repo         = "ooni/backend"
   # TODO change to master when https://github.com/ooni/backend/pull/969 is merged 
-  branch_name             = "report-to-ecs" 
+  branch_name             = "report-to-ecs"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -359,8 +380,8 @@ module "ooniapi_ooniprobe" {
   }
 
   task_environment = {
-    FASTPATH_URL                = format("http://fastpath.%s.ooni.io:8472", local.environment)  
-    FAILED_REPORTS_BUCKET       = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    FASTPATH_URL          = format("http://fastpath.%s.ooni.io:8472", local.environment)
+    FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
   }
 
   ooniapi_service_security_groups = [
@@ -465,7 +486,7 @@ module "ooni_clickhouse_proxy" {
     to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
-  }, {
+    }, {
     from_port   = 9100,
     to_port     = 9100,
     protocol    = "tcp"

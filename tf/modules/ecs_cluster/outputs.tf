@@ -17,3 +17,7 @@ output "web_security_group_id" {
 output "container_security_group_id" {
   value = aws_security_group.container_host.id
 }
+
+output "container_host_role" {
+  value = aws_iam_role.container_host
+}
