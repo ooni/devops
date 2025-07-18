@@ -232,6 +232,10 @@ resource "random_id" "artifact_id" {
   byte_length = 4
 }
 
+resource "aws_s3_bucket" "ooniprobe_failed_reports" {
+  bucket = "ooniprobe-failed-reports-${var.aws_region}"
+}
+
 resource "aws_s3_bucket" "ooniapi_codepipeline_bucket" {
   bucket = "codepipeline-ooniapi-${var.aws_region}-${random_id.artifact_id.hex}"
 }
@@ -313,12 +317,34 @@ module "ooniapi_cluster" {
 
 #### OONI Probe service
 
+# For accessing the s3 bucket
+resource "aws_iam_role_policy" "ooniprobe_role" {
+  name = "${local.name}-task-role"
+  role = module.ooniapi_cluster.container_host_role.name
+
+  policy = format(<<EOF
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "",
+			"Effect": "Allow",
+			"Action": "s3:PutObject",
+			"Resource": "%s/*"
+		}
+	]
+}
+EOF
+  , aws_s3_bucket.ooniprobe_failed_reports.arn)
+}
+
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  service_name            = "ooniprobe"
-  repo                    = "ooni/backend"
-  branch_name             = "bg-geoip-update"
+  service_name = "ooniprobe"
+  repo         = "ooni/backend"
+  # TODO change to master when https://github.com/ooni/backend/pull/969 is merged 
+  branch_name             = "report-to-ecs"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -351,6 +377,11 @@ module "ooniapi_ooniprobe" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+  }
+
+  task_environment = {
+    FASTPATH_URL          = format("http://fastpath.%s.ooni.io:8472", local.environment)
+    FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
   }
 
   ooniapi_service_security_groups = [
@@ -455,7 +486,7 @@ module "ooni_clickhouse_proxy" {
     to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
-  }, {
+    }, {
     from_port   = 9100,
     to_port     = 9100,
     protocol    = "tcp"
