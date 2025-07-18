@@ -98,7 +98,7 @@
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
-    image: ooni/fastpath:latest
+    image: ooni/fastpath:v0.87
     state: started
     published_ports: 
       - "8472:8472"
