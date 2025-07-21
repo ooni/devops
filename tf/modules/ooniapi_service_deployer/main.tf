@@ -4,6 +4,29 @@ data "aws_caller_identity" "current" {}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
+  deploy_stage = var.deploy ? [
+    {
+      name = "Deploy"
+      actions = [
+        {
+          name            = "Deploy"
+          category        = "Deploy"
+          owner           = "AWS"
+          provider        = "ECS"
+          input_artifacts = ["BuildArtifact"]
+          output_artifacts = []
+          region          = var.aws_region
+          run_order       = "1"
+          version         = "1"
+          namespace       = "DeployVariables"
+          configuration = {
+            ClusterName = var.ecs_cluster_name
+            ServiceName = var.ecs_service_name
+          }
+        }
+      ]
+    }
+  ] : []
 }
 
 resource "aws_iam_policy" "codebuild" {
@@ -266,25 +289,28 @@ resource "aws_codepipeline" "ooniapi" {
     name = "Build"
   }
 
-  stage {
-    action {
-      category = "Deploy"
+  dynamic "stage" {
+    for_each = local.deploy_stage
+    content {
+      name = stage.value.name
 
-      configuration = {
-        ClusterName = var.ecs_cluster_name
-        ServiceName = var.ecs_service_name
+      dynamic "action" {
+        for_each = stage.value.actions
+        content {
+          name             = action.value.name
+          category         = action.value.category
+          owner            = action.value.owner
+          provider         = action.value.provider
+          region           = action.value.region
+          run_order        = action.value.run_order
+          version          = action.value.version
+          namespace        = action.value.namespace
+          input_artifacts  = action.value.input_artifacts
+          output_artifacts = action.value.output_artifacts
+
+          configuration = action.value.configuration
+        }
       }
-
-      input_artifacts = ["BuildArtifact"]
-      name            = "Deploy"
-      namespace       = "DeployVariables"
-      owner           = "AWS"
-      provider        = "ECS"
-      region          = var.aws_region
-      run_order       = "1"
-      version         = "1"
     }
-
-    name = "Deploy"
   }
 }
