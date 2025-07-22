@@ -163,7 +163,7 @@ module "oonipg" {
   db_instance_class        = "db.t3.micro"
   db_storage_type          = "gp3"
   db_allocated_storage     = "50"
-  db_engine_version        = "16.4"
+  db_engine_version        = "16.8"
   db_max_allocated_storage = null
 
   # TODO: fix this to further restrict to only our subnets
@@ -384,7 +384,7 @@ module "ooni_clickhouse_proxy" {
     from_port   = 9000,
     to_port     = 9000,
     protocol    = "tcp",
-    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    cidr_blocks = module.network.vpc_subnet_public[*].cidr_block,
     }, {
     // For the prometheus proxy:
     from_port   = 9200,
