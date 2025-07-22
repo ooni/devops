@@ -38,8 +38,3 @@ variable "ecs_service_name" {
   description = "id of the service in the cluster to deploy"
 }
 
-variable "deploy" {
-  description = "If should deploy this code as an ECS service. Set false to just publish the docker image to Dockerhub"
-  default = true
-  type = bool
-}

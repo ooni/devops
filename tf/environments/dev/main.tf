@@ -658,9 +658,8 @@ resource "aws_route53_record" "fastpath_alias" {
 }
 
 module "fastpath_builder" {
-  source = "../../modules/ooniapi_service_deployer"
-  ecs_service_name = "fastpath"
-  deploy = false
+  source = "../../modules/ooni_docker_build"
+  trigger_tag = ""
 
   service_name            = "fastpath"
   repo                    = "ooni/backend"
