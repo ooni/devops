@@ -72,14 +72,6 @@
         state: started
         path: airflow-scheduler.service.j2
 
-- name: Set correct permissions on oonidata repo dir
-  ansible.builtin.file:
-    path: /opt/airflow/oonidata
-    state: directory
-    mode: "0644"
-    owner: airflow
-    recurse: true
-
 - name: Setup airflow nginx config
   ansible.builtin.template:
     src: nginx-airflow.j2
