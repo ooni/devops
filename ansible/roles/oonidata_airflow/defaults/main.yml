@@ -1,1 +1,2 @@
 tls_cert_dir: /var/lib/dehydrated/certs
+miniconda_install_dir: /opt/miniconda

@@ -24,6 +24,24 @@
     dest: /opt/airflow/oonidata
     version: main
 
+- name: Ensure miniconda is installed
+  ansible.builtin.include_role:
+    name: miniconda
+  vars:
+    miniconda_install_dir: "{{ miniconda_install_dir }}"
+  tags:
+    - oonidata
+    - oonipipeline
+
+- name: "Install pipeline with pip"
+  ansible.builtin.shell:
+    cmd: "{{ miniconda_install_dir }}/bin/pip install --upgrade /opt/airflow/oonidata/oonipipeline/"
+    chdir: "{{ miniconda_install_dir }}"
+  become_user: miniconda
+  tags:
+    - oonidata
+    - oonipipeline
+
 - name: Install airflow
   ansible.builtin.include_role:
     name: ooni.airflow_role
