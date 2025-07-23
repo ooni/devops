@@ -155,7 +155,25 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule" {
         "/api/v1/register",
         "/api/v1/update/*",
         # Activate this when the DB is connected in prod
-        # "/api/v1/check-in*" 
+        "/api/v1/check-in*",
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 121
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
+  }
+
+  condition {
+    path_pattern {
+      values = [
+        "/api/v1/test-helpers*"
       ]
     }
   }
@@ -163,7 +181,7 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule" {
 
 resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_host" {
   listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 121
+  priority     = 125
 
   action {
     type             = "forward"

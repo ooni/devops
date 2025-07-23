@@ -13,7 +13,7 @@
         tls_cert_dir: /var/lib/dehydrated/certs
     - role: clickhouse_proxy
       vars:
-        clickhouse_url: "clickhouse3.prod.ooni.io"
+        # clikchouse_url configured from host vars
         clickhouse_port: 9000
         clickhouse_proxy_public_fqdn: "{{ inventory_hostname }}"
     - role: prometheus_node_exporter
