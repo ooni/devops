@@ -27,8 +27,6 @@
 - name: Ensure miniconda is installed
   ansible.builtin.include_role:
     name: miniconda
-  vars:
-    miniconda_install_dir: "{{ miniconda_install_dir }}"
   tags:
     - oonidata
     - oonipipeline
