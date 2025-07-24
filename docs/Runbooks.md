@@ -1172,3 +1172,27 @@ sudo passwd NEWUSERNAME
 and sets the password of the new user to a randomly generated password prefixed with the string `CHANGEME`
 4. This password is sent privately to the new user and they are told to login via ssh using their key to update the password
 5. This user is now able to login with the password they have chosen via https://notebook.ooni.org/
+
+### Reprocessing data
+
+In order to reprocess older data the steps are:
+
+1. Update oonipipeline on the airflow host to the latest version by running the `deploy-airflow.yml` playbook:
+```
+./play deploy-airflow.yml --diff -i inventory
+```
+
+2. Trigger the main run task, preferrably under tmux, on the airflow host (airflow.prod.ooni.io):
+```
+CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main run --start-at 2025-01-01 --end-at 2025-02-01
+```
+
+3. Wait for it to converge and then verify that there are no duplicates left around by running:
+```
+CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main run check-duplicates --start-at 2025-01-01 --end-at 2025-02-01
+```
+
+If there are duplicate you can prune them with:
+```
+CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main run check-duplicates --start-at 2025-01-01 --end-at 2025-02-01 --optimize
+```
