@@ -341,10 +341,9 @@ EOF
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  service_name = "ooniprobe"
-  repo         = "ooni/backend"
-  # TODO change to master when https://github.com/ooni/backend/pull/969 is merged 
-  branch_name             = "report-to-ecs"
+  service_name            = "ooniprobe"
+  repo                    = "ooni/backend"
+  branch_name             = "fastpath-writes-to-disk"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -382,6 +381,7 @@ module "ooniapi_ooniprobe" {
   task_environment = {
     FASTPATH_URL          = format("http://fastpath.%s.ooni.io:8472", local.environment)
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    COLLECTOR_ID = 3 # use a different one in prod
   }
 
   ooniapi_service_security_groups = [
@@ -479,7 +479,7 @@ module "ooni_clickhouse_proxy" {
     from_port   = 9000,
     to_port     = 9000,
     protocol    = "tcp",
-    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, [format("%s/32", module.ooni_fastpath.aws_instance_private_ip)]),
     }, {
     // For the prometheus proxy:
     from_port   = 9200,
@@ -588,6 +588,89 @@ resource "aws_route53_record" "monitoring_proxy_alias" {
   records = [
     module.ooni_monitoring_proxy.aws_instance_public_dns
   ]
+}
+
+
+### Fastpath 
+module "ooni_fastpath" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.small"
+
+  name = "oonifastpath"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 8472,
+    to_port     = 8472,
+    protocol    = "tcp",
+    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "oonifastpath"
+  tg_prefix = "fstp"
+
+  disk_size = 150
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-fastpath" }
+  )
+}
+
+resource "aws_route53_record" "fastpath_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "fastpath.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_fastpath.aws_instance_public_dns
+  ]
+}
+
+module "fastpath_builder" {
+  source = "../../modules/ooni_docker_build"
+  trigger_tag = ""
+
+  service_name            = "fastpath"
+  repo                    = "ooni/backend"
+  branch_name             = "fastpath-writes-to-disk"
+  buildspec_path          = "fastpath/buildspec.yml"
+  trigger_path            = "fastpath/**"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
 #### OONI Run service

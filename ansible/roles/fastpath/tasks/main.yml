@@ -69,6 +69,15 @@
     mode: '0755'
   become: yes
 
+### Run fastpath
+- name: Make sure that the fastpath configuration directory exists
+  ansible.builtin.file:
+    path: /opt/{{fastpath_user}}/backend/fastpath/
+    state: directory
+    mode: '0700'
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
+
 - name: Create configuration file
   tags: fastpath
   template:
@@ -78,9 +87,70 @@
     owner: "{{fastpath_user}}"
   become: yes
 
-- name: Run docker container
-  tags: fastpath
-  ansible.builtin.command: "make docker-all" # TODO Change to `make docker` when clickhouse is migrated
-  args:
-    chdir: "/opt/{{fastpath_user}}/backend/fastpath"
+- name: Ensure ooniapi directory existence 
+  ansible.builtin.file:
+    path: /var/lib/ooniapi
+    state: directory
+    mode: '0700'
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
 
+- name: Ensure fastpath is running
+  community.docker.docker_container:
+    name: fastpath
+    image: ooni/fastpath:v0.87
+    state: started
+    published_ports: 
+      - "8472:8472"
+    volumes:
+      - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
+      - /var/lib/ooniapi:/var/lib/ooniapi
+
+### API Uploader set up
+- name: configure api uploader using s3 bucket
+  tags: uploader
+  template:
+    src: templates/api-uploader.conf
+    dest: /etc/ooni/api-uploader.conf
+
+- name: Install measurement uploader script
+  tags: uploader
+  template:
+    src: templates/ooni_api_uploader.py
+    dest: /usr/bin/ooni_api_uploader.py
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
+    mode: "0755"
+
+- name: Install dependencies for uploader
+  tags: uploader
+  apt:
+    pkg: 
+    - python3-statsd
+    - python3-boto3
+    - python3-clickhouse-driver
+    - python3-ujson
+    - python3-systemd
+
+- name: Install uploder service
+  tags: uploader
+  template:
+    src: templates/ooni-api-uploader.service 
+    dest: /etc/systemd/system/ooni-api-uploader.service
+    mode: 0644
+    owner: root
+
+- name: Install uploader timer
+  tags: uploader
+  template:
+    src: templates/ooni-api-uploader.timer
+    dest: /etc/systemd/system/ooni-api-uploader.timer
+    mode: 0644
+    owner: root
+
+- name: Ensure uploader timer runs
+  tags: uploader
+  systemd:
+    name: ooni-api-uploader.timer
+    state: started
+    enabled: yes

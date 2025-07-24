@@ -1,0 +1,8 @@
+tls_cert_dir: /var/lib/dehydrated/certs
+
+# Fastpath user
+fastpath_user: fastpath
+fastpath_home: "/opt/{{ fastpath_user }}"
+
+# Fastpath settings
+clickhouse_url: "clickhouse://write:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_write_password', profile='oonidevops_user_prod') }}@clickhouseproxy.dev.ooni.io/oonitest"

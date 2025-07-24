@@ -90,6 +90,11 @@ resource "aws_instance" "ooni_ec2" {
     ignore_changes = [ user_data, launch_template ]
   }
 
+  root_block_device {
+    volume_size = var.disk_size  # Size in GB
+    volume_type = "gp2"
+  }
+
   tags = merge(var.tags, {MonitoringActive = var.monitoring_active})
 }
 
