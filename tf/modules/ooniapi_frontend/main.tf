@@ -174,7 +174,8 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
     path_pattern {
       values = [
         "/api/v1/test-helpers*",
-        "/report*"
+        # TODO uncomment when fastpath is deployed to prod
+        # "/report*"
       ]
     }
   }
