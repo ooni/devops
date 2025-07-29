@@ -1,4 +1,4 @@
 s3_ooni_open_data_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/s3_ooni_open_data_access_key', profile='oonidevops_user_prod') }}"
 clickhouse_url: "clickhouse://write:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_write_password', profile='oonidevops_user_prod') }}@clickhouseproxy.prod.ooni.io/ooni"
-bucket_name: "ooniprobe-failed-reports-eu-central-1-1d24426a"
+bucket_name: "ooni-data-eu-fra"
 collector_id: "4"
