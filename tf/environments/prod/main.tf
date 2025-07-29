@@ -251,6 +251,10 @@ resource "random_id" "artifact_id" {
   byte_length = 4
 }
 
+resource "aws_s3_bucket" "ooniprobe_failed_reports" {
+  bucket = "ooniprobe-failed-reports-${var.aws_region}-${random_id.artifact_id.hex}"
+}
+
 resource "aws_s3_bucket" "ooniapi_codepipeline_bucket" {
   bucket = "codepipeline-ooniapi-${var.aws_region}-${random_id.artifact_id.hex}"
 }
@@ -384,7 +388,7 @@ module "ooni_clickhouse_proxy" {
     from_port   = 9000,
     to_port     = 9000,
     protocol    = "tcp",
-    cidr_blocks = module.network.vpc_subnet_public[*].cidr_block,
+    cidr_blocks = concat(module.network.vpc_subnet_public[*].cidr_block, ["${module.ooni_fastpath.aws_instance_private_ip}/32", "${module.ooni_fastpath.aws_instance_public_ip}/32"]),
     }, {
     // For the prometheus proxy:
     from_port   = 9200,
@@ -530,6 +534,26 @@ module "ooniapi_cluster" {
 
 #### OONI Probe service
 
+# For accessing the s3 bucket
+resource "aws_iam_role_policy" "ooniprobe_role" {
+  name = "${local.name}-task-role"
+  role = module.ooniapi_cluster.container_host_role.name
+
+  policy = <<EOF
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "",
+			"Effect": "Allow",
+			"Action": "s3:PutObject",
+			"Resource": "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
+		}
+	]
+}
+EOF
+}
+
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
@@ -570,6 +594,12 @@ module "ooniapi_ooniprobe" {
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
   }
 
+  task_environment = {
+    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
+    FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    COLLECTOR_ID = 4 # use a different one in prod
+  }
+
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id
   ]
@@ -578,6 +608,88 @@ module "ooniapi_ooniprobe" {
     local.tags,
     { Name = "ooni-tier0-ooniprobe" }
   )
+}
+
+### Fastpath 
+module "ooni_fastpath" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.small"
+
+  name = "oonifastpath"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 8472,
+    to_port     = 8472,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "oonifastpath"
+  tg_prefix = "fstp"
+
+  disk_size = 150
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-fastpath" }
+  )
+}
+
+resource "aws_route53_record" "fastpath_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "fastpath.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_fastpath.aws_instance_public_dns
+  ]
+}
+
+module "fastpath_builder" {
+  source = "../../modules/ooni_docker_build"
+  trigger_tag = ""
+
+  service_name            = "fastpath"
+  repo                    = "ooni/backend"
+  branch_name             = "master"
+  buildspec_path          = "fastpath/buildspec.yml"
+  trigger_path            = "fastpath/**"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
 

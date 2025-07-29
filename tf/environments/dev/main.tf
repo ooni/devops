@@ -322,7 +322,7 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
   name = "${local.name}-task-role"
   role = module.ooniapi_cluster.container_host_role.name
 
-  policy = format(<<EOF
+  policy = <<EOF
 {
 	"Version": "2012-10-17",
 	"Statement": [
@@ -330,12 +330,11 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Sid": "",
 			"Effect": "Allow",
 			"Action": "s3:PutObject",
-			"Resource": "%s/*"
+			"Resource": "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
 		}
 	]
 }
 EOF
-  , aws_s3_bucket.ooniprobe_failed_reports.arn)
 }
 
 module "ooniapi_ooniprobe_deployer" {
@@ -379,7 +378,7 @@ module "ooniapi_ooniprobe" {
   }
 
   task_environment = {
-    FASTPATH_URL          = format("http://fastpath.%s.ooni.io:8472", local.environment)
+    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID = 3 # use a different one in prod
   }
