@@ -148,6 +148,15 @@
     mode: 0644
     owner: root
 
+- name: Create spool dir
+  tags: uploader
+  ansible.builtin.file:
+    path: /var/lib/ooniapi/measurements/incoming
+    state: directory
+    mode: '0700'
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
+
 - name: Ensure uploader timer runs
   tags: uploader
   systemd:
