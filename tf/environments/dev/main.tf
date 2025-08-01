@@ -617,6 +617,11 @@ module "ooni_fastpath" {
     protocol    = "tcp",
     cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
     }, {
+    from_port   = 8475, # for serving jsonl files
+    to_port     = 8475,
+    protocol    = "tcp",
+    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    }, {
     from_port   = 80,
     to_port     = 80,
     protocol    = "tcp",
@@ -882,6 +887,10 @@ module "ooniapi_oonimeasurements" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+  }
+
+  task_environment = {
+    OTHER_COLLECTORS            = jsonencode(["fastpath.${local.environment}.ooni.io:8475"]) # it has to be a json-compliant array
   }
 
   ooniapi_service_security_groups = [
