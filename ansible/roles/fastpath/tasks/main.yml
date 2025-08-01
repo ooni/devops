@@ -83,7 +83,7 @@
   template:
     src: templates/fastpath.conf
     dest: "/opt/{{fastpath_user}}/backend/fastpath/fastpath.conf"
-    mode: 0444
+    mode: "0744"
     owner: "{{fastpath_user}}"
   become: yes
 
@@ -91,7 +91,7 @@
   ansible.builtin.file:
     path: /var/lib/ooniapi
     state: directory
-    mode: '0700'
+    mode: '0755'
     owner: "{{fastpath_user}}"
     group: "{{fastpath_user}}"
 
@@ -105,6 +105,18 @@
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
+
+### Serve jsonl from spool dir for oonimeasurements 
+- name: Add nginx config file for serving spool dir measurements
+  tags: fastpath
+  template:
+    src: templates/02-spool-dir.conf
+    dest: /etc/nginx/sites-enabled/02-spool-dir.conf
+    mode: "0444"
+    owner: nginx
+  become: yes
+  notify: 
+    - reload nginx
 
 ### API Uploader set up
 - name: configure api uploader using s3 bucket
@@ -137,7 +149,7 @@
   template:
     src: templates/ooni-api-uploader.service 
     dest: /etc/systemd/system/ooni-api-uploader.service
-    mode: 0644
+    mode: "0644"
     owner: root
 
 - name: Install uploader timer
@@ -145,7 +157,7 @@
   template:
     src: templates/ooni-api-uploader.timer
     dest: /etc/systemd/system/ooni-api-uploader.timer
-    mode: 0644
+    mode: "0644"
     owner: root
 
 - name: Ensure uploader timer runs

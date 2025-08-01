@@ -2,3 +2,4 @@ s3_ooni_open_data_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secr
 clickhouse_url: "clickhouse://write:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_write_password', profile='oonidevops_user_prod') }}@clickhouseproxy.dev.ooni.io/oonitest"
 bucket_name: "ooni-data-eu-fra-test"
 collector_id: "3"
+env: "dev"
