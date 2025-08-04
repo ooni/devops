@@ -381,7 +381,7 @@ module "ooniapi_ooniprobe" {
   task_environment = {
     FASTPATH_URL          = format("http://fastpath.%s.ooni.io:8472", local.environment)
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
-    COLLECTOR_ID = 3 # use a different one in prod
+    COLLECTOR_ID          = 3 # use a different one in prod
   }
 
   ooniapi_service_security_groups = [
@@ -668,7 +668,7 @@ resource "aws_route53_record" "fastpath_alias" {
 }
 
 module "fastpath_builder" {
-  source = "../../modules/ooni_docker_build"
+  source      = "../../modules/ooni_docker_build"
   trigger_tag = ""
 
   service_name            = "fastpath"
@@ -890,7 +890,7 @@ module "ooniapi_oonimeasurements" {
   }
 
   task_environment = {
-    OTHER_COLLECTORS            = jsonencode(["fastpath.${local.environment}.ooni.io:8475"]) # it has to be a json-compliant array
+    OTHER_COLLECTORS = jsonencode(["fastpath.${local.environment}.ooni.io:8475"]) # it has to be a json-compliant array
   }
 
   ooniapi_service_security_groups = [
