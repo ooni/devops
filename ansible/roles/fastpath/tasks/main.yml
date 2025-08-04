@@ -26,6 +26,18 @@
   notify:
    - reload nftables  
 
+# For serving jsonl files
+- name: Allow traffic on port 8475
+  become: true
+  tags: fastpath
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/8475.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 8475 counter accept comment "serve measurement spool"
+  notify:
+   - reload nftables  
+
 # Docker seems to have problems with nftables, so this command will translate all iptables
 # commands to nftables commands
 - name: Update alternatives for iptables 
