@@ -879,6 +879,10 @@ module "ooniapi_oonimeasurements" {
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
   }
 
+  task_environment = {
+    BASE_URL = "https://api.${local.environment}.ooni.io"
+  }
+
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id
   ]
