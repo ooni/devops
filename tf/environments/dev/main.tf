@@ -890,7 +890,8 @@ module "ooniapi_oonimeasurements" {
   }
 
   task_environment = {
-    OTHER_COLLECTORS = jsonencode(["fastpath.${local.environment}.ooni.io:8475"]) # it has to be a json-compliant array
+    # it has to be a json-compliant array
+    OTHER_COLLECTORS = jsonencode(["fastpath.${local.environment}.ooni.io:8475"]) 
     BASE_URL = "https://api.${local.environment}.ooni.io"
   }
 
