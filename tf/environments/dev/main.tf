@@ -893,6 +893,7 @@ module "ooniapi_oonimeasurements" {
     # it has to be a json-compliant array
     OTHER_COLLECTORS = jsonencode(["fastpath.${local.environment}.ooni.io:8475"]) 
     BASE_URL = "https://api.${local.environment}.ooni.io"
+    S3_BUCKET = "ooni-data-eu-test"
   }
 
   ooniapi_service_security_groups = [
