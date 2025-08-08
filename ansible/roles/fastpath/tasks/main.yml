@@ -63,6 +63,7 @@
     name: "{{ fastpath_user }}"
     state: present
   become: yes
+
 - name: Create the fastpath user
   ansible.builtin.user:
     name: "{{ fastpath_user }}"
@@ -72,6 +73,7 @@
     create_home: yes
     system: yes
   become: yes
+
 - name: Set ownership of the fastpath directory
   ansible.builtin.file:
     path: "{{ fastpath_home }}"
@@ -138,9 +140,6 @@
     image: ooni/fastpath:v0.87
     state: started
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
-    env: 
-      # This setting prevents clickhouse from breaking the docker container
-      USER: "{{fastpath_user}}"
     published_ports: 
       - "8472:8472"
     volumes:
