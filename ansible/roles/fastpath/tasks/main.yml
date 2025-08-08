@@ -78,7 +78,7 @@
     owner: "{{ fastpath_user }}"
     group: "{{ fastpath_user }}"
     state: directory
-    mode: '0755'
+    mode: "0700"
   become: yes
 
 ### Run fastpath
@@ -86,7 +86,7 @@
   ansible.builtin.file:
     path: /opt/{{fastpath_user}}/backend/fastpath/
     state: directory
-    mode: '0700'
+    mode: "0700"
     owner: "{{fastpath_user}}"
     group: "{{fastpath_user}}"
 
@@ -95,7 +95,7 @@
   template:
     src: templates/fastpath.conf
     dest: "/opt/{{fastpath_user}}/backend/fastpath/fastpath.conf"
-    mode: "0744"
+    mode: "0700"
     owner: "{{fastpath_user}}"
   become: yes
 
@@ -103,20 +103,50 @@
   ansible.builtin.file:
     path: /var/lib/ooniapi
     state: directory
-    mode: '0755'
+    mode: "0750"
     owner: "{{fastpath_user}}"
     group: "{{fastpath_user}}"
+
+- name: Ensure fastpath var dir exists
+  ansible.builtin.file:
+    path: /var/lib/fastpath
+    state: directory
+    mode: "0700"
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
+
+- name: Allow nginx access to the spool dir 
+  become: true
+  ansible.builtin.user:
+    name: nginx
+    groups: "{{fastpath_user}}"
+    append: yes
+
+- name: Get UID of a specific user
+  command: id -u {{fastpath_user}}
+  register: user_uid
+  changed_when: false
+
+- name: Get GID of a specific user
+  command: id -g {{fastpath_user}}
+  register: user_gid
+  changed_when: false
 
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
     image: ooni/fastpath:v0.87
     state: started
+    user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
+    env: 
+      # This setting prevents clickhouse from breaking the docker container
+      USER: "{{fastpath_user}}"
     published_ports: 
       - "8472:8472"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
+      - /var/lib/fastpath:/var/lib/fastpath
 
 ### Serve jsonl from spool dir for oonimeasurements 
 - name: Add nginx config file for serving spool dir measurements
