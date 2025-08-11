@@ -97,7 +97,7 @@
   template:
     src: templates/fastpath.conf
     dest: "/opt/{{fastpath_user}}/backend/fastpath/fastpath.conf"
-    mode: "0700"
+    mode: "0400"
     owner: "{{fastpath_user}}"
   become: yes
 
