@@ -40,7 +40,7 @@
 
 - name: Setup prometheus nginx config
   ansible.builtin.template:
-    src: nginx-prometheus.j2
+    src: "{{ 'nginx-prometheus-https.j2' if use_https else 'nginx-prometheus-http.j2'}}"
     dest: /etc/nginx/sites-enabled/01-prometheus
     mode: "0655"
   notify:

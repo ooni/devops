@@ -1,0 +1,22 @@
+# ansible-managed in ooni/devops.git
+
+server {
+    listen 80;
+
+    server_name {{ inventory_hostname }};
+
+    {% for config in prometheus_nginx_proxy_config %}
+
+    location {{ config['location'] }} {
+        auth_basic           "Administrator’s Area";
+        auth_basic_user_file /etc/ooni/prometheus_passwd;
+
+        proxy_pass {{ config['proxy_pass'] }};
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    {% endfor %}
+}
