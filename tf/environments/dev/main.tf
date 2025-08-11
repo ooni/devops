@@ -622,11 +622,6 @@ module "ooni_fastpath" {
     protocol    = "tcp",
     cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
     }, {
-    from_port   = 80,
-    to_port     = 80,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"], # for dehydrated 
-    }, {
     from_port   = 9100,
     to_port     = 9100,
     protocol    = "tcp"
