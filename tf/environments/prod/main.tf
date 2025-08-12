@@ -860,6 +860,56 @@ module "ooniapi_ooniauth" {
   )
 }
 
+### OONI Measurements service
+
+module "ooniapi_oonimeasurements_deployer" {
+  source = "../../modules/ooniapi_service_deployer"
+
+  service_name            = "oonimeasurements"
+  repo                    = "ooni/backend"
+  branch_name             = "master"
+  trigger_path            = "ooniapi/services/oonimeasurements/**"
+  buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+}
+
+module "ooniapi_oonimeasurements" {
+  source = "../../modules/ooniapi_service"
+
+  task_memory = 64
+
+  first_run = true
+  vpc_id    = module.network.vpc_id
+
+  service_name             = "oonimeasurements"
+  default_docker_image_url = "ooni/api-oonimeasurements:latest"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+
+  task_secrets = {
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
+    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+  }
+
+  ooniapi_service_security_groups = [
+    module.ooniapi_cluster.web_security_group_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-oonimeasurements" }
+  )
+}
+
 #### OONI Tier0 API Frontend
 
 module "ooniapi_frontend" {
