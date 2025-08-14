@@ -140,8 +140,11 @@
     image: ooni/fastpath:v0.87
     state: started
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
-    published_ports: 
-      - "8472:8472"
+    # use network mode = host to allow traffic from fastpath to the statsd exporter without 
+    # creating a network with redirection rules to match the ports
+    network_mode: host  
+    # published_ports: # unused on network_mode: host
+    #   - "8472:8472"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
@@ -158,6 +161,16 @@
   become: yes
   notify: 
     - reload nginx
+
+- name: Ensure the statsd to prometheus exporter is running
+  community.docker.docker_container:
+    name: statsd-exporter
+    image: prom/statsd-exporter:v0.28.0
+    state: started
+    published_ports: 
+      - "9102:9102" # for /metrics
+      - "8125:9125" # for reporting metrics 
+      - "8125:9125/udp"
 
 ### API Uploader set up
 - name: configure api uploader using s3 bucket
