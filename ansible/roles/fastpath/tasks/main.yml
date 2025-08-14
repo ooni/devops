@@ -62,6 +62,7 @@
   ansible.builtin.group:
     name: "{{ fastpath_user }}"
     state: present
+    gid: "1420"
   become: yes
 
 - name: Create the fastpath user
@@ -72,6 +73,7 @@
     group: "{{ fastpath_user }}"
     create_home: yes
     system: yes
+    uid: "1420"
   become: yes
 
 - name: Set ownership of the fastpath directory
