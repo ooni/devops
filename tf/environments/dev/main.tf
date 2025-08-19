@@ -380,7 +380,7 @@ module "ooniapi_ooniprobe" {
   task_environment = {
     FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
-    COLLECTOR_ID = 3 # use a different one in prod
+    COLLECTOR_ID          = 3 # use a different one in prod
   }
 
   ooniapi_service_security_groups = [
@@ -616,8 +616,18 @@ module "ooni_fastpath" {
     protocol    = "tcp",
     cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
+    from_port   = 8475, # for serving jsonl files
+    to_port     = 8475,
+    protocol    = "tcp",
+    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    }, {
     from_port   = 9100,
     to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    }, {
+    from_port   = 9102, # For fastpath metrics
+    to_port     = 9102,
     protocol    = "tcp"
     cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
   }]
@@ -657,7 +667,7 @@ resource "aws_route53_record" "fastpath_alias" {
 }
 
 module "fastpath_builder" {
-  source = "../../modules/ooni_docker_build"
+  source      = "../../modules/ooni_docker_build"
   trigger_tag = ""
 
   service_name            = "fastpath"
@@ -875,7 +885,14 @@ module "ooniapi_oonimeasurements" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_test_url.arn
+  }
+
+  task_environment = {
+    # it has to be a json-compliant array
+    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475"]) 
+    BASE_URL = "https://api.${local.environment}.ooni.io"
+    S3_BUCKET_NAME = "ooni-data-eu-fra-test"
   }
 
   ooniapi_service_security_groups = [

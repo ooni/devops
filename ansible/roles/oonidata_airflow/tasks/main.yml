@@ -24,6 +24,22 @@
     dest: /opt/airflow/oonidata
     version: main
 
+- name: Ensure miniconda is installed
+  ansible.builtin.include_role:
+    name: miniconda
+  tags:
+    - oonidata
+    - oonipipeline
+
+- name: "Install pipeline with pip"
+  ansible.builtin.shell:
+    cmd: "{{ miniconda_install_dir }}/bin/pip install --upgrade /opt/airflow/oonidata/oonipipeline/"
+    chdir: "{{ miniconda_install_dir }}"
+  become_user: miniconda
+  tags:
+    - oonidata
+    - oonipipeline
+
 - name: Install airflow
   ansible.builtin.include_role:
     name: ooni.airflow_role
@@ -55,14 +71,6 @@
         running: true
         state: started
         path: airflow-scheduler.service.j2
-
-- name: Set correct permissions on oonidata repo dir
-  ansible.builtin.file:
-    path: /opt/airflow/oonidata
-    state: directory
-    mode: "0755"
-    owner: airflow
-    recurse: true
 
 - name: Setup airflow nginx config
   ansible.builtin.template:
