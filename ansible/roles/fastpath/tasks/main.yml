@@ -26,6 +26,18 @@
   notify:
    - reload nftables  
 
+# For serving jsonl files
+- name: Allow traffic on port 8475
+  become: true
+  tags: fastpath
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/8475.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 8475 counter accept comment "serve measurement spool"
+  notify:
+   - reload nftables  
+
 # Docker seems to have problems with nftables, so this command will translate all iptables
 # commands to nftables commands
 - name: Update alternatives for iptables 
@@ -50,7 +62,9 @@
   ansible.builtin.group:
     name: "{{ fastpath_user }}"
     state: present
+    gid: "1420"
   become: yes
+
 - name: Create the fastpath user
   ansible.builtin.user:
     name: "{{ fastpath_user }}"
@@ -59,14 +73,16 @@
     group: "{{ fastpath_user }}"
     create_home: yes
     system: yes
+    uid: "1420"
   become: yes
+
 - name: Set ownership of the fastpath directory
   ansible.builtin.file:
     path: "{{ fastpath_home }}"
     owner: "{{ fastpath_user }}"
     group: "{{ fastpath_user }}"
     state: directory
-    mode: '0755'
+    mode: "0700"
   become: yes
 
 ### Run fastpath
@@ -74,7 +90,7 @@
   ansible.builtin.file:
     path: /opt/{{fastpath_user}}/backend/fastpath/
     state: directory
-    mode: '0700'
+    mode: "0700"
     owner: "{{fastpath_user}}"
     group: "{{fastpath_user}}"
 
@@ -83,7 +99,7 @@
   template:
     src: templates/fastpath.conf
     dest: "/opt/{{fastpath_user}}/backend/fastpath/fastpath.conf"
-    mode: 0444
+    mode: "0400"
     owner: "{{fastpath_user}}"
   become: yes
 
@@ -91,15 +107,41 @@
   ansible.builtin.file:
     path: /var/lib/ooniapi
     state: directory
-    mode: '0700'
+    mode: "0750"
     owner: "{{fastpath_user}}"
     group: "{{fastpath_user}}"
+
+- name: Ensure fastpath var dir exists
+  ansible.builtin.file:
+    path: /var/lib/fastpath
+    state: directory
+    mode: "0700"
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
+
+- name: Allow nginx access to the spool dir 
+  become: true
+  ansible.builtin.user:
+    name: nginx
+    groups: "{{fastpath_user}}"
+    append: yes
+
+- name: Get UID of a specific user
+  command: id -u {{fastpath_user}}
+  register: user_uid
+  changed_when: false
+
+- name: Get GID of a specific user
+  command: id -g {{fastpath_user}}
+  register: user_gid
+  changed_when: false
 
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
     image: ooni/fastpath:v0.87
     state: started
+    user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from fastpath to the statsd exporter without 
     # creating a network with redirection rules to match the ports
     network_mode: host  
@@ -108,6 +150,19 @@
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
+      - /var/lib/fastpath:/var/lib/fastpath
+
+### Serve jsonl from spool dir for oonimeasurements 
+- name: Add nginx config file for serving spool dir measurements
+  tags: fastpath
+  template:
+    src: templates/02-spool-dir.conf
+    dest: /etc/nginx/sites-enabled/02-spool-dir.conf
+    mode: "0444"
+    owner: nginx
+  become: yes
+  notify: 
+    - reload nginx
 
 - name: Ensure the statsd to prometheus exporter is running
   community.docker.docker_container:
@@ -150,7 +205,7 @@
   template:
     src: templates/ooni-api-uploader.service 
     dest: /etc/systemd/system/ooni-api-uploader.service
-    mode: 0644
+    mode: "0644"
     owner: root
 
 - name: Install uploader timer
@@ -158,7 +213,7 @@
   template:
     src: templates/ooni-api-uploader.timer
     dest: /etc/systemd/system/ooni-api-uploader.timer
-    mode: 0644
+    mode: "0644"
     owner: root
 
 - name: Ensure uploader timer runs
