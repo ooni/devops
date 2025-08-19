@@ -597,7 +597,7 @@ module "ooniapi_ooniprobe" {
   task_environment = {
     FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
-    COLLECTOR_ID = 4 # use a different one in prod
+    COLLECTOR_ID = 4 # be sure this is different from dev
   }
 
   ooniapi_service_security_groups = [
@@ -636,8 +636,18 @@ module "ooni_fastpath" {
     protocol    = "tcp",
     cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
+    from_port   = 8475, # for serving jsonl files
+    to_port     = 8475,
+    protocol    = "tcp",
+    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    }, {
     from_port   = 9100,
     to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    }, {
+    from_port   = 9102, # For fastpath metrics
+    to_port     = 9102,
     protocol    = "tcp"
     cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
   }]
@@ -900,6 +910,13 @@ module "ooniapi_oonimeasurements" {
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
   }
 
+  task_environment = {
+    # it has to be a json-compliant array
+    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475"]) 
+    BASE_URL = "https://api.${local.environment}.ooni.io"
+    S3_BUCKET_NAME = "ooni-data-eu-fra-test"
+  }
+
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id
   ]
@@ -923,6 +940,8 @@ module "ooniapi_frontend" {
   ooniapi_ooniauth_target_group_arn     = module.ooniapi_ooniauth.alb_target_group_id
   ooniapi_ooniprobe_target_group_arn    = module.ooniapi_ooniprobe.alb_target_group_id
   ooniapi_oonifindings_target_group_arn = module.ooniapi_oonifindings.alb_target_group_id
+  # TODO Uncomment when ready to deploy
+  # ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id
