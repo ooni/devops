@@ -54,7 +54,7 @@ def read_conf():
 def connect_to_db(conf):
     default = "clickhouse://api:api@localhost/default"
     uri = conf.get("db_uri", default)
-    log.info(f"Connecting to database on {uri}")
+    log.debug(f"Connecting to database on {uri}")
     conn = Clickhouse.from_url(uri)
     return conn
 
