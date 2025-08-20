@@ -917,7 +917,7 @@ module "ooniapi_oonimeasurements" {
       "http://fastpath.${local.environment}.ooni.io:8475"
     ])
     BASE_URL       = "https://api.${local.environment}.ooni.io"
-    S3_BUCKET_NAME = "ooni-data-eu-fra-test"
+    S3_BUCKET_NAME = "ooni-data-eu-fra"
   }
 
   ooniapi_service_security_groups = [
