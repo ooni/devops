@@ -940,8 +940,7 @@ module "ooniapi_frontend" {
   ooniapi_ooniauth_target_group_arn     = module.ooniapi_ooniauth.alb_target_group_id
   ooniapi_ooniprobe_target_group_arn    = module.ooniapi_ooniprobe.alb_target_group_id
   ooniapi_oonifindings_target_group_arn = module.ooniapi_oonifindings.alb_target_group_id
-  # TODO Uncomment when ready to deploy
-  # ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
+  ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id
