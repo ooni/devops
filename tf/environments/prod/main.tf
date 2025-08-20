@@ -400,7 +400,7 @@ module "ooni_clickhouse_proxy" {
     to_port     = 9100,
     protocol    = "tcp"
     cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
-    }]
+  }]
 
   egress_rules = [{
     from_port   = 0,
@@ -520,7 +520,7 @@ module "ooniapi_cluster" {
     # The clickhouse proxy has an nginx configuration
     # to proxy requests from the monitoring server
     # to the cluster instances
-    module.ooni_clickhouse_proxy.ec2_sg_id,  
+    module.ooni_clickhouse_proxy.ec2_sg_id,
     module.ooni_monitoring_proxy.ec2_sg_id
   ]
 
@@ -597,7 +597,7 @@ module "ooniapi_ooniprobe" {
   task_environment = {
     FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
-    COLLECTOR_ID = 4 # be sure this is different from dev
+    COLLECTOR_ID          = 4 # be sure this is different from dev
   }
 
   ooniapi_service_security_groups = [
@@ -639,7 +639,7 @@ module "ooni_fastpath" {
     from_port   = 8475, # for serving jsonl files
     to_port     = 8475,
     protocol    = "tcp",
-    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
     from_port   = 9100,
     to_port     = 9100,
@@ -687,7 +687,7 @@ resource "aws_route53_record" "fastpath_alias" {
 }
 
 module "fastpath_builder" {
-  source = "../../modules/ooni_docker_build"
+  source      = "../../modules/ooni_docker_build"
   trigger_tag = ""
 
   service_name            = "fastpath"
@@ -913,10 +913,10 @@ module "ooniapi_oonimeasurements" {
   task_environment = {
     # it has to be a json-compliant array
     OTHER_COLLECTORS = jsonencode([
-      "https://backend-fsn.ooni.org", 
+      "https://backend-fsn.ooni.org",
       "http://fastpath.${local.environment}.ooni.io:8475"
-    ]) 
-    BASE_URL = "https://api.${local.environment}.ooni.io"
+    ])
+    BASE_URL       = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME = "ooni-data-eu-fra-test"
   }
 
@@ -938,11 +938,11 @@ module "ooniapi_frontend" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_public[*].id
 
-  oonibackend_proxy_target_group_arn    = module.ooniapi_reverseproxy.alb_target_group_id
-  ooniapi_oonirun_target_group_arn      = module.ooniapi_oonirun.alb_target_group_id
-  ooniapi_ooniauth_target_group_arn     = module.ooniapi_ooniauth.alb_target_group_id
-  ooniapi_ooniprobe_target_group_arn    = module.ooniapi_ooniprobe.alb_target_group_id
-  ooniapi_oonifindings_target_group_arn = module.ooniapi_oonifindings.alb_target_group_id
+  oonibackend_proxy_target_group_arn        = module.ooniapi_reverseproxy.alb_target_group_id
+  ooniapi_oonirun_target_group_arn          = module.ooniapi_oonirun.alb_target_group_id
+  ooniapi_ooniauth_target_group_arn         = module.ooniapi_ooniauth.alb_target_group_id
+  ooniapi_ooniprobe_target_group_arn        = module.ooniapi_ooniprobe.alb_target_group_id
+  ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
 
   ooniapi_service_security_groups = [
@@ -1086,7 +1086,7 @@ module "ansible_controller" {
   dns_zone_ooni_io = local.dns_zone_ooni_io
 
   monitoring_sg_ids = [
-    module.ooni_clickhouse_proxy.ec2_sg_id,  
+    module.ooni_clickhouse_proxy.ec2_sg_id,
     module.ooni_monitoring_proxy.ec2_sg_id
   ]
 
