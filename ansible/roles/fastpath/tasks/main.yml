@@ -107,7 +107,7 @@
   ansible.builtin.file:
     path: /var/lib/ooniapi
     state: directory
-    mode: "0750"
+    mode: "0711"
     owner: "{{fastpath_user}}"
     group: "{{fastpath_user}}"
 
@@ -219,9 +219,9 @@
 - name: Create spool dir
   tags: uploader
   ansible.builtin.file:
-    path: /var/lib/ooniapi/measurements/incoming
+    path: /var/lib/ooniapi/measurements/incoming/
     state: directory
-    mode: '0700'
+    mode: '0711'
     owner: "{{fastpath_user}}"
     group: "{{fastpath_user}}"
 
