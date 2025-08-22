@@ -683,6 +683,107 @@ module "fastpath_builder" {
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
+
+#### Test Helpers Machine
+
+module "ooni_test_helpers" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.small"
+
+  name = "oonitesthelpers"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 80, # Echo test helper
+    to_port     = 80, 
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 8000, # Echo test helper
+    to_port     = 8000, 
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 8001, # Json test helper
+    to_port     = 8001, 
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 9100, # Prometheus monitoring
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "oonitesthelpers"
+  tg_prefix = "tshp"
+
+  disk_size = 20
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-testhelpers" }
+  )
+}
+
+resource "aws_route53_record" "testhelpers_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "test-helpers.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_test_helpers.aws_instance_public_dns
+  ]
+}
+
+resource "aws_route53_record" "testhelpers_echo_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "echo-th.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_test_helpers.aws_instance_public_dns
+  ]
+}
+
+resource "aws_route53_record" "testhelpers_json_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "json-th.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_test_helpers.aws_instance_public_dns
+  ]
+}
+
+
 #### OONI Run service
 
 module "ooniapi_oonirun_deployer" {
