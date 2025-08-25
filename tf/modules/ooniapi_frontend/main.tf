@@ -265,7 +265,6 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_1" {
   condition {
     path_pattern {
       values = [
-        "/unimplemented",
         "/api/v1/measurements/*",
         "/api/v1/raw_measurement",
         "/api/v1/measurement_meta",
@@ -291,7 +290,6 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
   condition {
     path_pattern {
       values = [
-        "/unimplemented",
         "/api/v1/aggregation",
         "/api/v1/aggregation/*",
         "/api/v1/observations",
