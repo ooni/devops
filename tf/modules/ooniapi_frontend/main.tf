@@ -232,6 +232,24 @@ resource "aws_lb_listener_rule" "ooniapi_oonifindings_rule_host" {
   }
 }
 
+resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_host" {
+  # hotfix: to allow us to deploy the frontend without the measurements service
+  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
+
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 139
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
+  }
+  condition {
+    host_header {
+      values = ["oonimeasurements.${local.direct_domain_suffix}"]
+    }
+  }
+}
+
 resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_1" {
   # hotfix: to allow us to deploy the frontend without the measurements service
   count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
@@ -248,11 +266,11 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_1" {
     path_pattern {
       values = [
         "/unimplemented",
-        # "/api/v1/measurements/*",
-        # "/api/v1/raw_measurement",
-        # "/api/v1/measurement_meta",
-        # "/api/v1/measurements",
-        # "/api/v1/torsf_stats"
+        "/api/v1/measurements/*",
+        "/api/v1/raw_measurement",
+        "/api/v1/measurement_meta",
+        "/api/v1/measurements",
+        "/api/v1/torsf_stats"
       ]
     }
   }
@@ -274,29 +292,11 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
     path_pattern {
       values = [
         "/unimplemented",
-        # "/api/v1/aggregation",
-        # "/api/v1/aggregation/*",
-        # "/api/v1/observations",
-        # "/api/v1/analysis",
+        "/api/v1/aggregation",
+        "/api/v1/aggregation/*",
+        "/api/v1/observations",
+        "/api/v1/analysis",
       ]
-    }
-  }
-}
-
-resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_host" {
-  # hotfix: to allow us to deploy the frontend without the measurements service
-  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
-
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 141
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
-  }
-  condition {
-    host_header {
-      values = ["oonimeasurements.${local.direct_domain_suffix}"]
     }
   }
 }
