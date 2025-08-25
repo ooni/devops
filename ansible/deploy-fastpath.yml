@@ -2,6 +2,7 @@
 - name: Deploy fastpath
   hosts:
     - fastpath.dev.ooni.io
+    - fastpath.prod.ooni.io
   become: true
   roles:
     - role: bootstrap
