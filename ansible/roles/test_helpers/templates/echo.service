@@ -1,12 +1,12 @@
 [Unit]
-Description=Test helper that will respond with a json showing the headers it received
+Description=Test helper that will start an echo session on request
 After=network.target
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/jsonth --port 8001
+ExecStart=/usr/local/bin/echo --port 8000
 Restart=on-failure
 RestartSec=5
 User=testhelpers

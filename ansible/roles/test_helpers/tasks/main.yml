@@ -53,6 +53,13 @@
     mode: '0600'
   become: true
 
+- name: Create test helpers temp dir
+  ansible.builtin.file:
+    path: "/tmp/test-helpers"
+    state: directory
+    mode: "0700"
+  become: yes
+
 - name: Extract tar content
   ansible.builtin.unarchive:
     src: "/tmp/test-helpers.tar.gz"
@@ -65,6 +72,7 @@
     src: "/tmp/test-helpers/jsonth"
     dest: "/usr/local/bin/"
     mode: '0755'
+    remote_src: yes
   become: yes
 
 - name: Make echo accessible system wide
@@ -72,6 +80,7 @@
     src: "/tmp/test-helpers/echo"
     dest: "/usr/local/bin/"
     mode: '0755'
+    remote_src: yes
   become: yes
 
 - name: Clean up temporary files
@@ -87,6 +96,7 @@
   become: yes
 
 # Create systemd units
+
 - name: Create jsonth.service file
   tags: test-helpers
   ansible.builtin.template: 
@@ -94,15 +104,34 @@
     dest: /etc/systemd/system/jsonth.service
     mode: '0755'
     owner: root
+  notify: 
+    - restart jsonth
+ 
+- name: Create echo.service file
+  tags: test-helpers
+  ansible.builtin.template: 
+    src: templates/echo.service
+    dest: /etc/systemd/system/echo.service
+    mode: '0755'
+    owner: root
+  notify: 
+    - restart echo
 
 - name: reload systemd
   tags: test-helpers
   shell: systemctl daemon-reload
 
-- name: Start jupyter
+- name: Start json
   tags: test-helpers
   systemd:
     name: jsonth.service
+    state: started
+    enabled: yes
+
+- name: Start echo
+  tags: test-helpers
+  systemd:
+    name: echo.service
     state: started
     enabled: yes
     
