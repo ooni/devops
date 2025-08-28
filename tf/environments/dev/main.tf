@@ -1084,6 +1084,10 @@ resource "aws_acm_certificate" "ooniapi_frontend" {
   tags = local.tags
 
   subject_alternative_names = keys(local.ooniapi_frontend_alternative_domains)
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_route53_record" "ooniapi_frontend_cert_validation" {
