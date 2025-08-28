@@ -1,12 +1,11 @@
 ---
 - name: Deploy test helpers
   hosts:
-    - test-helpers.dev.ooni.io
-    - test-helpers.prod.ooni.io
+    - echo.th.dev.ooni.io
+    - echo.th.prod.ooni.io
   become: true
   roles:
     - role: bootstrap
-    - role: nginx
     - role: prometheus_node_exporter
       vars:
         node_exporter_port: 9100
@@ -16,5 +15,6 @@
             proxy_pass: http://127.0.0.1:9100/metrics
     - role: test_helpers
       vars:
-        services:
-          - jsonth
+        helper: echo
+        port: 80
+

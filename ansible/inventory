@@ -46,4 +46,5 @@ openvpn2.htz-fsn.prod.ooni.nu
 [aws-backend]
 fastpath.dev.ooni.io
 # fastpath.prod.ooni.io
-test-helpers.dev.ooni.io
+json.th.dev.ooni.io
+echo.th.dev.ooni.io
