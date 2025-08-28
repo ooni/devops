@@ -799,18 +799,18 @@ module "ooni_test_helpers_echo" {
 
 resource "aws_route53_record" "testhelpers_json_alias" {
   zone_id = local.dns_zone_ooni_io
-  name    = "json.th.${local.environment}.ooni.io" # json
+  name    = "json.th.${local.environment}.ooni.io"
   type    = "CNAME"
   ttl     = 300
 
   records = [
-    module.ooni_test_helpers.aws_instance_public_dns
+    module.ooni_test_helpers_json.aws_instance_public_dns
   ]
 }
 
 resource "aws_route53_record" "testhelpers_echo_alias" {
   zone_id = local.dns_zone_ooni_io
-  name    = "echo.th.${local.environment}.ooni.io" # echo
+  name    = "echo.th.${local.environment}.ooni.io"
   type    = "CNAME"
   ttl     = 300
 
