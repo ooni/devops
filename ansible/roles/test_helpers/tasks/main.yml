@@ -97,34 +97,23 @@
 
 # Create systemd units
 
-- name: Create jsonth.service file
+- name: Create <helper>.service file
   tags: test-helpers
   ansible.builtin.template:
-    src: templates/jsonth.service
-    dest: /etc/systemd/system/jsonth.service
+    src: templates/{{helper}}.service
+    dest: /etc/systemd/system/{{helper}}.service
     mode: '0755'
     owner: root
   notify:
-    - restart jsonth
-
-- name: Create echo.service file
-  tags: test-helpers
-  ansible.builtin.template:
-    src: templates/echo.service
-    dest: /etc/systemd/system/echo.service
-    mode: '0755'
-    owner: root
-  notify:
-    - restart echo
+    - "restart {{helper}}"
 
 - name: reload systemd
   tags: test-helpers
   shell: systemctl daemon-reload
 
-- name: Start service
+- name: Start helper
   tags: test-helpers
   systemd:
-    name: "{{item}}.service"
+    name: "{{helper}}.service"
     state: started
     enabled: yes
-  loop: "{{helpers}}"

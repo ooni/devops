@@ -1,3 +1,4 @@
 
 # choices: jsonth, echo
-helpers: "jsonth"
+helper: "jsonth"
+port: "80"

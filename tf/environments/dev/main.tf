@@ -687,7 +687,7 @@ module "fastpath_builder" {
 #### Test Helpers Machines
 
 # jsonth and other http helpers
-module "ooni_test_helpers" {
+module "ooni_test_helpers_json" {
   source = "../../modules/ec2"
 
   stage = local.environment
@@ -700,20 +700,15 @@ module "ooni_test_helpers" {
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3.micro"
 
-  name = "oonitesthelpers"
+  name = "oonijsonth"
   ingress_rules = [{
     from_port   = 22,
     to_port     = 22,
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
-    from_port   = 80, # dehydrated
+    from_port   = 80, # jsonth
     to_port     = 80,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 8000, # Json test helper
-    to_port     = 8000,
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
@@ -768,13 +763,8 @@ module "ooni_test_helpers_echo" {
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
-    from_port   = 80, # dehydrated
+    from_port   = 80, # echo
     to_port     = 80,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 8000, # Echo test helper
-    to_port     = 8000,
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
@@ -807,9 +797,9 @@ module "ooni_test_helpers_echo" {
   )
 }
 
-resource "aws_route53_record" "testhelpers_alias" {
+resource "aws_route53_record" "testhelpers_json_alias" {
   zone_id = local.dns_zone_ooni_io
-  name    = "test-helpers.${local.environment}.ooni.io"
+  name    = "json.th.${local.environment}.ooni.io" # json
   type    = "CNAME"
   ttl     = 300
 
@@ -820,18 +810,7 @@ resource "aws_route53_record" "testhelpers_alias" {
 
 resource "aws_route53_record" "testhelpers_echo_alias" {
   zone_id = local.dns_zone_ooni_io
-  name    = "42.th.${local.environment}.ooni.io" # json and others
-  type    = "CNAME"
-  ttl     = 300
-
-  records = [
-    module.ooni_test_helpers.aws_instance_public_dns
-  ]
-}
-
-resource "aws_route53_record" "testhelpers_json_alias" {
-  zone_id = local.dns_zone_ooni_io
-  name    = "43.th.${local.environment}.ooni.io" # echo
+  name    = "echo.th.${local.environment}.ooni.io" # echo
   type    = "CNAME"
   ttl     = 300
 

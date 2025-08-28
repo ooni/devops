@@ -6,7 +6,7 @@ StartLimitBurst=3
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/echo --port 8000
+ExecStart=/usr/local/bin/echo --port {{port}}
 Restart=on-failure
 RestartSec=5
 User=testhelpers

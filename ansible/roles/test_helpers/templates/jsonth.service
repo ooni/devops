@@ -6,7 +6,7 @@ StartLimitBurst=3
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/jsonth --port 8001
+ExecStart=/usr/local/bin/jsonth --port {{port}}
 Restart=on-failure
 RestartSec=5
 User=testhelpers
