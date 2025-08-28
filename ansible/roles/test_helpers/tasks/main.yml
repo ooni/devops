@@ -121,27 +121,10 @@
   tags: test-helpers
   shell: systemctl daemon-reload
 
-- name: Start json
+- name: Start service
   tags: test-helpers
   systemd:
-    name: jsonth.service
+    name: "{{item}}.service"
     state: started
     enabled: yes
-
-- name: Start echo
-  tags: test-helpers
-  systemd:
-    name: echo.service
-    state: started
-    enabled: yes
-
-# Nginx routing
-- name: Copy nginx config
-  tags: test-helpers
-  ansible.builtin.template:
-    src: templates/test-helpers.conf
-    dest: /etc/nginx/sites-enabled/02-test-helpers.conf
-    mode: '744'
-    owner: nginx
-  notify:
-    - reload nginx
+  loop: "{{helpers}}"

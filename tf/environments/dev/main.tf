@@ -591,7 +591,7 @@ resource "aws_route53_record" "monitoring_proxy_alias" {
 }
 
 
-### Fastpath 
+### Fastpath
 module "ooni_fastpath" {
   source = "../../modules/ec2"
 
@@ -684,8 +684,9 @@ module "fastpath_builder" {
 }
 
 
-#### Test Helpers Machine
+#### Test Helpers Machines
 
+# jsonth and other http helpers
 module "ooni_test_helpers" {
   source = "../../modules/ec2"
 
@@ -697,7 +698,7 @@ module "ooni_test_helpers" {
   dns_zone_ooni_io    = local.dns_zone_ooni_io
 
   key_name      = module.adm_iam_roles.oonidevops_key_name
-  instance_type = "t3a.small"
+  instance_type = "t3.micro"
 
   name = "oonitesthelpers"
   ingress_rules = [{
@@ -707,17 +708,12 @@ module "ooni_test_helpers" {
     cidr_blocks = ["0.0.0.0/0"],
     }, {
     from_port   = 80, # dehydrated
-    to_port     = 80, 
+    to_port     = 80,
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
-    from_port   = 8000, # Echo test helper
-    to_port     = 8000, 
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 8001, # Json test helper
-    to_port     = 8001, 
+    from_port   = 8000, # Json test helper
+    to_port     = 8000,
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
@@ -750,6 +746,67 @@ module "ooni_test_helpers" {
   )
 }
 
+# Echo test helper, requires a dedicated machine bc it's a tcp server,
+# not an HTTP server, so it's harder to reroute using nginx
+module "ooni_test_helpers_echo" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3.micro"
+
+  name = "ooniechoth"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 80, # dehydrated
+    to_port     = 80,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 8000, # Echo test helper
+    to_port     = 8000,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 9100, # Prometheus monitoring
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "ooniechoth"
+  tg_prefix = "echo"
+
+  disk_size = 20
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-echoth" }
+  )
+}
+
 resource "aws_route53_record" "testhelpers_alias" {
   zone_id = local.dns_zone_ooni_io
   name    = "test-helpers.${local.environment}.ooni.io"
@@ -763,7 +820,7 @@ resource "aws_route53_record" "testhelpers_alias" {
 
 resource "aws_route53_record" "testhelpers_echo_alias" {
   zone_id = local.dns_zone_ooni_io
-  name    = "42.th.${local.environment}.ooni.io"
+  name    = "42.th.${local.environment}.ooni.io" # json and others
   type    = "CNAME"
   ttl     = 300
 
@@ -774,12 +831,12 @@ resource "aws_route53_record" "testhelpers_echo_alias" {
 
 resource "aws_route53_record" "testhelpers_json_alias" {
   zone_id = local.dns_zone_ooni_io
-  name    = "43.th.${local.environment}.ooni.io"
+  name    = "43.th.${local.environment}.ooni.io" # echo
   type    = "CNAME"
   ttl     = 300
 
   records = [
-    module.ooni_test_helpers.aws_instance_public_dns
+    module.ooni_test_helpers_echo.aws_instance_public_dns
   ]
 }
 
@@ -992,7 +1049,7 @@ module "ooniapi_oonimeasurements" {
 
   task_environment = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475"]) 
+    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475"])
     BASE_URL = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME = "ooni-data-eu-fra-test"
   }
