@@ -15,3 +15,8 @@
   ansible.builtin.systemd_service:
     name: nftables
     state: reloaded
+
+- name: reload nginx
+  service:
+    name: nginx
+    state: reloaded

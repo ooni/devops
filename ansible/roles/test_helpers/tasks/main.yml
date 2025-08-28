@@ -10,7 +10,7 @@
     block: |
       add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
   notify:
-   - reload nftables  
+   - reload nftables
 
 
 # For incoming test helper traffic
@@ -23,7 +23,7 @@
     block: |
       add rule inet filter input tcp dport 8000 counter accept comment "echo"
   notify:
-   - reload nftables  
+   - reload nftables
 
 - name: Allow traffic on port 8001 (json)
   become: true
@@ -34,7 +34,7 @@
     block: |
       add rule inet filter input tcp dport 8001 counter accept comment "json"
   notify:
-   - reload nftables  
+   - reload nftables
 
 # Create test helpers user
 - name: Create the testhelpers user
@@ -99,22 +99,22 @@
 
 - name: Create jsonth.service file
   tags: test-helpers
-  ansible.builtin.template: 
+  ansible.builtin.template:
     src: templates/jsonth.service
     dest: /etc/systemd/system/jsonth.service
     mode: '0755'
     owner: root
-  notify: 
+  notify:
     - restart jsonth
- 
+
 - name: Create echo.service file
   tags: test-helpers
-  ansible.builtin.template: 
+  ansible.builtin.template:
     src: templates/echo.service
     dest: /etc/systemd/system/echo.service
     mode: '0755'
     owner: root
-  notify: 
+  notify:
     - restart echo
 
 - name: reload systemd
@@ -134,4 +134,14 @@
     name: echo.service
     state: started
     enabled: yes
-    
+
+# Nginx routing
+- name: Copy nginx config
+  tags: test-helpers
+  ansible.builtin.template:
+    src: templates/test-helpers.conf
+    dest: /etc/nginx/sites-enabled/02-test-helpers.conf
+    mode: '744'
+    owner: nginx
+  notify:
+    - reload nginx
