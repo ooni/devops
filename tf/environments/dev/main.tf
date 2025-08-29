@@ -730,14 +730,14 @@ module "ooni_test_helpers_json" {
     ipv6_cidr_blocks = ["::/0"],
   }]
 
-  sg_prefix = "oonitesthelpers"
+  sg_prefix = "oonijsonth"
   tg_prefix = "tshp"
 
   disk_size = 20
 
   tags = merge(
     local.tags,
-    { Name = "ooni-tier0-testhelpers" }
+    { Name = "ooni-tier0-jsonth" }
   )
 }
 

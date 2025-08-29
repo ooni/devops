@@ -13,6 +13,7 @@
         prometheus_nginx_proxy_config:
           - location: /metrics/node_exporter
             proxy_pass: http://127.0.0.1:9100/metrics
+        use_https: false
     - role: test_helpers
       vars:
         helper: jsonth
