@@ -13,8 +13,9 @@
         prometheus_nginx_proxy_config:
           - location: /metrics/node_exporter
             proxy_pass: http://127.0.0.1:9100/metrics
+        use_https: false
+        http_port: 8080 # if we leave port 80, it's taken by nginx
     - role: test_helpers
       vars:
         helper: echo
         port: 80
-
