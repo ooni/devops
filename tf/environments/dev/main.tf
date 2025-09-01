@@ -686,7 +686,6 @@ module "fastpath_builder" {
 
 #### Test Helpers Machines
 
-# jsonth and other http helpers
 module "ooni_test_helpers_json" {
   source = "../../modules/ec2"
 
@@ -742,7 +741,7 @@ module "ooni_test_helpers_json" {
 }
 
 # Echo test helper, requires a dedicated machine bc it's a tcp server,
-# not an HTTP server, so it's harder to reroute using nginx
+# not an HTTP server. It's impossible to reroute using nginx
 module "ooni_test_helpers_echo" {
   source = "../../modules/ec2"
 
