@@ -7,11 +7,43 @@ resource "aws_alb" "ooniapi" {
   subnets         = var.subnet_ids
   security_groups = var.ooniapi_service_security_groups
 
+  access_logs {
+    bucket  = aws_s3_bucket.load_balancer_logs.bucket
+    enabled = true
+  }
+
   lifecycle {
     create_before_destroy = true
   }
 
   tags = var.tags
+}
+
+resource "random_id" "artifact_id" {
+  byte_length = 4
+}
+
+// For load balancer logs
+resource "aws_s3_bucket" "load_balancer_logs" {
+  bucket = "lb-logs-${var.aws_region}-${random_id.artifact_id.hex}"
+}
+
+resource "aws_s3_bucket_policy" "alb_logs_policy" {
+  bucket = aws_s3_bucket.load_balancer_logs.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AWSLoadBalancerLogging"
+        Effect    = "Allow"
+        Principal = {
+          Service = "logdelivery.elb.amazonaws.com"
+        }
+        Action = "s3:PutObject"
+        Resource = "${aws_s3_bucket.load_balancer_logs.arn}/*"
+      }
+    ]
+  })
 }
 
 resource "aws_alb_listener" "ooniapi_listener_http" {
