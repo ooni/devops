@@ -12,30 +12,6 @@
   notify:
    - reload nftables
 
-
-# For incoming test helper traffic
-- name: Allow traffic on port 8000 (echo)
-  become: true
-  tags: test-helpers
-  blockinfile:
-    path: /etc/ooni/nftables/tcp/8000.nft
-    create: yes
-    block: |
-      add rule inet filter input tcp dport 8000 counter accept comment "echo"
-  notify:
-   - reload nftables
-
-- name: Allow traffic on port 8001 (json)
-  become: true
-  tags: test-helpers
-  blockinfile:
-    path: /etc/ooni/nftables/tcp/8001.nft
-    create: yes
-    block: |
-      add rule inet filter input tcp dport 8001 counter accept comment "json"
-  notify:
-   - reload nftables
-
 # Create test helpers user
 - name: Create the testhelpers user
   ansible.builtin.user:
