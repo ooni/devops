@@ -174,7 +174,7 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
     path_pattern {
       values = [
         "/api/v1/test-helpers*",
-        "/report*"
+        # "/report*"
       ]
     }
   }
@@ -264,11 +264,12 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_1" {
   condition {
     path_pattern {
       values = [
-        "/api/v1/measurements/*",
-        "/api/v1/raw_measurement",
-        "/api/v1/measurement_meta",
-        "/api/v1/measurements",
-        "/api/v1/torsf_stats"
+        "/unimplemented"
+        # "/api/v1/measurements/*",
+        # "/api/v1/raw_measurement",
+        # "/api/v1/measurement_meta",
+        # "/api/v1/measurements",
+        # "/api/v1/torsf_stats"
       ]
     }
   }
@@ -289,10 +290,11 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
   condition {
     path_pattern {
       values = [
-        "/api/v1/aggregation",
-        "/api/v1/aggregation/*",
-        "/api/v1/observations",
-        "/api/v1/analysis",
+        "/unimplemented",
+        # "/api/v1/aggregation",
+        # "/api/v1/aggregation/*",
+        # "/api/v1/observations",
+        # "/api/v1/analysis",
       ]
     }
   }
