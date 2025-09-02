@@ -35,6 +35,23 @@ resource "aws_s3_bucket_ownership_controls" "load_balancer_logs" {
   }
 }
 
+resource "aws_s3_bucket_lifecycle_configuration" "load_balancer_logs" {
+  bucket = aws_s3_bucket.load_balancer_logs.id
+
+  rule {
+    id     = "expire-old-logs"
+    status = "Enabled"
+
+    expiration {
+      days = 15
+    }
+
+    filter {
+      prefix = "" // All objects
+    }
+  }
+}
+
 variable "region_to_account_id" {
   // We need a different id depending on the region, see:
   // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/enable-access-logging.html#attach-bucket-policy
