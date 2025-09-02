@@ -81,7 +81,7 @@ resource "aws_s3_bucket_policy" "alb_logs_policy" {
 
 // Athena DB for logs browsing
 resource "aws_s3_bucket" "athena_results" {
-  bucket = "ooni-athena-results"
+  bucket = "ooni-athena-results-${random_id.artifact_id.hex}"
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "athena_results" {
