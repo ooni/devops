@@ -28,6 +28,22 @@ resource "aws_s3_bucket" "load_balancer_logs" {
   bucket = "lb-logs-${var.aws_region}-${random_id.artifact_id.hex}"
 }
 
+resource "aws_s3_bucket_ownership_controls" "load_balancer_logs" {
+  bucket = aws_s3_bucket.load_balancer_logs.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+variable "region_to_account_id" {
+  // We need a different id depending on the region, see:
+  // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/enable-access-logging.html#attach-bucket-policy
+  type = map(string)
+  default = {
+    "eu-central-1" = "054676820928"
+  }
+}
+
 resource "aws_s3_bucket_policy" "alb_logs_policy" {
   bucket = aws_s3_bucket.load_balancer_logs.id
   policy = jsonencode({
@@ -37,7 +53,7 @@ resource "aws_s3_bucket_policy" "alb_logs_policy" {
         Sid       = "AWSLoadBalancerLogging"
         Effect    = "Allow"
         Principal = {
-          Service = "logdelivery.elb.amazonaws.com"
+          AWS = "arn:aws:iam::${var.region_to_account_id[var.aws_region]}:root"
         }
         Action = "s3:PutObject"
         Resource = "${aws_s3_bucket.load_balancer_logs.arn}/*"
@@ -45,6 +61,8 @@ resource "aws_s3_bucket_policy" "alb_logs_policy" {
     ]
   })
 }
+
+// -- Listener rules -------------------------------------
 
 resource "aws_alb_listener" "ooniapi_listener_http" {
   load_balancer_arn = aws_alb.ooniapi.id
