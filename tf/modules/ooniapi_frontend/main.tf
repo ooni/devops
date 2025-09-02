@@ -84,6 +84,23 @@ resource "aws_s3_bucket" "athena_results" {
   bucket = "ooni-athena-results"
 }
 
+resource "aws_s3_bucket_lifecycle_configuration" "athena_results" {
+  bucket = aws_s3_bucket.athena_results.id
+
+  rule {
+    id     = "expire-old-results"
+    status = "Enabled"
+
+    expiration {
+      days = 90
+    }
+
+    filter {
+      prefix = "output/"
+    }
+  }
+}
+
 resource "aws_athena_database" "load_balancer_logs" {
   name   = "load_balancer_logs"
   bucket = aws_s3_bucket.athena_results.bucket
