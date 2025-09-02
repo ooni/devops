@@ -137,8 +137,21 @@ resource "aws_athena_named_query" "create_alb_logs_table" {
         '([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*):([0-9]*) ([^ ]*)[:-]([0-9]*) ([-.0-9]*) ([-.0-9]*) ([-.0-9]*) (|[-0-9]*) (-|[-0-9]*) ([-0-9]*) ([-0-9]*) \"([^ ]*) (.*) (- |[^ ]*)\" \"([^\"]*)\" ([A-Z0-9-_]+) ([A-Za-z0-9.-]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^\"]*)\" ([-.0-9]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^ ]*)\" \"([^\\s]+?)\" \"([^\\s]+)\" \"([^ ]*)\" \"([^ ]*)\" ?([^ ]*)?'
         LOCATION 's3://${aws_s3_bucket.load_balancer_logs.bucket}/AWSLogs/'
         EOT
+    workgroup = aws_athena_workgroup.ooni_workgroup.name
 }
 
+resource "aws_athena_workgroup" "ooni_workgroup" {
+  name = "ooni-workgroup"
+
+  configuration {
+    enforce_workgroup_configuration    = true
+    publish_cloudwatch_metrics_enabled = true
+
+    result_configuration {
+      output_location = "s3://${aws_s3_bucket.athena_results.bucket}/output/"
+    }
+  }
+}
 
 // -- Listener rules -------------------------------------
 
