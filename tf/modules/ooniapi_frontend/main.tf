@@ -23,7 +23,7 @@ resource "random_id" "artifact_id" {
   byte_length = 4
 }
 
-// For load balancer logs
+// -- Logs Configuration -------------------------------------------------
 resource "aws_s3_bucket" "load_balancer_logs" {
   bucket = "lb-logs-${var.aws_region}-${random_id.artifact_id.hex}"
 }
@@ -77,6 +77,16 @@ resource "aws_s3_bucket_policy" "alb_logs_policy" {
       }
     ]
   })
+}
+
+// Athena DB for logs browsing
+resource "aws_s3_bucket" "athena_results" {
+  bucket = "ooni-athena-results"
+}
+
+resource "aws_athena_database" "load_balancer_logs" {
+  name   = "load_balancer_logs"
+  bucket = aws_s3_bucket.athena_results.bucket
 }
 
 // -- Listener rules -------------------------------------
