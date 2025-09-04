@@ -1,0 +1,106 @@
+---
+
+# For prometheus scrape requests
+- name: Allow traffic on port 9100
+  become: true
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9100.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
+  notify:
+   - reload nftables
+
+# Create test helpers user
+- name: Create the testhelpers user
+  ansible.builtin.user:
+    name: "testhelpers"
+    shell: "/bin/bash"
+    create_home: no
+    system: yes
+  become: yes
+
+# Install test helpers
+- name: Donwload binaries for test helpers
+  ansible.builtin.get_url:
+    url: "{{test_helpers_url}}"
+    dest: "/tmp/test-helpers.tar.gz"
+    mode: '0600'
+  become: true
+
+- name: Get checksum of downloaded file
+  ansible.builtin.stat:
+    path: "/tmp/test-helpers.tar.gz"
+    checksum_algorithm: sha256
+  register: file_stat
+
+- name: Verify checksum
+  ansible.builtin.fail:
+    msg: "Checksum failed! Expected: {{checksum}} but got: {{file_stat.stat.checksum}}"
+  when: file_stat.stat.checksum != checksum
+
+- name: Create test helpers temp dir
+  ansible.builtin.file:
+    path: "/tmp/test-helpers"
+    state: directory
+    mode: "0700"
+  become: yes
+
+- name: Extract tar content
+  ansible.builtin.unarchive:
+    src: "/tmp/test-helpers.tar.gz"
+    dest: "/tmp/test-helpers"
+    remote_src: yes
+  become: yes
+
+- name: Make jsonth accessible system wide
+  ansible.builtin.copy:
+    src: "/tmp/test-helpers/jsonth"
+    dest: "/usr/local/bin/"
+    mode: '0755'
+    remote_src: yes
+  become: yes
+
+- name: Make echo accessible system wide
+  ansible.builtin.copy:
+    src: "/tmp/test-helpers/echo"
+    dest: "/usr/local/bin/"
+    mode: '0755'
+    remote_src: yes
+  become: yes
+
+- name: Clean up temporary files
+  ansible.builtin.file:
+    path: "/tmp/test-helpers"
+    state: absent
+  become: yes
+
+- name: Remove downloaded tarball
+  ansible.builtin.file:
+    path: "/tmp/test-helpers.tar.gz"
+    state: absent
+  become: yes
+
+# Create systemd units
+
+- name: Create <helper>.service file
+  tags: test-helpers
+  ansible.builtin.template:
+    src: templates/{{helper}}.service
+    dest: /etc/systemd/system/{{helper}}.service
+    mode: '0755'
+    owner: root
+  notify:
+    - "restart {{helper}}"
+
+- name: reload systemd
+  tags: test-helpers
+  shell: systemctl daemon-reload
+
+- name: Start helper
+  tags: test-helpers
+  systemd:
+    name: "{{helper}}.service"
+    state: started
+    enabled: yes

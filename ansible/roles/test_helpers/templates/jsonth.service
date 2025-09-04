@@ -1,0 +1,22 @@
+[Unit]
+Description=Test helper that will respond with a json showing the headers it received
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/jsonth --port {{port}}
+Restart=on-failure
+RestartSec=5
+User=testhelpers
+Group=testhelpers
+ProtectSystem=full
+ProtectHome=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
