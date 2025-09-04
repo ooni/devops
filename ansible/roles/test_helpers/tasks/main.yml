@@ -29,6 +29,17 @@
     mode: '0600'
   become: true
 
+- name: Get checksum of downloaded file
+  ansible.builtin.stat:
+    path: "/tmp/test-helpers.tar.gz"
+    checksum_algorithm: sha256
+  register: file_stat
+
+- name: Verify checksum
+  ansible.builtin.fail:
+    msg: "Checksum failed! Expected: {{checksum}} but got: {{file_stat.stat.checksum}}"
+  when: file_stat.stat.checksum != checksum
+
 - name: Create test helpers temp dir
   ansible.builtin.file:
     path: "/tmp/test-helpers"

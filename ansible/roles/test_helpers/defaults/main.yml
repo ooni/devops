@@ -1,1 +1,3 @@
-test_helpers_url: https://github.com/ooni/test-helpers/releases/download/0.1.0-dbca/test-helpers@0.1.0-dbca.tar.gz
+test_helpers_url: https://github.com/ooni/test-helpers/releases/download/0.1.0-1ac1/test-helpers@0.1.0-1ac1.tar.gz
+# remember to remove the "sha256:" prefix from github
+checksum: 9a7387050412d747df8d0479c004357edfc4cd7825ce7e1c83141e1e0838715c 
