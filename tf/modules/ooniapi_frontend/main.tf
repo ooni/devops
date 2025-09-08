@@ -449,11 +449,10 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
   condition {
     path_pattern {
       values = [
-        "/unimplemented",
-        # "/api/v1/aggregation",
-        # "/api/v1/aggregation/*",
-        # "/api/v1/observations",
-        # "/api/v1/analysis",
+         "/api/v1/aggregation",
+         "/api/v1/aggregation/*",
+         "/api/v1/observations",
+         "/api/v1/analysis",
       ]
     }
   }
