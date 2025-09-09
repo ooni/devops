@@ -913,8 +913,8 @@ module "ooniapi_oonimeasurements" {
   task_environment = {
     # it has to be a json-compliant array
     OTHER_COLLECTORS = jsonencode([
-      "https://backend-fsn.ooni.org",
-      "http://fastpath.${local.environment}.ooni.io:8475"
+      "http://fastpath.${local.environment}.ooni.io:8475",
+      "https://backend-fsn.ooni.org"
     ])
     BASE_URL       = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME = "ooni-data-eu-fra"
