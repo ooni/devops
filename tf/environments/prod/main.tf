@@ -622,7 +622,7 @@ module "ooni_fastpath" {
   dns_zone_ooni_io    = local.dns_zone_ooni_io
 
   key_name      = module.adm_iam_roles.oonidevops_key_name
-  instance_type = "t3a.small"
+  instance_type = "c6i.large"
 
   name = "oonifastpath"
   ingress_rules = [{
