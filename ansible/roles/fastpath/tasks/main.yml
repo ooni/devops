@@ -1,6 +1,6 @@
 ---
 # For prometheus scrape requests
-- name: Flush all handlers 
+- name: Flush all handlers
   meta: flush_handlers
 
 - name: Allow traffic on port 9100
@@ -12,7 +12,7 @@
     block: |
       add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
   notify:
-   - reload nftables  
+   - reload nftables
 
 # For incoming fastpath traffic
 - name: Allow traffic on port 8472
@@ -24,7 +24,7 @@
     block: |
       add rule inet filter input tcp dport 8472 counter accept comment "fastpath"
   notify:
-   - reload nftables  
+   - reload nftables
 
 # For serving jsonl files
 - name: Allow traffic on port 8475
@@ -36,28 +36,28 @@
     block: |
       add rule inet filter input tcp dport 8475 counter accept comment "serve measurement spool"
   notify:
-   - reload nftables  
+   - reload nftables
 
 # Docker seems to have problems with nftables, so this command will translate all iptables
 # commands to nftables commands
-- name: Update alternatives for iptables 
-  tags: docker
-  become: yes
-  ansible.builtin.command: "update-alternatives --set iptables /usr/sbin/iptables-nft"
-  notify: 
-   - restart docker
+# - name: Update alternatives for iptables
+#   tags: docker
+#   become: yes
+#   ansible.builtin.command: "update-alternatives --set iptables /usr/sbin/iptables-nft"
+#   notify:
+#    - restart docker
 
-- name: Update alternatives for iptables 
-  tags: docker
-  become: yes
-  ansible.builtin.command: "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft"
-  notify: 
-   - restart docker
+# - name: Update alternatives for iptables
+#   tags: docker
+#   become: yes
+#   ansible.builtin.command: "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft"
+#   notify:
+#    - restart docker
 
-- name: Flush all handlers # Required to apply iptables settings before docker runs
-  meta: flush_handlers
+# - name: Flush all handlers # Required to apply iptables settings before docker runs
+#   meta: flush_handlers
 
-### Create fastpath user 
+### Create fastpath user
 - name: Ensure the fastpath group exists
   ansible.builtin.group:
     name: "{{ fastpath_user }}"
@@ -103,11 +103,11 @@
     owner: "{{fastpath_user}}"
   become: yes
 
-- name: Ensure ooniapi directory existence 
+- name: Ensure ooniapi directory existence
   ansible.builtin.file:
     path: /var/lib/ooniapi
     state: directory
-    mode: "0750"
+    mode: "0711"
     owner: "{{fastpath_user}}"
     group: "{{fastpath_user}}"
 
@@ -119,7 +119,7 @@
     owner: "{{fastpath_user}}"
     group: "{{fastpath_user}}"
 
-- name: Allow nginx access to the spool dir 
+- name: Allow nginx access to the spool dir
   become: true
   ansible.builtin.user:
     name: nginx
@@ -139,20 +139,22 @@
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
-    image: ooni/fastpath:v0.87
+    image: ooni/fastpath:v0.88
     state: started
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
-    # use network mode = host to allow traffic from fastpath to the statsd exporter without 
+    # use network mode = host to allow traffic from fastpath to the statsd exporter without
     # creating a network with redirection rules to match the ports
-    network_mode: host  
+    network_mode: host
     # published_ports: # unused on network_mode: host
     #   - "8472:8472"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
       - /var/lib/fastpath:/var/lib/fastpath
+  tags:
+    - fastpath
 
-### Serve jsonl from spool dir for oonimeasurements 
+### Serve jsonl from spool dir for oonimeasurements
 - name: Add nginx config file for serving spool dir measurements
   tags: fastpath
   template:
@@ -161,7 +163,7 @@
     mode: "0444"
     owner: nginx
   become: yes
-  notify: 
+  notify:
     - reload nginx
 
 - name: Ensure the statsd to prometheus exporter is running
@@ -169,9 +171,9 @@
     name: statsd-exporter
     image: prom/statsd-exporter:v0.28.0
     state: started
-    published_ports: 
+    published_ports:
       - "9102:9102" # for /metrics
-      - "8125:9125" # for reporting metrics 
+      - "8125:9125" # for reporting metrics
       - "8125:9125/udp"
 
 ### API Uploader set up
@@ -193,7 +195,7 @@
 - name: Install dependencies for uploader
   tags: uploader
   apt:
-    pkg: 
+    pkg:
     - python3-statsd
     - python3-boto3
     - python3-clickhouse-driver
@@ -203,7 +205,7 @@
 - name: Install uploder service
   tags: uploader
   template:
-    src: templates/ooni-api-uploader.service 
+    src: templates/ooni-api-uploader.service
     dest: /etc/systemd/system/ooni-api-uploader.service
     mode: "0644"
     owner: root
@@ -215,6 +217,15 @@
     dest: /etc/systemd/system/ooni-api-uploader.timer
     mode: "0644"
     owner: root
+
+- name: Create spool dir
+  tags: uploader
+  ansible.builtin.file:
+    path: /var/lib/ooniapi/measurements/incoming/
+    state: directory
+    mode: '0711'
+    owner: "{{fastpath_user}}"
+    group: "{{fastpath_user}}"
 
 - name: Ensure uploader timer runs
   tags: uploader

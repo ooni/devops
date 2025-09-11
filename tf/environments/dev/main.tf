@@ -322,7 +322,7 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
   name = "${local.name}-task-role"
   role = module.ooniapi_cluster.container_host_role.name
 
-  policy = format(<<EOF
+  policy = <<EOF
 {
 	"Version": "2012-10-17",
 	"Statement": [
@@ -330,12 +330,11 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Sid": "",
 			"Effect": "Allow",
 			"Action": "s3:PutObject",
-			"Resource": "%s/*"
+			"Resource": "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
 		}
 	]
 }
 EOF
-  , aws_s3_bucket.ooniprobe_failed_reports.arn)
 }
 
 module "ooniapi_ooniprobe_deployer" {
@@ -379,7 +378,7 @@ module "ooniapi_ooniprobe" {
   }
 
   task_environment = {
-    FASTPATH_URL          = format("http://fastpath.%s.ooni.io:8472", local.environment)
+    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 3 # use a different one in prod
   }
@@ -615,12 +614,12 @@ module "ooni_fastpath" {
     from_port   = 8472,
     to_port     = 8472,
     protocol    = "tcp",
-    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
     from_port   = 8475, # for serving jsonl files
     to_port     = 8475,
     protocol    = "tcp",
-    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
     from_port   = 9100,
     to_port     = 9100,
@@ -891,7 +890,7 @@ module "ooniapi_oonimeasurements" {
 
   task_environment = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475"]) 
+    OTHER_COLLECTORS = jsonencode(["https://backend-", "http://fastpath.${local.environment}.ooni.io:8475"]) 
     BASE_URL = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME = "ooni-data-eu-fra-test"
   }
@@ -943,6 +942,7 @@ locals {
     "ooniauth.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "ooniprobe.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "oonirun.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
+    "oonimeasurements.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "8.th.dev.ooni.io" : local.dns_zone_ooni_io,
   }
   ooniapi_frontend_main_domain_name         = "api.${local.environment}.ooni.io"
@@ -983,6 +983,10 @@ resource "aws_acm_certificate" "ooniapi_frontend" {
   tags = local.tags
 
   subject_alternative_names = keys(local.ooniapi_frontend_alternative_domains)
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_route53_record" "ooniapi_frontend_cert_validation" {

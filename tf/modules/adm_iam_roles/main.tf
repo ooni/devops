@@ -50,7 +50,9 @@ resource "aws_iam_policy" "oonidevops" {
         "states:*",
         "organizations:*",
         "secretsmanager:*",
-        "cloudhsm:*"
+        "cloudhsm:*",
+        "athena:*",
+        "glue:*"
       ],
       "Resource": "*"
     }

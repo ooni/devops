@@ -58,3 +58,8 @@ variable "oonith_domains" {
 variable "ooniapi_acm_certificate_arn" {
   type = string
 }
+
+variable "aws_region" {
+  description = "The AWS region to create things in."
+  default     = "eu-central-1"
+}
