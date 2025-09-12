@@ -649,7 +649,7 @@ module "ooni_fastpath" {
     from_port   = 9102, # For fastpath metrics
     to_port     = 9102,
     protocol    = "tcp"
-    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32", "${module.ooni_monitoring_proxy.aws_instance_public_ip}/32"]
   }]
 
   egress_rules = [{
