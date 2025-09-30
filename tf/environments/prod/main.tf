@@ -511,8 +511,8 @@ module "ooniapi_cluster" {
 
   # You need be careful how these are tweaked.
   asg_min     = 4
-  asg_max     = 8
-  asg_desired = 4
+  asg_max     = 10
+  asg_desired = 8
 
   instance_type = "t3a.medium"
 
@@ -585,7 +585,7 @@ module "ooniapi_ooniprobe" {
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
-  service_desired_count = 4
+  service_desired_count = 6
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
