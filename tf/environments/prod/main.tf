@@ -877,7 +877,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "fix/measurements-timestamp-bug"
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
