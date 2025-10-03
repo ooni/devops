@@ -1,0 +1,45 @@
+---
+# For prometheus scrape requests
+- name: Flush all handlers
+  meta: flush_handlers
+
+- name: Allow traffic on port 9100
+  become: true
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9100.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
+  notify:
+   - reload nftables
+
+# Add Michele's user
+- name: Ensure user exists
+  ansible.builtin.user:
+    name: morru
+    comment: "Michele Orru"
+    shell: /bin/bash
+    groups: sudo
+    append: yes
+    create_home: yes
+  tags:
+    - morru
+
+- name: Add SSH key for Michele
+  ansible.builtin.authorized_key:
+    user: morru
+    state: present
+    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHLQroCtPsBHX3AqI+0w3sF+0GP8TnFSfekp1JU5jqkk m@orru.net"
+  tags:
+    - morru
+
+- name: Ensure passwordless sudo for deploy user
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/morru"
+    content: "morru ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: '0440'
+  tags:
+    - morru
