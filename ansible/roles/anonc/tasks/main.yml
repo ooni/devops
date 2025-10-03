@@ -7,10 +7,10 @@
   become: true
   tags: prometheus-proxy
   blockinfile:
-    path: /etc/ooni/nftables/tcp/9200.nft
+    path: /etc/ooni/nftables/tcp/9100.nft
     create: yes
     block: |
-      add rule inet filter input tcp dport 9200 counter accept comment "node exporter"
+      add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
   notify:
    - reload nftables
 
