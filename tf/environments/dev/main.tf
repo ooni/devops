@@ -1053,8 +1053,8 @@ module "ooni_anonc" {
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
-    from_port   = 9100, # for node exporter metrics
-    to_port     = 9100,
+    from_port   = 9200, # for node exporter metrics
+    to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"],
     }]
