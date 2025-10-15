@@ -152,7 +152,7 @@ module "oonipg" {
   # LEAST({DBInstanceClassMemory/9531392}, 5000) (see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Limits.html)
   # This machine has 1gb of ram:
   # 1e9 / 9531392 ~= 105
-  db_instance_class        = "db.t3.medium"
+  db_instance_class        = "db.t3.small"
   db_storage_type          = "standard"
   db_allocated_storage     = "5"
   db_max_allocated_storage = null
