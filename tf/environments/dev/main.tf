@@ -149,10 +149,11 @@ module "oonipg" {
   vpc_id                   = module.network.vpc_id
   subnet_ids               = module.network.vpc_subnet_public[*].id
   # By default, max_connections is computed as:
-  # LEAST({DBInstanceClassMemory/9531392}, 5000) (see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Limits.html)
-  # This machine has 1gb of ram:
-  # 1e9 / 9531392 ~= 105
-  db_instance_class        = "db.t3.small"
+  # LEAST({DBInstanceClassMemory/9531392}, 5000)
+  # see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Limits.html
+  # With 1GiB of ram you get ~112 connections:
+  # 1074000000 / 9531392 = 112.68
+  db_instance_class        = "db.t3.small" # 2GiB => ~224 max_connections
   db_storage_type          = "standard"
   db_allocated_storage     = "5"
   db_max_allocated_storage = null
