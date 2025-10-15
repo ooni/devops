@@ -160,7 +160,13 @@ module "oonipg" {
   aws_region               = var.aws_region
   vpc_id                   = module.network.vpc_id
   subnet_ids               = module.network.vpc_subnet_public[*].id
-  db_instance_class        = "db.t3.micro"
+
+  # By default, max_connections is computed as:
+  # LEAST({DBInstanceClassMemory/9531392}, 5000)
+  # see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Limits.html
+  # With 1GiB of ram you get ~112 connections:
+  # 1074000000 / 9531392 = 112.68
+  db_instance_class        = "db.t3.medium" # 4GiB => ~448 connections
   db_storage_type          = "gp3"
   db_allocated_storage     = "50"
   db_engine_version        = "16.8"
@@ -271,7 +277,7 @@ data "aws_secretsmanager_secret_version" "deploy_key" {
 # The aws_codestarconnections_connection resource is created in the state
 # PENDING. Authentication with the connection provider must be completed in the
 # AWS Console.
-# See: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/codestarconnections_connection 
+# See: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/codestarconnections_connection
 resource "aws_codestarconnections_connection" "oonidevops" {
   name          = "ooniapi"
   provider_type = "GitHub"
@@ -610,7 +616,7 @@ module "ooniapi_ooniprobe" {
   )
 }
 
-### Fastpath 
+### Fastpath
 module "ooni_fastpath" {
   source = "../../modules/ec2"
 
