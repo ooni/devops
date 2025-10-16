@@ -148,7 +148,12 @@ module "oonipg" {
   aws_region               = var.aws_region
   vpc_id                   = module.network.vpc_id
   subnet_ids               = module.network.vpc_subnet_public[*].id
-  db_instance_class        = "db.t3.micro"
+  # By default, max_connections is computed as:
+  # LEAST({DBInstanceClassMemory/9531392}, 5000)
+  # see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Limits.html
+  # With 1GiB of ram you get ~112 connections:
+  # 1074000000 / 9531392 = 112.68
+  db_instance_class        = "db.t3.micro" # 2GiB => ~224 max_connections
   db_storage_type          = "standard"
   db_allocated_storage     = "5"
   db_max_allocated_storage = null
@@ -590,7 +595,7 @@ resource "aws_route53_record" "monitoring_proxy_alias" {
 }
 
 
-### Fastpath 
+### Fastpath
 module "ooni_fastpath" {
   source = "../../modules/ec2"
 
@@ -855,7 +860,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "fix/measurements-timestamp-bug"
+  branch_name             = "master"
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -890,7 +895,7 @@ module "ooniapi_oonimeasurements" {
 
   task_environment = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS = jsonencode(["https://backend-", "http://fastpath.${local.environment}.ooni.io:8475"]) 
+    OTHER_COLLECTORS = jsonencode(["https://backend-", "http://fastpath.${local.environment}.ooni.io:8475"])
     BASE_URL = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME = "ooni-data-eu-fra-test"
   }
