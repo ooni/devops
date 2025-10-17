@@ -10,7 +10,7 @@ groups:
   # including http scraping failure
   - alert: InstanceDown
     expr: up != 1
-    for: 1m # TODO set back to 5m when we finish testing
+    for: 5m
     annotations:
       summary: '{{ $labels.instance }} {{if $labels.ec2_host}} ({{$labels.ec2_host}}) {{end}} is not `up`'
 
