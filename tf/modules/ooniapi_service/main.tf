@@ -103,6 +103,8 @@ resource "aws_ecs_service" "ooniapi_service" {
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
 
+  availability_zone_rebalancing = "ENABLED"
+
   ordered_placement_strategy {
     type  = "spread"
     field = "attribute:ecs.availability-zone"
