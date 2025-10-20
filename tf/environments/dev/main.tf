@@ -298,9 +298,9 @@ module "ooniapi_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 2
-  asg_max     = 6
-  asg_desired = 2
+  asg_min     = 1
+  asg_max     = 4
+  asg_desired = 1
 
   instance_type = "t3a.micro"
 
@@ -317,6 +317,38 @@ module "ooniapi_cluster" {
     { Name = "ooni-tier0-api-ecs-cluster" }
   )
 }
+
+# oonimeasuremenets can take too many resources, drowning other services.
+# We reserve its own cluster to avoid interfering with other services
+module "oonimeasurements_cluster" {
+  source = "../../modules/ecs_cluster"
+
+  name       = "oonimeasurements-ecs-cluster"
+  key_name   = module.adm_iam_roles.oonidevops_key_name
+  vpc_id     = module.network.vpc_id
+  subnet_ids = module.network.vpc_subnet_private[*].id
+
+  asg_min     = 1
+  asg_max     = 4
+  asg_desired = 1
+
+  instance_type = "t3a.micro"
+
+  monitoring_sg_ids = [
+    # The clickhouse proxy has an nginx configuration
+    # to proxy requests from the monitoring server
+    # to the cluster instances
+    module.ooni_clickhouse_proxy.ec2_sg_id,
+    module.ooni_monitoring_proxy.ec2_sg_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-oonimeasurements-ecs-cluster" }
+  )
+}
+
+
 
 #### OONI Tier0
 
@@ -868,7 +900,7 @@ module "ooniapi_oonimeasurements_deployer" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 
   ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
-  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+  ecs_cluster_name = module.oonimeasurements_cluster.cluster_name
 }
 
 module "ooniapi_oonimeasurements" {
