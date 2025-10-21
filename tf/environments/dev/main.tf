@@ -319,7 +319,7 @@ module "ooniapi_cluster" {
 }
 
 # oonimeasuremenets can take too many resources, drowning other services.
-# We reserve its own cluster to avoid interfering with other services
+# We reserve its own cluster to avoid interfering with other tasks
 module "oonimeasurements_cluster" {
   source = "../../modules/ecs_cluster"
 
@@ -916,7 +916,7 @@ module "ooniapi_oonimeasurements" {
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
-  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+  ecs_cluster_id           = module.oonimeasurements_cluster.cluster_id
   service_desired_count = 2
 
   task_secrets = {
@@ -934,7 +934,7 @@ module "ooniapi_oonimeasurements" {
   }
 
   ooniapi_service_security_groups = [
-    module.ooniapi_cluster.web_security_group_id
+    module.oonimeasurements_cluster.web_security_group_id
   ]
 
   tags = merge(
