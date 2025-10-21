@@ -11,7 +11,7 @@ data "aws_iam_policy_document" "assume_role" {
 resource "aws_iam_policy" "oonidevops" {
   name        = "OONIDevopsPolicy"
   path        = "/"
-  description = "Policy used by the oonidevops role to perform all terraform and CI/CD related tasks."
+  description = "Policy used by the oonidevops role to perform all terraform and CI/CD related tasks. Just making a change here."
 
   policy = <<EOF
 {
