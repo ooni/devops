@@ -959,7 +959,8 @@ module "ooniapi_frontend" {
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
 
   ooniapi_service_security_groups = [
-    module.ooniapi_cluster.web_security_group_id
+    module.ooniapi_cluster.web_security_group_id,
+    module.oonimeasurements_cluster.web_security_group_id
   ]
 
   ooniapi_acm_certificate_arn = aws_acm_certificate.ooniapi_frontend.arn
