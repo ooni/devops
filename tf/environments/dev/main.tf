@@ -298,9 +298,9 @@ module "ooniapi_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 1
+  asg_min     = 2
   asg_max     = 4
-  asg_desired = 1
+  asg_desired = 2
 
   instance_type = "t3a.micro"
 
@@ -328,9 +328,9 @@ module "oonimeasurements_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 1
+  asg_min     = 2
   asg_max     = 4
-  asg_desired = 1
+  asg_desired = 2
 
   instance_type = "t3a.micro"
 
