@@ -343,7 +343,7 @@ module "oonitier1plus_cluster" {
 
   tags = merge(
     local.tags,
-    { Name = "ooni-tier0-tier1plus-ecs-cluster" }
+    { Name = "ooni-tier1plus-ecs-cluster" }
   )
 }
 

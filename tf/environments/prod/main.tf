@@ -536,12 +536,11 @@ module "ooniapi_cluster" {
   )
 }
 
-# oonimeasuremenets can take too many resources, drowning other services.
-# We reserve its own cluster to avoid interfering with other tasks
-module "oonimeasurements_cluster" {
+# Cluster for services on tier >= 1
+module "oonitier1plus_cluster" {
   source = "../../modules/ecs_cluster"
 
-  name       = "oonimeasurements-ecs-cluster"
+  name       = "oonitier1plus-ecs-cluster"
   key_name   = module.adm_iam_roles.oonidevops_key_name
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
@@ -562,7 +561,7 @@ module "oonimeasurements_cluster" {
 
   tags = merge(
     local.tags,
-    { Name = "ooni-tier0-oonimeasurements-ecs-cluster" }
+    { Name = "ooni-tier1plus-ecs-cluster" }
   )
 }
 
@@ -921,7 +920,7 @@ module "ooniapi_oonimeasurements_deployer" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 
   ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
-  ecs_cluster_name = module.oonimeasurements_cluster.cluster_name
+  ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
 }
 
 module "ooniapi_oonimeasurements" {
@@ -937,7 +936,7 @@ module "ooniapi_oonimeasurements" {
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
-  ecs_cluster_id           = module.oonimeasurements_cluster.cluster_id
+  ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
 
   service_desired_count = 4
 
@@ -959,7 +958,7 @@ module "ooniapi_oonimeasurements" {
   }
 
   ooniapi_service_security_groups = [
-    module.oonimeasurements_cluster.web_security_group_id
+    module.oonitier1plus_cluster.web_security_group_id
   ]
 
   tags = merge(
@@ -985,7 +984,7 @@ module "ooniapi_frontend" {
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id,
-    module.oonimeasurements_cluster.web_security_group_id
+    module.oonitier1plus_cluster.web_security_group_id
   ]
 
   ooniapi_acm_certificate_arn = aws_acm_certificate.ooniapi_frontend.arn
