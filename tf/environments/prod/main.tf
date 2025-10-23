@@ -516,9 +516,9 @@ module "ooniapi_cluster" {
   subnet_ids = module.network.vpc_subnet_public[*].id
 
   # You need be careful how these are tweaked.
-  asg_min     = 2
+  asg_min     = 4
   asg_max     = 10
-  asg_desired = 6
+  asg_desired = 8
 
   instance_type = "t3a.medium"
 
@@ -920,7 +920,8 @@ module "ooniapi_oonimeasurements_deployer" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 
   ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
-  ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
+  # ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
 module "ooniapi_oonimeasurements" {
@@ -936,7 +937,8 @@ module "ooniapi_oonimeasurements" {
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
-  ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
+  # ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   service_desired_count = 4
 
@@ -958,7 +960,8 @@ module "ooniapi_oonimeasurements" {
   }
 
   ooniapi_service_security_groups = [
-    module.oonitier1plus_cluster.web_security_group_id
+    # module.oonitier1plus_cluster.web_security_group_id
+    module.ooniapi_cluster.web_security_group_id
   ]
 
   tags = merge(
