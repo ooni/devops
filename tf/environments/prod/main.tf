@@ -925,8 +925,8 @@ module "ooniapi_oonimeasurements_deployer" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 
   ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
-  # ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
-  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+  ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
+  # ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
 module "ooniapi_oonimeasurements" {
@@ -942,8 +942,8 @@ module "ooniapi_oonimeasurements" {
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
-  # ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
-  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+  ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
+  # ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   service_desired_count = 4
 
