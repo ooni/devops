@@ -299,7 +299,7 @@ module "ooniapi_cluster" {
   subnet_ids = module.network.vpc_subnet_private[*].id
 
   asg_min     = 2
-  asg_max     = 6
+  asg_max     = 4
   asg_desired = 2
 
   instance_type = "t3a.micro"
@@ -317,6 +317,37 @@ module "ooniapi_cluster" {
     { Name = "ooni-tier0-api-ecs-cluster" }
   )
 }
+
+# Cluster for services on tier >= 1
+module "oonitier1plus_cluster" {
+  source = "../../modules/ecs_cluster"
+
+  name       = "oonitier1plus-ecs-cluster"
+  key_name   = module.adm_iam_roles.oonidevops_key_name
+  vpc_id     = module.network.vpc_id
+  subnet_ids = module.network.vpc_subnet_private[*].id
+
+  asg_min     = 2
+  asg_max     = 4
+  asg_desired = 2
+
+  instance_type = "t3a.micro"
+
+  monitoring_sg_ids = [
+    # The clickhouse proxy has an nginx configuration
+    # to proxy requests from the monitoring server
+    # to the cluster instances
+    module.ooni_clickhouse_proxy.ec2_sg_id,
+    module.ooni_monitoring_proxy.ec2_sg_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier1plus-ecs-cluster" }
+  )
+}
+
+
 
 #### OONI Tier0
 
@@ -868,7 +899,7 @@ module "ooniapi_oonimeasurements_deployer" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 
   ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
-  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+  ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
 }
 
 module "ooniapi_oonimeasurements" {
@@ -884,7 +915,8 @@ module "ooniapi_oonimeasurements" {
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
-  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+  ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
+  service_desired_count = 2
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -901,7 +933,7 @@ module "ooniapi_oonimeasurements" {
   }
 
   ooniapi_service_security_groups = [
-    module.ooniapi_cluster.web_security_group_id
+    module.oonitier1plus_cluster.web_security_group_id
   ]
 
   tags = merge(
@@ -926,7 +958,8 @@ module "ooniapi_frontend" {
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
 
   ooniapi_service_security_groups = [
-    module.ooniapi_cluster.web_security_group_id
+    module.ooniapi_cluster.web_security_group_id,
+    module.oonitier1plus_cluster.web_security_group_id
   ]
 
   ooniapi_acm_certificate_arn = aws_acm_certificate.ooniapi_frontend.arn
