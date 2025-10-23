@@ -960,7 +960,7 @@ module "ooniapi_oonimeasurements" {
       "http://fastpath.${local.environment}.ooni.io:8475",
       "https://backend-fsn.ooni.org"
     ])
-    BASE_URL       = "https://api.${local.environment}.ooni.io"
+    BASE_URL       = "https://api.ooni.io"
     S3_BUCKET_NAME = "ooni-data-eu-fra"
   }
 
