@@ -180,7 +180,7 @@ PARTITION BY toMonth(ts)
 ORDER BY (probe_asn, probe_cc, ts, domain)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS event_detector_cusums
+CREATE TABLE IF NOT EXISTS event_detector_cusums ON CLUSTER oonidata_cluster
 (
     `probe_asn` UInt32,
     `probe_cc` String,
