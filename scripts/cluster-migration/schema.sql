@@ -175,7 +175,7 @@ ENGINE = ReplicatedReplacingMergeTree (
         '/clickhouse/{cluster}/tables/ooni/event_detector_changepoints/{shard}',
         '{replica}'
     )
-PARTITION BY toMonth(ts)
+PARTITION BY toYYYYMM(ts)
 ORDER BY (probe_asn, probe_cc, ts, domain)
 SETTINGS index_granularity = 8192;
 
@@ -209,6 +209,6 @@ ENGINE = ReplicatedReplacingMergeTree (
         '/clickhouse/{cluster}/tables/ooni/event_detector_cusums/{shard}',
         '{replica}'
 )
-PARTITION BY toMonth(ts)
+PARTITION BY toYYYYMM(ts)
 ORDER BY (probe_asn, probe_cc, domain);
 SETTINGS index_granularity = 8192;
