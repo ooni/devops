@@ -210,5 +210,5 @@ ENGINE = ReplicatedReplacingMergeTree (
         '{replica}'
 )
 PARTITION BY toYYYYMM(ts)
-ORDER BY (probe_asn, probe_cc, domain);
+ORDER BY (probe_asn, probe_cc, domain)
 SETTINGS index_granularity = 8192;
