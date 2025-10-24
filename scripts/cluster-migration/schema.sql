@@ -171,7 +171,6 @@ CREATE TABLE IF NOT EXISTS event_detector_changepoints ON CLUSTER oonidata_clust
     `current_mean` Nullable(float),
     `h` Nullable(float)
     )
-    )
 ENGINE = ReplicatedReplacingMergeTree (
         '/clickhouse/{cluster}/tables/ooni/event_detector_changepoints/{shard}',
         '{replica}'
