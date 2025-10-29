@@ -1,3 +1,14 @@
+- name: Install required apt packages
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - python-dev
+      - g++
+    state: latest
+    update_cache: yes
+    install_recommends: no
+
+
 - name: Ensure Airflow group
   ansible.builtin.group:
     name: "airflow"
