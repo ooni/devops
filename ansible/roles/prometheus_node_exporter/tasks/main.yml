@@ -12,6 +12,7 @@
   vars:
     ssl_domains:
       - "{{ inventory_hostname }}"
+  when: use_https
 
 - include_tasks: install.yml
 

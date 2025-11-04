@@ -2,7 +2,7 @@
 
 server {
     {% if use_https %}
-    listen 443 ssl http2;
+    listen {{https_port}} ssl http2;
 
     server_name {{ inventory_hostname }};
     include /etc/nginx/ssl_intermediate.conf;
@@ -11,9 +11,9 @@ server {
     ssl_certificate_key /var/lib/dehydrated/certs/{{ inventory_hostname }}/privkey.pem;
     ssl_trusted_certificate /var/lib/dehydrated/certs/{{ inventory_hostname }}/chain.pem;
     {% else %}
-    listen 80;
+    listen {{http_port}};
 
-    server_name {{ inventory_hostname }};
+    server_name {{inventory_hostname}};
     {% endif %}
 
     {% for config in prometheus_nginx_proxy_config %}
