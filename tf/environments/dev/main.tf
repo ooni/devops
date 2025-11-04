@@ -148,7 +148,12 @@ module "oonipg" {
   aws_region               = var.aws_region
   vpc_id                   = module.network.vpc_id
   subnet_ids               = module.network.vpc_subnet_public[*].id
-  db_instance_class        = "db.t3.micro"
+  # By default, max_connections is computed as:
+  # LEAST({DBInstanceClassMemory/9531392}, 5000)
+  # see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Limits.html
+  # With 1GiB of ram you get ~112 connections:
+  # 1074000000 / 9531392 = 112.68
+  db_instance_class        = "db.t3.micro" # 2GiB => ~224 max_connections
   db_storage_type          = "standard"
   db_allocated_storage     = "5"
   db_max_allocated_storage = null
@@ -294,7 +299,7 @@ module "ooniapi_cluster" {
   subnet_ids = module.network.vpc_subnet_private[*].id
 
   asg_min     = 2
-  asg_max     = 6
+  asg_max     = 4
   asg_desired = 2
 
   instance_type = "t3a.micro"
@@ -313,6 +318,37 @@ module "ooniapi_cluster" {
   )
 }
 
+# Cluster for services on tier >= 1
+module "oonitier1plus_cluster" {
+  source = "../../modules/ecs_cluster"
+
+  name       = "oonitier1plus-ecs-cluster"
+  key_name   = module.adm_iam_roles.oonidevops_key_name
+  vpc_id     = module.network.vpc_id
+  subnet_ids = module.network.vpc_subnet_private[*].id
+
+  asg_min     = 2
+  asg_max     = 4
+  asg_desired = 2
+
+  instance_type = "t3a.micro"
+
+  monitoring_sg_ids = [
+    # The clickhouse proxy has an nginx configuration
+    # to proxy requests from the monitoring server
+    # to the cluster instances
+    module.ooni_clickhouse_proxy.ec2_sg_id,
+    module.ooni_monitoring_proxy.ec2_sg_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier1plus-ecs-cluster" }
+  )
+}
+
+
+
 #### OONI Tier0
 
 #### OONI Probe service
@@ -322,7 +358,7 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
   name = "${local.name}-task-role"
   role = module.ooniapi_cluster.container_host_role.name
 
-  policy = format(<<EOF
+  policy = <<EOF
 {
 	"Version": "2012-10-17",
 	"Statement": [
@@ -330,12 +366,11 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Sid": "",
 			"Effect": "Allow",
 			"Action": "s3:PutObject",
-			"Resource": "%s/*"
+			"Resource": "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
 		}
 	]
 }
 EOF
-  , aws_s3_bucket.ooniprobe_failed_reports.arn)
 }
 
 module "ooniapi_ooniprobe_deployer" {
@@ -343,7 +378,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "investigate-geoip-reporting"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -379,7 +414,7 @@ module "ooniapi_ooniprobe" {
   }
 
   task_environment = {
-    FASTPATH_URL          = format("http://fastpath.%s.ooni.io:8472", local.environment)
+    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 3 # use a different one in prod
   }
@@ -615,12 +650,12 @@ module "ooni_fastpath" {
     from_port   = 8472,
     to_port     = 8472,
     protocol    = "tcp",
-    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
     from_port   = 8475, # for serving jsonl files
     to_port     = 8475,
     protocol    = "tcp",
-    cidr_blocks = module.network.vpc_subnet_private[*].cidr_block,
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
     from_port   = 9100,
     to_port     = 9100,
@@ -992,7 +1027,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "cusum-changepoint-api"
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1000,7 +1035,7 @@ module "ooniapi_oonimeasurements_deployer" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 
   ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
-  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+  ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
 }
 
 module "ooniapi_oonimeasurements" {
@@ -1016,7 +1051,8 @@ module "ooniapi_oonimeasurements" {
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
-  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+  ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
+  service_desired_count = 2
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -1027,13 +1063,13 @@ module "ooniapi_oonimeasurements" {
 
   task_environment = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475"])
+    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-fsn.ooni.org"])
     BASE_URL = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME = "ooni-data-eu-fra-test"
   }
 
   ooniapi_service_security_groups = [
-    module.ooniapi_cluster.web_security_group_id
+    module.oonitier1plus_cluster.web_security_group_id
   ]
 
   tags = merge(
@@ -1058,7 +1094,8 @@ module "ooniapi_frontend" {
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
 
   ooniapi_service_security_groups = [
-    module.ooniapi_cluster.web_security_group_id
+    module.ooniapi_cluster.web_security_group_id,
+    module.oonitier1plus_cluster.web_security_group_id
   ]
 
   ooniapi_acm_certificate_arn = aws_acm_certificate.ooniapi_frontend.arn
@@ -1079,6 +1116,7 @@ locals {
     "ooniauth.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "ooniprobe.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "oonirun.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
+    "oonimeasurements.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "8.th.dev.ooni.io" : local.dns_zone_ooni_io,
   }
   ooniapi_frontend_main_domain_name         = "api.${local.environment}.ooni.io"
@@ -1156,4 +1194,75 @@ module "ooni_monitoring" {
   aws_region  = var.aws_region
 
   tags = local.tags
+}
+
+### Anonymous credentials testing instance
+module "ooni_anonc" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.small"
+
+  name = "oonifastpath"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 80, # for dehydrated challenge
+    to_port     = 80,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 443, # for the POC hosting
+    to_port     = 443,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 9100, # for node exporter metrics
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"],
+    }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "oonianonc"
+  tg_prefix = "anon"
+
+  disk_size = 20
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-anonc" }
+  )
+}
+
+resource "aws_route53_record" "anonc_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "anonc.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_anonc.aws_instance_public_dns
+  ]
 }

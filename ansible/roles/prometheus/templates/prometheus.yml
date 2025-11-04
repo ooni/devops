@@ -329,7 +329,7 @@ scrape_configs:
     static_configs:
     - targets: 
       - fastpath.dev.ooni.io:9102
-      # - fastpath.prod.ooni.io:9102
+      - fastpath.prod.ooni.io:9102
     scrape_interval: 5s
     scheme: https
     relabel_configs: # Change the host to the proxy host with relabeling
