@@ -584,7 +584,7 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
   role = module.ooniapi_cluster.container_host_role.name
 
   policy = <<EOF
-{
+  {
 	"Version": "2012-10-17",
 	"Statement": [
 		{
@@ -592,7 +592,7 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Effect": "Allow",
 			"Action": "s3:PutObject",
 			"Resource": "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
-		},
+			},
 		{
 			"Sid": "",
 			"Effect": "Allow",
@@ -600,7 +600,7 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Resource": "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
 		}
 	]
-}
+  }
 EOF
 }
 
