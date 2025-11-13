@@ -1,7 +1,7 @@
 ssh_users:
   sloncocs:
     login: sloncocs
-    comment: Elizaveta 
+    comment: Elizaveta
     keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMlol+UQauDLLMB//CpGBiigJftQmqk5Wm2c1TXk9RNz elizaveta@openobservatory.org"]
   agrabeli:
     login: agrabeli
@@ -115,9 +115,14 @@ ssh_users:
     comment: iMAP partners (only for training by Siti/Sinar Project)
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
+  deleteme:
+    login: deleteme
+    comment: Testing user creation, deleteme later
+    keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDZD/vcqLAJyvaALO53zW55/CJJXeCVQX2XiMf+occw9kkZ74wFBLpi0BArKIfOTVgI3p1XhcnlgKSaXSJiWbNDHld1kkelHyVyRC422lIipGUIWwyJ+CHWri57L4Xo0CDRU0qm9XwlmDUuwdTjxdv9eASkjarBIc5mvb+RylWs1IWiIMhnoVOttkIgx5QGOk8IMTDcNkSwZUkb25Xf3Gxkbza4cVWLSPMwPB+uMPCUG2GKvY/VLXruEGPUjnEQRJvltArK0RmVTv+TMENl1C3hYFRWKwuL1kKdearuBpP8Ri3U+50QT2lyxRGQftBJf3sMCgzuidrwc3mNCra2eU1v luis-testing"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis ]
-non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex, imap, sloncocs]
+non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex, imap, sloncocs, deleteme]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 

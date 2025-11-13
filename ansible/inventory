@@ -33,7 +33,7 @@ ams-ps.ooni.nu
 #mia-echoth.ooni.nu
 #mia-httpth.ooni.nu
 
-[aws-proxy]
+[aws_proxy]
 clickhouseproxy.dev.ooni.io
 clickhouseproxy.prod.ooni.io
 monitoringproxy.dev.ooni.io
@@ -43,7 +43,7 @@ monitoringproxy.prod.ooni.io
 openvpn1.htz-fsn.prod.ooni.nu
 openvpn2.htz-fsn.prod.ooni.nu
 
-[aws-backend]
+[aws_backend]
 fastpath.dev.ooni.io
 fastpath.prod.ooni.io
 anonc.dev.ooni.io
