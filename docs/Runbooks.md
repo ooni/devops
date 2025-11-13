@@ -1196,3 +1196,24 @@ If there are duplicate you can prune them with:
 ```
 CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main run check-duplicates --start-at 2025-01-01 --end-at 2025-02-01 --optimize
 ```
+
+## Adding external users to the notebooks server
+
+Some users can request access to the notebooks server for research purposes, this way they can access the clickhouse database from a research-friendly
+interface. We can provide them access by creating an account for them.
+
+The notebook server is using the actual server users to authenticate access to the jupyter web interface. To create an user
+we usually create an user within the server. The idea is:
+
+1. Create a new user
+2. Set their default password
+3. Set their password to be changed on next login
+4. Ask them to login one time to update the password
+5. They can now log in into [notebook.ooni.org](https://notebook.ooni.org) with their new password
+
+Then the procedure is as follows:
+
+1. Create new user entry here in the [notebook server's host vars](https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook1.htz-fsn.prod.ooni.nu):
+2. Run:
+  ```
+  ```
