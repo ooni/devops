@@ -1212,7 +1212,7 @@ The notebooks server uses the system’s actual user accounts to authenticate ac
 ### Procedure
 
 0. Ask the person requesting a new account for the following details: **name**, **username** (used to log in to the server), and **SSH key**.
-1. Create a new user entry in the [notebook server’s host vars](https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook1.htz-fsn.prod.ooni.nu).
+1. Create a new user entry in the [notebook server’s host vars](https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook1.htz-fsn.prod.ooni.nu). Remember to also add the username to the `non_admin_usernames` variable
 2. In the `ansible` directory, run:
 
    ```
