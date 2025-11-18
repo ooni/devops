@@ -624,6 +624,7 @@ module "ooniapi_ooniprobe" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+  task_memory = 128
 
   service_desired_count = 8
 
@@ -932,7 +933,7 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 256
 
   first_run = true
   vpc_id    = module.network.vpc_id
