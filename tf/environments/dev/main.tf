@@ -917,7 +917,7 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 128
 
   first_run = true
   vpc_id    = module.network.vpc_id
@@ -946,6 +946,16 @@ module "ooniapi_oonimeasurements" {
 
   ooniapi_service_security_groups = [
     module.oonitier1plus_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  max_desired_count = 4
+  autoscale_policies = [
+    {
+      name = "memory"
+      resource_type = "memory"
+      scaleout_treshold = 60
+    }
   ]
 
   tags = merge(
