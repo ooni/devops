@@ -431,7 +431,6 @@ module "ooniapi_ooniprobe" {
       resource_type = "memory"
       name = "memory"
       scaleout_treshold = 60
-      scalein_treshold = 20
     }
   ]
 
