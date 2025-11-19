@@ -65,3 +65,26 @@ variable "ooniapi_service_security_groups" {
   description = "the shared web security group from the ecs cluster"
   type        = list(string)
 }
+
+// Autoscaling
+variable "use_autoscaling" {
+  description = "Whether this service should use autoscaling to modify task count at runtime"
+  type        = bool
+  default     = false
+}
+
+variable "max_desired_count" {
+  description = "Desired numbers of instances in the ecs service"
+  default     = 1
+}
+
+variable "autoscale_policies" {
+  description = "Policies used for autoscaling resources, only valid if `use_autoscaling` == true"
+  type = list(object({
+    resource_type = string // memory | cpu
+    scalein_treshold = number // from 0 to 100, number used to trigger a scale in. Should be lower than scaleout_treshold
+    scaleout_treshold = number // from 0 to 100, number used to trigger a scale in. Should be higher than scalein_treshold
+    name = string
+  }))
+  default = []
+}
