@@ -423,8 +423,8 @@ module "ooniapi_ooniprobe" {
     # module.ooniapi_cluster.web_security_group_id
   ]
 
-  service_desired_count = 2
   use_autoscaling = true
+  service_desired_count = 2
   max_desired_count = 10
   autoscale_policies = [
     {
@@ -927,7 +927,6 @@ module "ooniapi_oonimeasurements" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
-  service_desired_count = 2
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -948,6 +947,7 @@ module "ooniapi_oonimeasurements" {
   ]
 
   use_autoscaling = true
+  service_desired_count = 2
   max_desired_count = 4
   autoscale_policies = [
     {
