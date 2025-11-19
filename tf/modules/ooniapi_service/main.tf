@@ -145,3 +145,12 @@ resource "aws_alb_target_group" "ooniapi_service" {
 
   tags = var.tags
 }
+
+resource "aws_appautoscaling_target" "ecs_target" {
+  service_namespace  = "ecs"
+  scalable_dimension = "ecs:service:DesiredCount"
+  resource_id        = "${var.ecs_cluster_id}"
+
+  min_capacity = 2
+  max_capacity = 10
+}
