@@ -394,6 +394,8 @@ module "ooniapi_ooniprobe" {
 
   task_memory = 256
 
+  service_desired_count = 2
+
   # First run should be set on first run to bootstrap the task definition
   # first_run = true
 
