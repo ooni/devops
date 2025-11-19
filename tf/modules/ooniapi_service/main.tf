@@ -151,14 +151,17 @@ resource "aws_appautoscaling_target" "ecs_target" {
   count = var.use_autoscaling ? 1 : 0
   service_namespace  = "ecs"
   scalable_dimension = "ecs:service:DesiredCount"
-  resource_id        = "${var.ecs_cluster_id}"
+  resource_id        = "${reverse(split(":", aws_ecs_service.ooniapi_service.id))[0]}"
 
   min_capacity = var.service_desired_count
   max_capacity = var.max_desired_count
 }
 
 resource "aws_appautoscaling_policy" "policies" {
-  for_each = toset(var.autoscale_policies)
+  for_each = {
+    for p in var.autoscale_policies :
+    p.name => p
+  }
 
   name               = each.value.name
   service_namespace  = "ecs"
@@ -177,7 +180,7 @@ resource "aws_appautoscaling_policy" "policies" {
       )
     }
 
-    target_value       = each.value.scaleout_threshold
+    target_value       = each.value.scaleout_treshold
     scale_in_cooldown  = 60
     scale_out_cooldown = 60
   }

@@ -30,7 +30,11 @@ variable "tags" {
 }
 
 variable "service_desired_count" {
-  description = "Desired numbers of instances in the ecs service"
+  description = <<-EOF
+                Desired numbers of instances in the ecs service.
+                When `use_autoscaling == true` this will be the minimum amount of
+                spawned services
+                EOF
   default     = 1
 }
 
@@ -82,7 +86,6 @@ variable "autoscale_policies" {
   description = "Policies used for autoscaling resources, only valid if `use_autoscaling` == true"
   type = list(object({
     resource_type = string // memory | cpu
-    scalein_treshold = number // from 0 to 100, number used to trigger a scale in. Should be lower than scaleout_treshold
     scaleout_treshold = number // from 0 to 100, number used to trigger a scale in. Should be higher than scalein_treshold
     name = string
   }))

@@ -392,7 +392,7 @@ module "ooniapi_ooniprobe_deployer" {
 module "ooniapi_ooniprobe" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 256
 
   # First run should be set on first run to bootstrap the task definition
   # first_run = true
@@ -421,6 +421,18 @@ module "ooniapi_ooniprobe" {
 
   ooniapi_service_security_groups = [
     # module.ooniapi_cluster.web_security_group_id
+  ]
+
+  service_desired_count = 2
+  use_autoscaling = true
+  max_desired_count = 10
+  autoscale_policies = [
+    {
+      resource_type = "memory"
+      name = "memory"
+      scaleout_treshold = 60
+      scalein_treshold = 20
+    }
   ]
 
   tags = merge(
