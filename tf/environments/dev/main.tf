@@ -424,8 +424,8 @@ module "ooniapi_ooniprobe" {
   ]
 
   use_autoscaling = true
-  service_desired_count = 12
-  max_desired_count = 20
+  service_desired_count = 1
+  max_desired_count = 4
   autoscale_policies = [
     {
       resource_type = "memory"
