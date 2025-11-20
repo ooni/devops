@@ -117,7 +117,7 @@ resource "aws_security_group" "container_host" {
 
     security_groups = concat([
       aws_security_group.web.id,
-    ], 
+    ],
     var.monitoring_sg_ids)
   }
 
@@ -212,4 +212,21 @@ resource "aws_autoscaling_group" "container_host" {
 
     triggers = ["tag"]
   }
+}
+
+resource "aws_ecs_capacity_provider" "capacity_provider" {
+  name = "${var.name}-capacity-provider"
+
+  auto_scaling_group_provider {
+      auto_scaling_group_arn         = aws_autoscaling_group.container_host.arn
+      managed_draining = "ENABLED"
+      managed_termination_protection = "ENABLED"
+
+      managed_scaling {
+        maximum_scaling_step_size = 1000
+        minimum_scaling_step_size = 1
+        status                    = "ENABLED"
+        target_capacity           = 100
+      }
+    }
 }
