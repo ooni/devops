@@ -933,7 +933,7 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 256
+  task_memory = 512
 
   first_run = true
   vpc_id    = module.network.vpc_id
@@ -946,7 +946,7 @@ module "ooniapi_oonimeasurements" {
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
   # ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
-  service_desired_count = 8
+  service_desired_count = 4
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
