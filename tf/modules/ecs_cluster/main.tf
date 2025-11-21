@@ -204,8 +204,6 @@ resource "aws_autoscaling_group" "container_host" {
     version = "$Latest"
   }
 
-  protect_from_scale_in = true
-
   instance_refresh {
     strategy = "Rolling"
     preferences {
