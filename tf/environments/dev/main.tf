@@ -947,7 +947,7 @@ module "ooniapi_oonimeasurements" {
   ]
 
   use_autoscaling = true
-  service_desired_count = 12
+  service_desired_count = 16
   max_desired_count = 20
   autoscale_policies = [
     {
