@@ -117,7 +117,7 @@ resource "aws_security_group" "container_host" {
 
     security_groups = concat([
       aws_security_group.web.id,
-    ], 
+    ],
     var.monitoring_sg_ids)
   }
 
@@ -211,5 +211,43 @@ resource "aws_autoscaling_group" "container_host" {
     }
 
     triggers = ["tag"]
+  }
+
+  // This tag is required by the aws_ecs_capacity_provider resource
+  // See: https://registry.terraform.io/providers/hashicorp/aws/5.87.0/docs/resources/ecs_capacity_provider#example-usage
+  tag {
+    key                 = "AmazonECSManaged"
+    value               = true
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_ecs_capacity_provider" "capacity_provider" {
+  name = "${var.name}-capacity-provider"
+
+  auto_scaling_group_provider {
+      auto_scaling_group_arn         = aws_autoscaling_group.container_host.arn
+      managed_termination_protection = "ENABLED"
+      # managed_draining = "ENABLED"
+
+      managed_scaling {
+        maximum_scaling_step_size = 1000
+        minimum_scaling_step_size = 1
+        status                    = "ENABLED"
+        target_capacity           = 90
+      }
+    }
+}
+
+// You also need to link the capacity provider to the cluster
+resource "aws_ecs_cluster_capacity_providers" "cluster_capacity_providers" {
+  cluster_name = aws_ecs_cluster.main.name
+
+  capacity_providers = [aws_ecs_capacity_provider.capacity_provider.name]
+
+  default_capacity_provider_strategy {
+    base              = 1
+    weight            = 100
+    capacity_provider = aws_ecs_capacity_provider.capacity_provider.name
   }
 }
