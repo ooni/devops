@@ -1196,3 +1196,40 @@ If there are duplicate you can prune them with:
 ```
 CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main run check-duplicates --start-at 2025-01-01 --end-at 2025-02-01 --optimize
 ```
+
+## Adding External Users to the Notebooks Server
+
+Some users may request access to the notebooks server for research purposes. This allows them to access the ClickHouse database through a research-friendly interface. We can provide access by creating an account for them.
+
+The notebooks server uses the system’s actual user accounts to authenticate access to the Jupyter web interface. To create a user, we usually create a corresponding system account on the server. The process is as follows:
+
+1. Create a new user.
+2. Set their default password.
+3. Configure the account so that the password must be changed on the next login.
+4. Ask them to log in once to update their password.
+5. They can then log in to [notebook.ooni.org](https://notebook.ooni.org) with their new password.
+
+### Procedure
+
+0. Ask the person requesting a new account for the following details: **name**, **username** (used to log in to the server), and **SSH key**.
+1. Create a new user entry in the [notebook server’s host vars](https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook1.htz-fsn.prod.ooni.nu). Remember to also add the username to the `non_admin_usernames` variable
+2. In the `ansible` directory, run:
+
+   ```
+   ./play -i inventory deploy-bootstrap.yml -l notebook1.htz-fsn.prod.ooni.nu --diff
+   ```
+3. Log in to `notebook.ooni.org` via SSH.
+4. Set the default password for the new user using:
+
+   ```
+   sudo passwd <username>
+   ```
+5. Expire the password using:
+
+   ```
+   sudo passwd -e <username>
+   ```
+
+   This will force the user to update their password on the next login.
+6. Ask the user to SSH into the notebooks server; this action will prompt them to change their password.
+7. They are now able to log in to [notebook.ooni.org](https://notebook.ooni.org).
