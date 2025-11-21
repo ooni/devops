@@ -392,7 +392,7 @@ module "ooniapi_ooniprobe_deployer" {
 module "ooniapi_ooniprobe" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 256
+  task_memory = 128
 
   # First run should be set on first run to bootstrap the task definition
   # first_run = true
