@@ -947,8 +947,8 @@ module "ooniapi_oonimeasurements" {
   ]
 
   use_autoscaling = true
-  service_desired_count = 16
-  max_desired_count = 20
+  service_desired_count = 2
+  max_desired_count = 8
   autoscale_policies = [
     {
       name = "memory"
