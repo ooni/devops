@@ -392,9 +392,7 @@ module "ooniapi_ooniprobe_deployer" {
 module "ooniapi_ooniprobe" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
-
-  service_desired_count = 2
+  task_memory = 128
 
   # First run should be set on first run to bootstrap the task definition
   # first_run = true
@@ -423,6 +421,17 @@ module "ooniapi_ooniprobe" {
 
   ooniapi_service_security_groups = [
     # module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  service_desired_count = 1
+  max_desired_count = 4
+  autoscale_policies = [
+    {
+      resource_type = "memory"
+      name = "memory"
+      scaleout_treshold = 60
+    }
   ]
 
   tags = merge(
@@ -907,7 +916,7 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 128
 
   first_run = true
   vpc_id    = module.network.vpc_id
@@ -918,7 +927,6 @@ module "ooniapi_oonimeasurements" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
-  service_desired_count = 2
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -936,6 +944,17 @@ module "ooniapi_oonimeasurements" {
 
   ooniapi_service_security_groups = [
     module.oonitier1plus_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  service_desired_count = 2
+  max_desired_count = 8
+  autoscale_policies = [
+    {
+      name = "memory"
+      resource_type = "memory"
+      scaleout_treshold = 60
+    }
   ]
 
   tags = merge(
