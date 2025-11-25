@@ -521,11 +521,11 @@ module "ooniapi_cluster" {
   subnet_ids = module.network.vpc_subnet_public[*].id
 
   # You need be careful how these are tweaked.
-  asg_min     = 2
-  asg_max     = 10
-  asg_desired = 7
+  asg_min     = 1
+  asg_max     = 5
+  asg_desired = 4
 
-  instance_type = "t3a.medium"
+  instance_type = "t3a.large"
 
   monitoring_sg_ids = [
     # The clickhouse proxy has an nginx configuration
@@ -550,11 +550,11 @@ module "oonitier1plus_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 2
-  asg_max     = 5
-  asg_desired = 3
+  asg_min     = 1
+  asg_max     = 4
+  asg_desired = 2
 
-  instance_type = "t3a.medium"
+  instance_type = "t3a.large"
 
   monitoring_sg_ids = [
     # The clickhouse proxy has an nginx configuration
@@ -624,9 +624,9 @@ module "ooniapi_ooniprobe" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
-  task_memory = 128
+  task_memory = 512
 
-  service_desired_count = 8
+  service_desired_count = 2
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -933,7 +933,7 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 256
+  task_memory = 512
 
   first_run = true
   vpc_id    = module.network.vpc_id
@@ -946,7 +946,7 @@ module "ooniapi_oonimeasurements" {
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
   # ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
-  service_desired_count = 8
+  service_desired_count = 4
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
