@@ -550,7 +550,7 @@ module "oonitier1plus_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 2
+  asg_min     = 4
   asg_max     = 5
   asg_desired = 3
 
