@@ -916,7 +916,7 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 128
+  task_memory = 256
 
   first_run = true
   vpc_id    = module.network.vpc_id
