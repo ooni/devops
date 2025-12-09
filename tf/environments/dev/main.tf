@@ -392,7 +392,7 @@ module "ooniapi_ooniprobe_deployer" {
 module "ooniapi_ooniprobe" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 128
+  task_memory = 256
 
   # First run should be set on first run to bootstrap the task definition
   # first_run = true
@@ -750,7 +750,7 @@ module "ooniapi_oonirun_deployer" {
 module "ooniapi_oonirun" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 256
 
   vpc_id = module.network.vpc_id
 
@@ -799,7 +799,7 @@ module "ooniapi_oonifindings_deployer" {
 module "ooniapi_oonifindings" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 256
 
   vpc_id = module.network.vpc_id
 
@@ -849,7 +849,7 @@ module "ooniapi_ooniauth_deployer" {
 module "ooniapi_ooniauth" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 128
 
   vpc_id = module.network.vpc_id
 
