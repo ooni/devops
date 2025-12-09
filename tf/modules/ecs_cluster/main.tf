@@ -197,7 +197,9 @@ resource "aws_autoscaling_group" "container_host" {
   vpc_zone_identifier = var.subnet_ids
   min_size            = var.asg_min
   max_size            = var.asg_max
-  desired_capacity    = var.asg_desired
+  # desired_capacity is usually managed by the capacity provider
+  # defined below. Note that this is an ECS cluster, so
+  # cluster capacity is directed by task load demands
 
   launch_template {
     id      = aws_launch_template.container_host.id

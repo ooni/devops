@@ -300,7 +300,6 @@ module "ooniapi_cluster" {
 
   asg_min     = 2
   asg_max     = 4
-  asg_desired = 2
 
   instance_type = "t3a.micro"
 
@@ -329,7 +328,6 @@ module "oonitier1plus_cluster" {
 
   asg_min     = 2
   asg_max     = 4
-  asg_desired = 2
 
   instance_type = "t3a.micro"
 
