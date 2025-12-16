@@ -1189,7 +1189,7 @@ module "ooni_jumphost" {
   }]
 
   sg_prefix = "oonijump"
-  tg_prefix = "jumph"
+  tg_prefix = "jump"
 
   disk_size = 20
 
