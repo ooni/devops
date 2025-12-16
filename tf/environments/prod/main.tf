@@ -527,7 +527,7 @@ module "ooniapi_cluster" {
   # You need be careful how these are tweaked.
   asg_min     = 2
   asg_max     = 10
-  asg_desired = 6
+  asg_desired = 5
 
   instance_type = "t3a.medium"
 
@@ -556,7 +556,7 @@ module "oonitier1plus_cluster" {
 
   asg_min     = 2
   asg_max     = 5
-  asg_desired = 2
+  asg_desired = 4
 
   instance_type = "t3a.medium"
 
@@ -634,8 +634,9 @@ module "ooniapi_ooniprobe" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+  task_memory = 256
 
-  service_desired_count = 6
+  service_desired_count = 8
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -943,7 +944,7 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 256
 
   first_run = true
   vpc_id    = module.network.vpc_id
@@ -956,7 +957,7 @@ module "ooniapi_oonimeasurements" {
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
   # ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
-  service_desired_count = 4
+  service_desired_count = 8
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
