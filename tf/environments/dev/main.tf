@@ -144,10 +144,10 @@ module "oonidevops_github_user" {
 module "oonipg" {
   source = "../../modules/postgresql"
 
-  name                     = "ooni-tier0-postgres"
-  aws_region               = var.aws_region
-  vpc_id                   = module.network.vpc_id
-  subnet_ids               = module.network.vpc_subnet_public[*].id
+  name       = "ooni-tier0-postgres"
+  aws_region = var.aws_region
+  vpc_id     = module.network.vpc_id
+  subnet_ids = module.network.vpc_subnet_public[*].id
   # By default, max_connections is computed as:
   # LEAST({DBInstanceClassMemory/9531392}, 5000)
   # see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Limits.html
@@ -247,6 +247,10 @@ resource "aws_s3_bucket" "ooniapi_codepipeline_bucket" {
 
 resource "aws_s3_bucket" "oonith_codepipeline_bucket" {
   bucket = "codepipeline-oonith-${var.aws_region}-${random_id.artifact_id.hex}"
+}
+
+resource "aws_s3_bucket" "ooni_private_config_bucket" {
+  bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
 }
 
 data "aws_secretsmanager_secret_version" "deploy_key" {
@@ -367,6 +371,12 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Effect": "Allow",
 			"Action": "s3:PutObject",
 			"Resource": "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
+			},
+		{
+			"Sid": "",
+			"Effect": "Allow",
+			"Action": "s3:GetObject",
+			"Resource": "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
 		}
 	]
 }
@@ -419,6 +429,7 @@ module "ooniapi_ooniprobe" {
     FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 3 # use a different one in prod
+    CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
   }
 
   ooniapi_service_security_groups = [
@@ -918,7 +929,7 @@ module "ooniapi_oonimeasurements" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
-  service_desired_count = 2
+  service_desired_count    = 2
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -929,9 +940,9 @@ module "ooniapi_oonimeasurements" {
 
   task_environment = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS = jsonencode(["https://backend-hel.ooni.org", "http://fastpath.${local.environment}.ooni.io:8475"])
-    BASE_URL = "https://api.${local.environment}.ooni.io"
-    S3_BUCKET_NAME = "ooni-data-eu-fra-test"
+    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
+    BASE_URL         = "https://api.${local.environment}.ooni.io"
+    S3_BUCKET_NAME   = "ooni-data-eu-fra-test"
   }
 
   ooniapi_service_security_groups = [
@@ -1097,7 +1108,7 @@ module "ooni_anonc" {
     to_port     = 9100,
     protocol    = "tcp"
     cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"],
-    }]
+  }]
 
   egress_rules = [{
     from_port   = 0,
