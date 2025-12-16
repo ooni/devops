@@ -1087,7 +1087,7 @@ module "ooni_anonc" {
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3a.small"
 
-  name = "oonifastpath"
+  name = "anonc"
   ingress_rules = [{
     from_port   = 22,
     to_port     = 22,
@@ -1141,5 +1141,71 @@ resource "aws_route53_record" "anonc_alias" {
 
   records = [
     module.ooni_anonc.aws_instance_public_dns
+  ]
+}
+
+# Jump host for accessing postgres
+module "ooni_jumphost" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3.micro"
+
+  name = "jumphost"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 80, # for dehydrated challenge
+    to_port     = 80,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 9100, # for node exporter metrics
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"],
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "oonijump"
+  tg_prefix = "jumph"
+
+  disk_size = 20
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-jumph" }
+  )
+}
+
+resource "aws_route53_record" "jumphost_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "jumphost.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_jumphost.aws_instance_public_dns
   ]
 }
