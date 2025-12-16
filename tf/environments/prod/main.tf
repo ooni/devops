@@ -527,7 +527,6 @@ module "ooniapi_cluster" {
   # You need be careful how these are tweaked.
   asg_min     = 2
   asg_max     = 10
-  asg_desired = 5
 
   instance_type = "t3a.medium"
 
@@ -556,7 +555,6 @@ module "oonitier1plus_cluster" {
 
   asg_min     = 2
   asg_max     = 5
-  asg_desired = 4
 
   instance_type = "t3a.medium"
 
