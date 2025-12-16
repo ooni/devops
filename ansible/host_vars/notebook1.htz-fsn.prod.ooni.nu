@@ -115,9 +115,14 @@ ssh_users:
     comment: iMAP partners (only for training by Siti/Sinar Project)
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
+  hodgepodge:
+    login: hodgepodge
+    comment: Tyler Fisher
+    keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICa00RLaeiPN397Q46POv8VGvDc5H1Vma6jZWLsmyotC tylerfisher@tylerfisher.ca"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis ]
-non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex, imap, sloncocs]
+non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex, imap, sloncocs, hodgepodge]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
