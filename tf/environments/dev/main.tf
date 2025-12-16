@@ -1195,7 +1195,7 @@ module "ooni_jumphost" {
 
   tags = merge(
     local.tags,
-    { Name = "ooni-tier0-jumph" }
+    { Name = "ooni-tier3-jumph" }
   )
 }
 
