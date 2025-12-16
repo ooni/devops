@@ -1,7 +1,7 @@
 ssh_users:
   sloncocs:
     login: sloncocs
-    comment: Elizaveta 
+    comment: Elizaveta
     keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMlol+UQauDLLMB//CpGBiigJftQmqk5Wm2c1TXk9RNz elizaveta@openobservatory.org"]
   agrabeli:
     login: agrabeli

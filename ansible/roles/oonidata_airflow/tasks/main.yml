@@ -23,6 +23,8 @@
     repo: "https://github.com/ooni/data.git"
     dest: /opt/airflow/oonidata
     version: main
+  tags:
+    - oonipipeline
 
 - name: Ensure miniconda is installed
   ansible.builtin.include_role:

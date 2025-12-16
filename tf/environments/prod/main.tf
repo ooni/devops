@@ -269,6 +269,10 @@ resource "aws_s3_bucket" "oonith_codepipeline_bucket" {
   bucket = "codepipeline-oonith-${var.aws_region}-${random_id.artifact_id.hex}"
 }
 
+resource "aws_s3_bucket" "ooni_private_config_bucket" {
+  bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
+}
+
 data "aws_secretsmanager_secret_version" "deploy_key" {
   secret_id  = module.adm_iam_roles.oonidevops_deploy_key_arn
   depends_on = [module.adm_iam_roles]
@@ -578,7 +582,7 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
   role = module.ooniapi_cluster.container_host_role.name
 
   policy = <<EOF
-{
+  {
 	"Version": "2012-10-17",
 	"Statement": [
 		{
@@ -586,9 +590,15 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Effect": "Allow",
 			"Action": "s3:PutObject",
 			"Resource": "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
+			},
+		{
+			"Sid": "",
+			"Effect": "Allow",
+			"Action": "s3:GetObject",
+			"Resource": "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
 		}
 	]
-}
+  }
 EOF
 }
 
@@ -622,7 +632,7 @@ module "ooniapi_ooniprobe" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
-  task_memory = 128
+  task_memory = 256
 
   service_desired_count = 8
 
@@ -637,6 +647,7 @@ module "ooniapi_ooniprobe" {
     FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 4 # be sure this is different from dev
+    CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
   }
 
   ooniapi_service_security_groups = [

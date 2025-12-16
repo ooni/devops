@@ -212,3 +212,5 @@ ENGINE = ReplicatedReplacingMergeTree (
 PARTITION BY toYYYYMM(ts)
 ORDER BY (probe_asn, probe_cc, domain)
 SETTINGS index_granularity = 8192;
+
+ALTER TABLE event_detector_changepoints ON CLUSTER oonidata_cluster ADD COLUMN `block_type` String;
