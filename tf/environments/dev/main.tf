@@ -1173,7 +1173,7 @@ module "ooni_jumphost" {
     from_port   = 9100, # for node exporter metrics
     to_port     = 9100,
     protocol    = "tcp"
-    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"],
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32", "${module.ooni_monitoring_proxy.aws_instance_public_ip}/32"],
   }]
 
   egress_rules = [{
@@ -1192,6 +1192,8 @@ module "ooni_jumphost" {
   tg_prefix = "jump"
 
   disk_size = 20
+
+  monitoring_active = "false"
 
   tags = merge(
     local.tags,
