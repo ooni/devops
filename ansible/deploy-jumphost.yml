@@ -2,6 +2,7 @@
 - name: Deploy jumphost
   hosts:
     - jumphost.dev.ooni.io
+    - jumphost.prod.ooni.io
   become: true
   roles:
     - role: bootstrap
