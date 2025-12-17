@@ -1193,6 +1193,9 @@ module "ooni_jumphost" {
 
   disk_size = 20
 
+  # This host will be turned off most of the times and
+  # the monitoring system will think it's down, so it's
+  # not worth monitoring
   monitoring_active = "false"
 
   tags = merge(
