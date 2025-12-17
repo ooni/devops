@@ -24,3 +24,12 @@
     name: postgresql-client
     state: present
     update_cache: yes
+
+- name: Install utilities
+  become: true
+  tags:
+    - jumphost
+  apt:
+    name: jq
+    state: present
+    update_cache: yes
