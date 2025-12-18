@@ -181,7 +181,9 @@ module "oonipg" {
     # airflow host
     "142.132.254.225/32",
     # ams-ps
-    "37.218.245.90/32"
+    "37.218.245.90/32",
+    # Jumphost
+    "${module.ooni_jumphost.aws_instance_private_ip}/32"
   ]
   allow_security_groups = [module.ooni_jumphost.ec2_sg_id]
 
