@@ -183,7 +183,7 @@ module "oonipg" {
     # ams-ps
     "37.218.245.90/32",
     # Jumphost
-    "${module.ooni_jumphost.aws_instance_public_ip}/32"
+    "${module.ooni_jumphost.aws_instance_private_ip}/32"
   ]
   allow_security_groups = [module.ooni_jumphost.ec2_sg_id]
 
@@ -529,7 +529,7 @@ module "ooniapi_cluster" {
   # You need be careful how these are tweaked.
   asg_min     = 2
   asg_max     = 10
-  asg_desired = 5
+  asg_desired = 2
 
   instance_type = "t3a.medium"
 
