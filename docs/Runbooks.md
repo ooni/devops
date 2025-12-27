@@ -2,6 +2,37 @@
 
 Below you will find runbooks for common tasks and operations to manage our infra.
 
+## OONI Data Pipeline
+
+### Deploying updates
+
+There are two main ways to update the OONI Data pipeline codebase.
+
+1. Faster iterative approach
+2. More stable ansible based
+
+#### Faster iterative appraoch
+
+This is mostly useful for while you are developing and need a quick turnaround.
+
+1. Login to `clickhouse1.prod.ooni.io`
+2. Update the codebase via git using `cd /opt/airflow/oonidata/oonipipeline && sudo -u airflow git pull`
+3. Upgrade the pip oonipipeline installation using `sudo -u miniconda /opt/miniconda/bin/pip install --upgrade /opt/airflow/oonidata/oonipipeline/`
+4. You can check the version by running `sudo -u airflow CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main --version`
+
+#### Ansible based
+
+TODO
+
+#### Deploying updates
+
+Backfilling event detector tables
+
+You can run a backfill task using the `event-detector` command, like so:
+```
+sudo -u airflow CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main event-detector --start-at 2024-01-01 --end-at 2025-01-01
+```
+
 ## Monitoring deployment runbook
 
 The monitoring stack is deployed and configured by
