@@ -1,0 +1,6 @@
+# citizenlab user
+citizenlab_user: citizenlab
+citizenlab_home: "/opt/{{ citizenlab_user }}"
+
+# citizenlab settings
+clickhouse_url: "clickhouse://write:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_write_password', profile='oonidevops_user_prod') }}@clickhouseproxy.dev.ooni.io/oonitest"
