@@ -315,6 +315,8 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule" {
         "/api/v1/update/*",
         # Activate this when the DB is connected in prod
         "/api/v1/check-in*",
+        "/api/_/show_countries_prioritization",
+        "/api/_/debug_prioritization",
       ]
     }
   }
