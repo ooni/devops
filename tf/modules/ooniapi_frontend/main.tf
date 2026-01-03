@@ -315,6 +315,8 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule" {
         "/api/v1/update/*",
         # Activate this when the DB is connected in prod
         "/api/v1/check-in*",
+        "/api/v1/geolookup*",
+        "/api/v1/collectors*",
       ]
     }
   }
