@@ -410,7 +410,9 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_4" {
   condition {
     path_pattern {
       values = [
-        "/bouncer/net-tests*"
+        "/bouncer/net-tests*",
+        "/api/v1/geolookup*",
+        "/api/v1/collectors*"
       ]
     }
   }
