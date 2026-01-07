@@ -967,8 +967,6 @@ module "ooniapi_oonimeasurements" {
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
   # ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
-  service_desired_count = 8
-
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
@@ -989,6 +987,17 @@ module "ooniapi_oonimeasurements" {
   ooniapi_service_security_groups = [
     module.oonitier1plus_cluster.web_security_group_id,
     module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  service_desired_count = 4
+  max_desired_count = 8
+  autoscale_policies = [
+    {
+      name = "memory"
+      resource_type = "memory"
+      scaleout_treshold = 60
+    }
   ]
 
   tags = merge(
