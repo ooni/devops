@@ -636,7 +636,6 @@ module "ooniapi_ooniprobe" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
   task_memory = 256
 
-  service_desired_count = 8
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -654,6 +653,17 @@ module "ooniapi_ooniprobe" {
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  service_desired_count = 2
+  max_desired_count = 8
+  autoscale_policies = [
+    {
+      resource_type = "memory"
+      name = "memory"
+      scaleout_treshold = 60
+    }
   ]
 
   tags = merge(
