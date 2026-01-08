@@ -529,7 +529,6 @@ module "ooniapi_cluster" {
   # You need be careful how these are tweaked.
   asg_min     = 2
   asg_max     = 10
-  asg_desired = 2
 
   instance_type = "t3a.medium"
 
@@ -558,7 +557,6 @@ module "oonitier1plus_cluster" {
 
   asg_min     = 2
   asg_max     = 5
-  asg_desired = 4
 
   instance_type = "t3a.medium"
 
@@ -638,7 +636,6 @@ module "ooniapi_ooniprobe" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
   task_memory = 256
 
-  service_desired_count = 8
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -656,6 +653,17 @@ module "ooniapi_ooniprobe" {
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  service_desired_count = 2
+  max_desired_count = 8
+  autoscale_policies = [
+    {
+      resource_type = "memory"
+      name = "memory"
+      scaleout_treshold = 60
+    }
   ]
 
   tags = merge(
@@ -959,8 +967,6 @@ module "ooniapi_oonimeasurements" {
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
   # ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
-  service_desired_count = 8
-
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
@@ -981,6 +987,17 @@ module "ooniapi_oonimeasurements" {
   ooniapi_service_security_groups = [
     module.oonitier1plus_cluster.web_security_group_id,
     module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  service_desired_count = 4
+  max_desired_count = 8
+  autoscale_policies = [
+    {
+      name = "memory"
+      resource_type = "memory"
+      scaleout_treshold = 60
+    }
   ]
 
   tags = merge(
