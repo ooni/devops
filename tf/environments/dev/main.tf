@@ -237,6 +237,14 @@ resource "random_id" "artifact_id" {
   byte_length = 4
 }
 
+resource "aws_s3_bucket" "anoncred_manifests" {
+  bucket = "anoncred-manifests-${var.aws_region}"
+  object_lock_enabled = true
+  versioning {
+    enabled = true
+  }
+}
+
 resource "aws_s3_bucket" "ooniprobe_failed_reports" {
   bucket = "ooniprobe-failed-reports-${var.aws_region}"
 }
