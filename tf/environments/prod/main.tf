@@ -992,7 +992,7 @@ module "ooniapi_oonimeasurements" {
 
   use_autoscaling = true
   service_desired_count = 4
-  max_desired_count = 8
+  max_desired_count = 32 # 8gb (total mem) / 256mb (mem per task) = 32 tasks
   autoscale_policies = [
     {
       name = "memory"
