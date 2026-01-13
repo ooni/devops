@@ -120,6 +120,11 @@ ssh_users:
     comment: Aaron Gibson
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINCW9YqNPaMRhNw84sk3NCea0RETVEg4EQS0f4CO020/ aagbsn@extc.org"
+  iyp:
+    login: iyp
+    comment: Internet Yellow Pages (Romain Fontugne / Malte Tashiro)
+    keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMlyJ7Bp6fg4bWuS8btqL5jLDz6iZZcd1DbKh8FPZz+I admin@ihr.live"
   imap:
     login: imap
     comment: iMAP partners (only for training by Siti/Sinar Project)
@@ -127,7 +132,7 @@ ssh_users:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis ]
-non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, dillon, lex, imap, sloncocs, aagbsn]
+non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, dillon, lex, imap, sloncocs, aagbsn, iyp]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
