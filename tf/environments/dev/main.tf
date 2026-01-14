@@ -302,6 +302,34 @@ resource "aws_s3_bucket_acl" "anonc_manifests" {
   acl    = "public-read"
 }
 
+# Anonymous credentials manifest.
+#
+# Stored here to be publicly available, verifiable, and version controlled
+resource "aws_s3_object" "manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key = "manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAApNRh7fk+riQoD24/O1deyv96zzUKrPl/iVfFArlNGjABIAAAAAAAAADcq4aiJe0vkFuO1YnByaMEiB8ZA/rqf1d4O/SzFec8bAMAAAAAAAAAIAAAAAAAAAD+Z9JjHXAYvJdxloiGdIaqUQF208Oq7YTdvRYDrZY8SyAAAAAAAAAAUGiViBIvG4Xd7Cv29tLNuC/y0lTINIw63Je/Zm0XXGQgAAAAAAAAAFbDFU/rX+kMZEwVlx4ZeaqYLTbYO30Kz37W8DNx2Cw3"
+  })
+}
+
+# Test manifest used for integration tests
+resource "aws_s3_object" "test_manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key = "test_manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAAIKrSuwbE4aYXbC1VvFTCtPo1vUILohyRb/n6mkNQx3kBIAAAAAAAAABszBl0xj4qhFI5QwT7PQ0xji+ol5GBL13C2unPmDARUQMAAAAAAAAAIAAAAAAAAACWDzG7YtM9HEwD1B3cRXOxU8i0BbYlew0K+Gu6QKGwTSAAAAAAAAAAZPVqGmnoY9XSyzWyfgX05kZ8L21DZ+Pt6l5lsQXpezcgAAAAAAAAAOQ0W+VAKzDLrac3x2msH90sef2c+VLl0aHdOX/lMlVa"
+  })
+}
+
 resource "aws_s3_bucket" "ooniprobe_failed_reports" {
   bucket = "ooniprobe-failed-reports-${var.aws_region}"
 }
