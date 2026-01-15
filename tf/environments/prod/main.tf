@@ -649,6 +649,7 @@ module "ooniapi_ooniprobe" {
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 4 # be sure this is different from dev
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
+    TOR_TARGETS           = "tor_targets.json"
   }
 
   ooniapi_service_security_groups = [
@@ -991,7 +992,7 @@ module "ooniapi_oonimeasurements" {
 
   use_autoscaling = true
   service_desired_count = 4
-  max_desired_count = 8
+  max_desired_count = 32 # 8gb (total mem) / 256mb (mem per task) = 32 tasks
   autoscale_policies = [
     {
       name = "memory"
