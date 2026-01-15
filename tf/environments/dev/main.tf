@@ -237,6 +237,99 @@ resource "random_id" "artifact_id" {
   byte_length = 4
 }
 
+resource "aws_s3_bucket" "anoncred_manifests" {
+  bucket = "anoncred-manifests-${var.aws_region}"
+  object_lock_enabled = true
+  versioning {
+    enabled = true
+  }
+}
+
+resource "aws_s3_bucket_versioning" "anoncred_manifests_version" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_policy" "anonc_manifsts_policy" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicList"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:ListBucket"
+        Resource  = aws_s3_bucket.anoncred_manifests.arn
+      },
+      {
+        Sid       = "PublicRead"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.anoncred_manifests.arn}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_ownership_controls" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_acl" "anonc_manifests" {
+  depends_on = [
+    aws_s3_bucket_ownership_controls.anonc_manifests,
+    aws_s3_bucket_public_access_block.anonc_manifests,
+  ]
+
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  acl    = "public-read"
+}
+
+# Anonymous credentials manifest.
+#
+# Stored here to be publicly available, verifiable, and version controlled
+resource "aws_s3_object" "manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key = "manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAApNRh7fk+riQoD24/O1deyv96zzUKrPl/iVfFArlNGjABIAAAAAAAAADcq4aiJe0vkFuO1YnByaMEiB8ZA/rqf1d4O/SzFec8bAMAAAAAAAAAIAAAAAAAAAD+Z9JjHXAYvJdxloiGdIaqUQF208Oq7YTdvRYDrZY8SyAAAAAAAAAAUGiViBIvG4Xd7Cv29tLNuC/y0lTINIw63Je/Zm0XXGQgAAAAAAAAAFbDFU/rX+kMZEwVlx4ZeaqYLTbYO30Kz37W8DNx2Cw3"
+  })
+}
+
+# Test manifest used for integration tests
+resource "aws_s3_object" "test_manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key = "test_manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAAIKrSuwbE4aYXbC1VvFTCtPo1vUILohyRb/n6mkNQx3kBIAAAAAAAAABszBl0xj4qhFI5QwT7PQ0xji+ol5GBL13C2unPmDARUQMAAAAAAAAAIAAAAAAAAACWDzG7YtM9HEwD1B3cRXOxU8i0BbYlew0K+Gu6QKGwTSAAAAAAAAAAZPVqGmnoY9XSyzWyfgX05kZ8L21DZ+Pt6l5lsQXpezcgAAAAAAAAAOQ0W+VAKzDLrac3x2msH90sef2c+VLl0aHdOX/lMlVa"
+  })
+}
+
 resource "aws_s3_bucket" "ooniprobe_failed_reports" {
   bucket = "ooniprobe-failed-reports-${var.aws_region}"
 }
