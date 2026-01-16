@@ -473,6 +473,18 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Effect": "Allow",
 			"Action": "s3:GetObject",
 			"Resource": "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
+		},
+		{
+  		"Sid": "",
+  		"Effect": "Allow",
+  		"Action": "s3:GetObject",
+  		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
+		},
+		{
+  		"Sid": "",
+  		"Effect": "Allow",
+  		"Action": "s3:ListBucket",
+  		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
 		}
 	]
 }
