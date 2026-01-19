@@ -30,7 +30,11 @@ variable "tags" {
 }
 
 variable "service_desired_count" {
-  description = "Desired numbers of instances in the ecs service"
+  description = <<-EOF
+                Desired numbers of instances in the ecs service.
+                When `use_autoscaling == true` this will be the minimum amount of
+                spawned services
+                EOF
   default     = 1
 }
 
@@ -64,4 +68,28 @@ variable "task_environment" {
 variable "ooniapi_service_security_groups" {
   description = "the shared web security group from the ecs cluster"
   type        = list(string)
+}
+
+// Autoscaling
+variable "use_autoscaling" {
+  description = "Whether this service should use autoscaling to modify task count at runtime"
+  type        = bool
+  default     = false
+}
+
+variable "max_desired_count" {
+  description = "Desired numbers of instances in the ecs service"
+  default     = 1
+}
+
+variable "autoscale_policies" {
+  description = "Policies used for autoscaling resources, only valid if `use_autoscaling` == true"
+
+  type = list(object({
+    resource_type = string // memory | cpu
+    scaleout_treshold = number // from 0 to 100, number used to trigger a scale in. Should be higher than scalein_treshold
+    name = string
+  }))
+
+  default = []
 }

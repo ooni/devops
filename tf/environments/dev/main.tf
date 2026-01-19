@@ -206,6 +206,11 @@ data "aws_ssm_parameter" "prometheus_metrics_password" {
   name = "/oonidevops/ooni_services/prometheus_metrics_password"
 }
 
+# Manually managed with the AWS console
+data "aws_ssm_parameter" "anonc_secret_key" {
+  name = "/oonidevops/secrets/zkp/secret_key"
+}
+
 resource "aws_secretsmanager_secret" "oonipg_url" {
   name = "oonidevops/ooni-tier0-postgres/postgresql_url"
   tags = local.tags
@@ -235,6 +240,99 @@ data "aws_ssm_parameter" "clickhouse_readonly_test_url" {
 
 resource "random_id" "artifact_id" {
   byte_length = 4
+}
+
+resource "aws_s3_bucket" "anoncred_manifests" {
+  bucket = "anoncred-manifests-${var.aws_region}"
+  object_lock_enabled = true
+  versioning {
+    enabled = true
+  }
+}
+
+resource "aws_s3_bucket_versioning" "anoncred_manifests_version" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_policy" "anonc_manifsts_policy" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicList"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:ListBucket"
+        Resource  = aws_s3_bucket.anoncred_manifests.arn
+      },
+      {
+        Sid       = "PublicRead"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.anoncred_manifests.arn}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_ownership_controls" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_acl" "anonc_manifests" {
+  depends_on = [
+    aws_s3_bucket_ownership_controls.anonc_manifests,
+    aws_s3_bucket_public_access_block.anonc_manifests,
+  ]
+
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  acl    = "public-read"
+}
+
+# Anonymous credentials manifest.
+#
+# Stored here to be publicly available, verifiable, and version controlled
+resource "aws_s3_object" "manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key = "manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAApNRh7fk+riQoD24/O1deyv96zzUKrPl/iVfFArlNGjABIAAAAAAAAADcq4aiJe0vkFuO1YnByaMEiB8ZA/rqf1d4O/SzFec8bAMAAAAAAAAAIAAAAAAAAAD+Z9JjHXAYvJdxloiGdIaqUQF208Oq7YTdvRYDrZY8SyAAAAAAAAAAUGiViBIvG4Xd7Cv29tLNuC/y0lTINIw63Je/Zm0XXGQgAAAAAAAAAFbDFU/rX+kMZEwVlx4ZeaqYLTbYO30Kz37W8DNx2Cw3"
+  })
+}
+
+# Test manifest used for integration tests
+resource "aws_s3_object" "test_manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key = "test_manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAAIKrSuwbE4aYXbC1VvFTCtPo1vUILohyRb/n6mkNQx3kBIAAAAAAAAABszBl0xj4qhFI5QwT7PQ0xji+ol5GBL13C2unPmDARUQMAAAAAAAAAIAAAAAAAAACWDzG7YtM9HEwD1B3cRXOxU8i0BbYlew0K+Gu6QKGwTSAAAAAAAAAAZPVqGmnoY9XSyzWyfgX05kZ8L21DZ+Pt6l5lsQXpezcgAAAAAAAAAOQ0W+VAKzDLrac3x2msH90sef2c+VLl0aHdOX/lMlVa"
+  })
 }
 
 resource "aws_s3_bucket" "ooniprobe_failed_reports" {
@@ -304,7 +402,6 @@ module "ooniapi_cluster" {
 
   asg_min     = 2
   asg_max     = 4
-  asg_desired = 2
 
   instance_type = "t3a.micro"
 
@@ -331,9 +428,8 @@ module "oonitier1plus_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 2
+  asg_min     = 1
   asg_max     = 4
-  asg_desired = 2
 
   instance_type = "t3a.micro"
 
@@ -377,6 +473,18 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Effect": "Allow",
 			"Action": "s3:GetObject",
 			"Resource": "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
+		},
+		{
+  		"Sid": "",
+  		"Effect": "Allow",
+  		"Action": "s3:GetObject",
+  		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
+		},
+		{
+  		"Sid": "",
+  		"Effect": "Allow",
+  		"Action": "s3:ListBucket",
+  		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
 		}
 	]
 }
@@ -388,7 +496,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "userauth-dep"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -402,9 +510,7 @@ module "ooniapi_ooniprobe_deployer" {
 module "ooniapi_ooniprobe" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
-
-  service_desired_count = 2
+  task_memory = 256
 
   # First run should be set on first run to bootstrap the task definition
   # first_run = true
@@ -423,6 +529,7 @@ module "ooniapi_ooniprobe" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
   }
 
   task_environment = {
@@ -430,10 +537,24 @@ module "ooniapi_ooniprobe" {
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 3 # use a different one in prod
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
+    TOR_TARGETS           = "tor_targets.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
   }
 
   ooniapi_service_security_groups = [
     # module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  service_desired_count = 1
+  max_desired_count = 4
+  autoscale_policies = [
+    {
+      resource_type = "memory"
+      name = "memory"
+      scaleout_treshold = 60
+    }
   ]
 
   tags = merge(
@@ -721,7 +842,7 @@ module "fastpath_builder" {
 
   service_name            = "fastpath"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "userauth-dep"
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -752,7 +873,7 @@ module "ooniapi_oonirun_deployer" {
 module "ooniapi_oonirun" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 256
 
   vpc_id = module.network.vpc_id
 
@@ -801,7 +922,7 @@ module "ooniapi_oonifindings_deployer" {
 module "ooniapi_oonifindings" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 256
 
   vpc_id = module.network.vpc_id
 
@@ -851,7 +972,7 @@ module "ooniapi_ooniauth_deployer" {
 module "ooniapi_ooniauth" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 128
 
   vpc_id = module.network.vpc_id
 
@@ -918,7 +1039,7 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 256
 
   first_run = true
   vpc_id    = module.network.vpc_id
@@ -929,7 +1050,6 @@ module "ooniapi_oonimeasurements" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
-  service_desired_count    = 2
 
   task_secrets = {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
@@ -947,6 +1067,17 @@ module "ooniapi_oonimeasurements" {
 
   ooniapi_service_security_groups = [
     module.oonitier1plus_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  service_desired_count = 1
+  max_desired_count = 8
+  autoscale_policies = [
+    {
+      name = "memory"
+      resource_type = "memory"
+      scaleout_treshold = 60
+    }
   ]
 
   tags = merge(
