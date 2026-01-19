@@ -1086,6 +1086,74 @@ module "ooniapi_oonimeasurements" {
   )
 }
 
+### Tier2 Citizenlab service
+
+module "ooniapi_citizenlab_deployer" {
+  source = "../../modules/ooniapi_service_deployer"
+
+  service_name            = "citizenlab"
+  repo                    = "ooni/backend"
+  branch_name             = "master"
+  trigger_path            = "ooniapi/services/citizenlab/**"
+  buildspec_path          = "ooniapi/services/citizenlab/buildspec.yml"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_service_name = module.ooniapi_citizenlab.ecs_service_name
+  ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
+}
+
+module "ooniapi_citizenlab" {
+  source = "../../modules/ooniapi_service"
+
+  task_memory = 256
+
+  first_run = true
+  vpc_id    = module.network.vpc_id
+
+  service_name             = "citizenlab"
+  default_docker_image_url = "ooni/api-citizenlab:latest"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
+
+  task_secrets = {
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
+    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_test_url.arn
+  }
+
+  task_environment = {
+    # it has to be a json-compliant array
+    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
+    BASE_URL         = "https://api.${local.environment}.ooni.io"
+    S3_BUCKET_NAME   = "ooni-data-eu-fra-test"
+  }
+
+  ooniapi_service_security_groups = [
+    module.oonitier1plus_cluster.web_security_group_id
+  ]
+
+  use_autoscaling = true
+  service_desired_count = 1
+  max_desired_count = 8
+  autoscale_policies = [
+    {
+      name = "memory"
+      resource_type = "memory"
+      scaleout_treshold = 60
+    }
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier2-citizenlab" }
+  )
+}
+
 #### OONI Tier0 API Frontend
 
 module "ooniapi_frontend" {
