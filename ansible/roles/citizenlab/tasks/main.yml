@@ -1,0 +1,168 @@
+---
+# For prometheus scrape requests
+- name: Flush all handlers
+  meta: flush_handlers
+
+- name: Allow traffic on port 9100
+  become: true
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9100.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
+  notify:
+   - reload nftables
+
+# For statsd importer metrics
+- name: Flush all handlers
+  meta: flush_handlers
+
+- name: Allow traffic on port 9102
+  become: true
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9102.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 9102 counter accept comment "node exporter"
+  notify:
+   - reload nftables
+
+# For incoming citizenlab traffic
+- name: Allow traffic on port 443
+  become: true
+  tags: citizenlab
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/443.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 443 counter accept comment "citizenlab"
+  notify:
+   - reload nftables
+
+# Docker seems to have problems with nftables, so this command will translate all iptables
+# commands to nftables commands
+# - name: Update alternatives for iptables
+#   tags: docker
+#   become: yes
+#   ansible.builtin.command: "update-alternatives --set iptables /usr/sbin/iptables-nft"
+#   notify:
+#    - restart docker
+
+# - name: Update alternatives for iptables
+#   tags: docker
+#   become: yes
+#   ansible.builtin.command: "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft"
+#   notify:
+#    - restart docker
+
+# - name: Flush all handlers # Required to apply iptables settings before docker runs
+#   meta: flush_handlers
+
+### Create citizenlab user
+- name: Ensure the citizenlab group exists
+  ansible.builtin.group:
+    name: "{{ citizenlab_user }}"
+    state: present
+    gid: "1420"
+  become: yes
+
+- name: Create the citizenlab user
+  ansible.builtin.user:
+    name: "{{ citizenlab_user }}"
+    home: "{{ citizenlab_home }}"
+    shell: "/bin/bash"
+    group: "{{ citizenlab_user }}"
+    create_home: yes
+    system: yes
+    uid: "1420"
+  become: yes
+
+- name: Set ownership of the citizenlab directory
+  ansible.builtin.file:
+    path: "{{ citizenlab_home }}"
+    owner: "{{ citizenlab_user }}"
+    group: "{{ citizenlab_user }}"
+    state: directory
+    mode: "0700"
+  become: yes
+
+### Run citizenlab
+- name: Make sure that the citizenlab configuration directory exists
+  ansible.builtin.file:
+    path: /opt/{{citizenlab_user}}/backend/citizenlab/
+    state: directory
+    mode: "0700"
+    owner: "{{citizenlab_user}}"
+    group: "{{citizenlab_user}}"
+
+- name: Create configuration file
+  tags: citizenlab
+  template:
+    src: templates/citizenlab.conf
+    dest: "/opt/{{citizenlab_user}}/backend/citizenlab/citizenlab.conf"
+    mode: "0400"
+    owner: "{{citizenlab_user}}"
+  become: yes
+
+- name: Ensure ooniapi directory existence
+  ansible.builtin.file:
+    path: /var/lib/ooniapi
+    state: directory
+    mode: "0711"
+    owner: "{{citizenlab_user}}"
+    group: "{{citizenlab_user}}"
+
+- name: Ensure citizenlab var dir exists
+  ansible.builtin.file:
+    path: /var/lib/citizenlab
+    state: directory
+    mode: "0700"
+    owner: "{{citizenlab_user}}"
+    group: "{{citizenlab_user}}"
+
+- name: Allow nginx access to the spool dir
+  become: true
+  ansible.builtin.user:
+    name: nginx
+    groups: "{{citizenlab_user}}"
+    append: yes
+
+- name: Get UID of a specific user
+  command: id -u {{citizenlab_user}}
+  register: user_uid
+  changed_when: false
+
+- name: Get GID of a specific user
+  command: id -g {{citizenlab_user}}
+  register: user_gid
+  changed_when: false
+
+- name: Ensure citizenlab is running
+  community.docker.docker_container:
+    name: citizenlab
+    image: ooni/citizenlab:v0.2
+    state: started
+    user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
+    # use network mode = host to allow traffic from citizenlab to the statsd exporter without
+    # creating a network with redirection rules to match the ports
+    network_mode: host
+    # published_ports: # unused on network_mode: host
+    #   - "8472:8472"
+    volumes:
+      - /opt/{{citizenlab_user}}/backend/citizenlab/citizenlab.conf:/etc/ooni/citizenlab.conf
+      - /var/lib/ooniapi:/var/lib/ooniapi
+      - /var/lib/citizenlab:/var/lib/citizenlab
+  tags:
+    - citizenlab
+
+- name: Ensure the statsd to prometheus exporter is running
+  community.docker.docker_container:
+    name: statsd-exporter
+    image: prom/statsd-exporter:v0.28.0
+    state: started
+    published_ports:
+      - "9102:9102" # for /metrics
+      - "8125:9125" # for reporting metrics
+      - "8125:9125/udp"
