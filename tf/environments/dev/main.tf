@@ -1163,6 +1163,17 @@ module "ooni_citizenlab" {
   )
 }
 
+resource "aws_route53_record" "citizenlab_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "citizenlab.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_citizenlab.aws_instance_public_dns
+  ]
+}
+
 #### OONI Tier0 API Frontend
 
 module "ooniapi_frontend" {
