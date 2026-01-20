@@ -1108,6 +1108,11 @@ module "ooni_citizenlab" {
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
+    from_port   = 80, # for dehydrated challenge
+    to_port     = 80,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
     // API endpoint
     from_port   = 443,
     to_port     = 443,
