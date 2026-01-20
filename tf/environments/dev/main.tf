@@ -1141,6 +1141,8 @@ module "ooni_citizenlab" {
   sg_prefix = "ooniciti"
   tg_prefix = "citi"
 
+  disk_size = 20
+
   tags = merge(
     local.tags,
     { Name = "ooni-tier2-citizenlab" }
