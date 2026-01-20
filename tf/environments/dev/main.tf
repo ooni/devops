@@ -1181,6 +1181,22 @@ resource "aws_route53_record" "citizenlab_alias" {
   ]
 }
 
+module "citizenlab_builder" {
+  source      = "../../modules/ooni_docker_build"
+  trigger_tag = ""
+
+  service_name            = "citizenlab"
+  repo                    = "ooni/backend"
+  branch_name             = "add_citizenlab_url_management_with_porcelain"
+  buildspec_path          = "ooniapi/services/citizenlab/buildspec.yml"
+  trigger_path            = "ooniapi/services/citizenlab/**"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+}
+
 #### OONI Tier0 API Frontend
 
 module "ooniapi_frontend" {
