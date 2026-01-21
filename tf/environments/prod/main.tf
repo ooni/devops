@@ -281,7 +281,7 @@ resource "aws_s3_bucket" "ooni_private_config_bucket" {
 }
 
 resource "aws_s3_bucket" "anoncred_manifests" {
-  bucket = "anoncred-manifests-${var.aws_region}"
+  bucket = "ooni-anoncreds-manifests-${var.aws_region}"
   object_lock_enabled = true
   versioning {
     enabled = true
