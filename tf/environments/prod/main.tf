@@ -295,7 +295,7 @@ resource "aws_s3_bucket_versioning" "anoncred_manifests_version" {
   }
 }
 
-resource "aws_s3_bucket_policy" "anonc_manifsts_policy" {
+resource "aws_s3_bucket_policy" "anonc_manifests_policy" {
   bucket = aws_s3_bucket.anoncred_manifests.id
 
   policy = jsonencode({
@@ -706,7 +706,8 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "userauth-dep"
+  # branch_name             = "userauth-dep"
+  branch_name             = "master"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -855,7 +856,8 @@ module "fastpath_builder" {
 
   service_name            = "fastpath"
   repo                    = "ooni/backend"
-  branch_name             = "userauth-dep"
+  # branch_name             = "userauth-dep"
+  branch_name             = "master"
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
