@@ -706,7 +706,6 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  # branch_name             = "userauth-dep"
   branch_name             = "master"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
@@ -856,7 +855,6 @@ module "fastpath_builder" {
 
   service_name            = "fastpath"
   repo                    = "ooni/backend"
-  # branch_name             = "userauth-dep"
   branch_name             = "master"
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
