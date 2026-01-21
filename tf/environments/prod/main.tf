@@ -41,6 +41,11 @@ provider "aws" {
 }
 
 data "aws_availability_zones" "available" {}
+#
+# Manually managed with the AWS console
+data "aws_ssm_parameter" "anonc_secret_key" {
+  name = "/oonidevops/secrets/zkp/secret_key"
+}
 
 data "aws_secretsmanager_secret" "do_token" {
   name = "oonidevops/digitalocean_access_token"
@@ -273,6 +278,86 @@ resource "aws_s3_bucket" "oonith_codepipeline_bucket" {
 
 resource "aws_s3_bucket" "ooni_private_config_bucket" {
   bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
+}
+
+resource "aws_s3_bucket" "anoncred_manifests" {
+  bucket = "ooni-anoncreds-manifests-${var.aws_region}"
+  object_lock_enabled = true
+  versioning {
+    enabled = true
+  }
+}
+
+resource "aws_s3_bucket_versioning" "anoncred_manifests_version" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_policy" "anonc_manifests_policy" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicList"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:ListBucket"
+        Resource  = aws_s3_bucket.anoncred_manifests.arn
+      },
+      {
+        Sid       = "PublicRead"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.anoncred_manifests.arn}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_ownership_controls" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_acl" "anonc_manifests" {
+  depends_on = [
+    aws_s3_bucket_ownership_controls.anonc_manifests,
+    aws_s3_bucket_public_access_block.anonc_manifests,
+  ]
+
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  acl    = "public-read"
+}
+
+# Anonymous credentials manifest.
+#
+# Stored here to be publicly available, verifiable, and version controlled
+resource "aws_s3_object" "manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key = "manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAAQuyVwuNRQJrFaYWNoTRktq7raodC5dwqXFBNlB5yPxoBIAAAAAAAAACySi3MEUQH886Jymv1Ft8ic+1w2gmmKmr6Kmse0C+mWwMAAAAAAAAAIAAAAAAAAAAW614MmIZZmvRrwG9vvEO5znoEkG413cUSDwVc/cstaCAAAAAAAAAAfo7B0TYG+ytQ5cEs6vENzPPkXOHNuLE+uVaC5upvgFMgAAAAAAAAAMhi0YHpOV60CphCTxCo0BO95oOdpz3VwOPcp4DNuOkN"
+  })
 }
 
 data "aws_secretsmanager_secret_version" "deploy_key" {
@@ -584,7 +669,7 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
   role = module.ooniapi_cluster.container_host_role.name
 
   policy = <<EOF
-  {
+{
 	"Version": "2012-10-17",
 	"Statement": [
 		{
@@ -598,9 +683,21 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Effect": "Allow",
 			"Action": "s3:GetObject",
 			"Resource": "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
+		},
+		{
+    		"Sid": "",
+    		"Effect": "Allow",
+    		"Action": "s3:GetObject",
+    		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
+		},
+		{
+    		"Sid": "",
+    		"Effect": "Allow",
+    		"Action": "s3:ListBucket",
+    		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
 		}
 	]
-  }
+}
 EOF
 }
 
@@ -642,6 +739,7 @@ module "ooniapi_ooniprobe" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
   }
 
   task_environment = {
@@ -650,6 +748,8 @@ module "ooniapi_ooniprobe" {
     COLLECTOR_ID          = 4 # be sure this is different from dev
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
     TOR_TARGETS           = "tor_targets.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
   }
 
   ooniapi_service_security_groups = [
