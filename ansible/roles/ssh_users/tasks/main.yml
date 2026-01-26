@@ -1,5 +1,6 @@
 ---
 - name: ensure admin group exists
+  tags: ssh_users
   group:
     name: "{{ admin_group_name }}"
     state: present
@@ -52,6 +53,7 @@
   with_items: "{{ admin_usernames | union(non_admin_usernames) }}"
 
 - name: configure sshd
+  tags: ssh_users
   include_role:
     name: willshersystems.sshd
   vars:
@@ -60,6 +62,7 @@
       AllowUsers: "{{ admin_usernames | union(non_admin_usernames) | sort | join(' ') }}"
 
 - name: Enesure sudoers dir exists
+  tags: ssh_users
   ansible.builtin.file:
     path: /etc/sudoers.d
     state: directory
@@ -67,6 +70,7 @@
     group: root
 
 - name: sudoers.d/80-admins
+  tags: ssh_users
   template:
     src: sudoers
     dest: /etc/sudoers.d/80-admins
@@ -76,11 +80,13 @@
     validate: 'visudo -cf %s'
 
 - name: sudoers.d/adm
+  tags: ssh_users
   ansible.builtin.file:
     path: /etc/sudoers.d/adm
     state: absent
 
 - name: reload sshd
+  tags: ssh_users
   ansible.builtin.systemd_service:
     name: sshd
     state: reloaded
