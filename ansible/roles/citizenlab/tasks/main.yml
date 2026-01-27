@@ -65,7 +65,6 @@
   ansible.builtin.group:
     name: "{{ citizenlab_user }}"
     state: present
-    gid: "1420"
   become: yes
 
 - name: Create the citizenlab user
@@ -76,7 +75,6 @@
     group: "{{ citizenlab_user }}"
     create_home: yes
     system: yes
-    uid: "1420"
   become: yes
 
 - name: Set ownership of the citizenlab directory
