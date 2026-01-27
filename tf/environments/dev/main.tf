@@ -75,7 +75,7 @@ module "adm_iam_roles" {
   source = "../../modules/adm_iam_roles"
 
   authorized_accounts = [
-    "arn:aws:iam::${local.ooni_main_org_id}:user/aaron",
+    "arn:aws:iam::${local.ooni_dev_org_id}:user/aaron",
     "arn:aws:iam::${local.ooni_main_org_id}:user/art",
     "arn:aws:iam::${local.ooni_main_org_id}:user/mehul",
     "arn:aws:iam::${local.ooni_main_org_id}:user/luis",
