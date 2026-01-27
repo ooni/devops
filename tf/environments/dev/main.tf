@@ -244,7 +244,7 @@ resource "random_id" "artifact_id" {
 }
 
 resource "aws_s3_bucket" "anoncred_manifests" {
-  bucket = "ooni-anoncreds-manifests-${var.aws_region}"
+  bucket = "ooni-anoncreds-manifests-dev-${var.aws_region}"
   object_lock_enabled = true
   versioning {
     enabled = true
