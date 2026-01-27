@@ -1088,7 +1088,7 @@ module "ooniapi_oonimeasurements" {
 }
 
 ### Tier2 Citizenlab service
-module "ooni_citizenlab" {
+module "ooniapi_citizenlab" {
   source = "../../modules/ec2"
 
   stage = local.environment
@@ -1161,7 +1161,7 @@ resource "aws_route53_record" "citizenlab_alias" {
   ttl     = 300
 
   records = [
-    module.ooni_citizenlab.aws_instance_public_dns
+    module.ooniapi_citizenlab.aws_instance_public_dns
   ]
 }
 
@@ -1195,6 +1195,7 @@ module "ooniapi_frontend" {
   ooniapi_ooniprobe_target_group_arn        = module.ooniapi_ooniprobe.alb_target_group_id
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
+  ooniapi_citizenlab_target_group_arn       = module.ooniapi_citizenlab.aws_instance_id
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id,
