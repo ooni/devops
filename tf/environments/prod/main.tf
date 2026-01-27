@@ -188,7 +188,8 @@ module "oonipg" {
     # ams-ps
     "37.218.245.90/32",
     # Jumphost
-    "${module.ooni_jumphost.aws_instance_private_ip}/32"
+    "${module.ooni_jumphost.aws_instance_private_ip}/32",
+    "${module.ooni_jumphost.aws_instance_public_ip}/32",
   ]
   allow_security_groups = [module.ooni_jumphost.ec2_sg_id]
 
