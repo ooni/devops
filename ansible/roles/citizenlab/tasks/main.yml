@@ -154,13 +154,3 @@
       - /var/lib/citizenlab:/var/lib/citizenlab
   tags:
     - citizenlab
-
-- name: Ensure the statsd to prometheus exporter is running
-  community.docker.docker_container:
-    name: statsd-exporter
-    image: prom/statsd-exporter:v0.28.0
-    state: started
-    published_ports:
-      - "9102:9102" # for /metrics
-      - "8125:9125" # for reporting metrics
-      - "8125:9125/udp"
