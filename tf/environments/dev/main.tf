@@ -452,19 +452,25 @@ module "oonitier1plus_cluster" {
 
 #### OONI Tier0
 
-resource "aws_elasticache_cluster" "ooniapi" {
-  cluster_id           = "ooniapi-valkey"
-  engine               = "valkey"
-  node_type            = "cache.t4g.micro"
-  num_cache_nodes      = 1
-  parameter_group_name = "default.valkey8"
-  engine_version       = "8.2"
-  port                 = 6379
+resource "aws_elasticache_serverless_cache" "ooniapi" {
+  name   = "ooniapi-${local.environment}-cache"
+  engine = "valkey"
+  cache_usage_limits {
+    data_storage {
+      maximum = 10
+      unit    = "GB"
+    }
+    ecpu_per_second {
+      maximum = 5000
+    }
+  }
+  major_engine_version = "8"
+  security_group_ids   = [module.ooniapi_cluster.web_security_group_id]
+  subnet_ids           = module.network.vpc_subnet_private[*].id
 }
 
 locals {
-  ooniapi_valkey_node = aws_elasticache_cluster.ooniapi.cache_nodes[0]
-  ooniapi_valkey_url  = "valkey://${local.ooniapi_valkey_node.address}:${local.ooniapi_valkey_node.port}"
+  ooniapi_valkey_url = "valkey://${aws_elasticache_serverless_cache.ooniapi.endpoint[0].address}:${aws_elasticache_serverless_cache.ooniapi.endpoint[0].port}"
 }
 
 #### OONI Probe service
