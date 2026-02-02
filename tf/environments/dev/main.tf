@@ -1078,7 +1078,6 @@ module "ooniapi_oonimeasurements" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_test_url.arn
-    VALKEY_URL                  = local.ooniapi_valkey_url
   }
 
   task_environment = {
@@ -1086,6 +1085,7 @@ module "ooniapi_oonimeasurements" {
     OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
     BASE_URL         = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME   = "ooni-data-eu-fra-test"
+    VALKEY_URL       = local.ooniapi_valkey_url
   }
 
   ooniapi_service_security_groups = [
