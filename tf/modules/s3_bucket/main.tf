@@ -40,6 +40,31 @@ resource "aws_s3_bucket_acl" "bucket" {
   ]
 }
 
+resource "aws_s3_bucket_policy" "public" {
+  count  = var.public_read ? 1 : 0
+  bucket = aws_s3_bucket.bucket.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicList"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:ListBucket"
+        Resource  = aws_s3_bucket.bucket.arn
+      },
+      {
+        Sid       = "PublicRead"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.bucket.arn}/*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_user" "bucket_user" {
   count = var.create_iam_user ? 1 : 0
   name  = "${var.bucket_name}-user"

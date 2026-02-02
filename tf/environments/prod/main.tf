@@ -262,6 +262,16 @@ resource "aws_secretsmanager_secret_version" "oonipg_url" {
   )
 }
 
+module "geoip_bucket" {
+  source = "../../modules/s3_bucket"
+
+  bucket_name = "ooni-geoip"
+  public_read = false
+  create_iam_user = true
+  versioning_enabled = false
+  object_lock_enabled = false
+}
+
 resource "random_id" "artifact_id" {
   byte_length = 4
 }
