@@ -452,6 +452,21 @@ module "oonitier1plus_cluster" {
 
 #### OONI Tier0
 
+resource "aws_elasticache_cluster" "ooniapi" {
+  cluster_id           = "ooniapi-valkey"
+  engine               = "valkey"
+  node_type            = "cache.t4g.micro"
+  num_cache_nodes      = 1
+  parameter_group_name = "default.valkey8.2"
+  engine_version       = "8.2"
+  port                 = 6379
+}
+
+locals {
+  ooniapi_valkey_node = aws_elasticache_cluster.ooniapi.cache_nodes[0]
+  ooniapi_valkey_url  = "valkey://${local.ooniapi_valkey_node.address}:${local.ooniapi_valkey_node.port}"
+}
+
 #### OONI Probe service
 
 # For accessing the s3 bucket
@@ -1057,6 +1072,7 @@ module "ooniapi_oonimeasurements" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_test_url.arn
+    VALKEY_URL                  = local.ooniapi_valkey_url
   }
 
   task_environment = {
