@@ -457,7 +457,7 @@ resource "aws_elasticache_cluster" "ooniapi" {
   engine               = "valkey"
   node_type            = "cache.t4g.micro"
   num_cache_nodes      = 1
-  parameter_group_name = "default.valkey8.2"
+  parameter_group_name = "default.valkey8"
   engine_version       = "8.2"
   port                 = 6379
 }
