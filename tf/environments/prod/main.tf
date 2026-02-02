@@ -282,6 +282,7 @@ resource "aws_s3_bucket" "ooni_private_config_bucket" {
   bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
 }
 
+
 resource "aws_s3_bucket" "anoncred_manifests" {
   bucket = "ooni-anoncreds-manifests-${var.aws_region}"
   object_lock_enabled = true
