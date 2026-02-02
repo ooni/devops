@@ -72,7 +72,7 @@ resource "aws_iam_user" "bucket_user" {
 
 resource "aws_iam_user_policy" "s3_access" {
   count = var.create_iam_user ? 1 : 0
-  user  = aws_iam_user.bucker_user[0].name
+  user  = aws_iam_user.bucket_user[0].name
 
   policy = jsonencode({
     Version = "2012-10-17"
