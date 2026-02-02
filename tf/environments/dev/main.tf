@@ -244,7 +244,7 @@ resource "random_id" "artifact_id" {
 }
 
 resource "aws_s3_bucket" "anoncred_manifests" {
-  bucket = "ooni-anoncreds-manifests-dev-${var.aws_region}"
+  bucket              = "ooni-anoncreds-manifests-dev-${var.aws_region}"
   object_lock_enabled = true
   versioning {
     enabled = true
@@ -313,7 +313,7 @@ resource "aws_s3_bucket_acl" "anonc_manifests" {
 # Stored here to be publicly available, verifiable, and version controlled
 resource "aws_s3_object" "manifest" {
   bucket = aws_s3_bucket.anoncred_manifests.id
-  key = "manifest.json"
+  key    = "manifest.json"
   content = jsonencode({
     nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
     submission_policy = {
@@ -326,7 +326,7 @@ resource "aws_s3_object" "manifest" {
 # Test manifest used for integration tests
 resource "aws_s3_object" "test_manifest" {
   bucket = aws_s3_bucket.anoncred_manifests.id
-  key = "test_manifest.json"
+  key    = "test_manifest.json"
   content = jsonencode({
     nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
     submission_policy = {
@@ -401,8 +401,8 @@ module "ooniapi_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 2
-  asg_max     = 4
+  asg_min = 2
+  asg_max = 4
 
   instance_type = "t3a.micro"
 
@@ -429,8 +429,8 @@ module "oonitier1plus_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 1
-  asg_max     = 4
+  asg_min = 1
+  asg_max = 4
 
   instance_type = "t3a.micro"
 
@@ -562,13 +562,13 @@ module "ooniapi_ooniprobe" {
     # module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 1
-  max_desired_count = 4
+  max_desired_count     = 4
   autoscale_policies = [
     {
-      resource_type = "memory"
-      name = "memory"
+      resource_type     = "memory"
+      name              = "memory"
       scaleout_treshold = 60
     }
   ]
@@ -1086,13 +1086,13 @@ module "ooniapi_oonimeasurements" {
     module.oonitier1plus_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 1
-  max_desired_count = 8
+  max_desired_count     = 8
   autoscale_policies = [
     {
-      name = "memory"
-      resource_type = "memory"
+      name              = "memory"
+      resource_type     = "memory"
       scaleout_treshold = 60
     }
   ]
