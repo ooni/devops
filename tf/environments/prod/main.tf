@@ -265,7 +265,7 @@ resource "aws_secretsmanager_secret_version" "oonipg_url" {
 module "geoip_bucket" {
   source = "../../modules/s3_bucket"
 
-  bucket_name         = "ooni-geoip-${var.aws_region}-private"
+  bucket_name         = "ooni-geoip-${var.aws_region}-private-${local.environment}"
   public_read         = false
   create_iam_user     = true
   versioning_enabled  = false
