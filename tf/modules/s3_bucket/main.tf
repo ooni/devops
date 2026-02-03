@@ -99,14 +99,14 @@ resource "aws_s3_bucket_policy" "bucket_iam_permissions" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-     Statement = [
+    Statement = [
       {
         Sid    = "IAMUserBucketPolicy",
         Effect = "Allow",
         Principal = {
           AWS = aws_iam_user.bucket_user[0].arn
         },
-        Action   = var.iam_user_permissions,
+        Action = var.iam_user_permissions,
         Resource = [
           aws_s3_bucket.bucket.arn,
           "${aws_s3_bucket.bucket.arn}/*"
