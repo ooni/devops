@@ -59,7 +59,7 @@ variable "instance_volume_size" {
 
 variable "monitoring_sg_ids" {
   default = []
-  type = list(string)
+  type    = list(string)
 }
 
 variable "node_exporter_port" {
@@ -68,6 +68,6 @@ variable "node_exporter_port" {
 
 variable "monitoring_active" {
   description = "If the monitoring system should consider cluster machines. Set it to 'true' to activate it, anything else to deactivate it"
-  default = "true"
-  type = string
+  default     = "true"
+  type        = string
 }

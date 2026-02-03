@@ -67,12 +67,12 @@ resource "aws_s3_bucket_policy" "alb_logs_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "AWSLoadBalancerLogging"
-        Effect    = "Allow"
+        Sid    = "AWSLoadBalancerLogging"
+        Effect = "Allow"
         Principal = {
           AWS = "arn:aws:iam::${var.region_to_account_id[var.aws_region]}:root"
         }
-        Action = "s3:PutObject"
+        Action   = "s3:PutObject"
         Resource = "${aws_s3_bucket.load_balancer_logs.arn}/*"
       }
     ]
@@ -107,8 +107,8 @@ resource "aws_athena_database" "load_balancer_logs" {
 }
 
 resource "aws_athena_named_query" "create_alb_logs_table" {
-  name      = "create_alb_logs_table"
-  database  = aws_athena_database.load_balancer_logs.name
+  name     = "create_alb_logs_table"
+  database = aws_athena_database.load_balancer_logs.name
 
   query     = <<EOT
 CREATE EXTERNAL TABLE IF NOT EXISTS alb_access_logs (
@@ -155,7 +155,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS alb_access_logs (
             )
         LOCATION 's3://${aws_s3_bucket.load_balancer_logs.bucket}/AWSLogs/'
         EOT
-    workgroup = aws_athena_workgroup.ooni_workgroup.name
+  workgroup = aws_athena_workgroup.ooni_workgroup.name
 }
 
 resource "aws_athena_workgroup" "ooni_workgroup" {
@@ -449,10 +449,10 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
   condition {
     path_pattern {
       values = [
-         "/api/v1/aggregation",
-         "/api/v1/aggregation/*",
-         "/api/v1/observations",
-         "/api/v1/analysis",
+        "/api/v1/aggregation",
+        "/api/v1/aggregation/*",
+        "/api/v1/observations",
+        "/api/v1/analysis",
       ]
     }
   }

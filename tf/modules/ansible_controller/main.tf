@@ -12,9 +12,9 @@ resource "aws_security_group" "ansible_ctrl_sg" {
   }
 
   ingress {
-    protocol = "tcp"
-    from_port = 9100
-    to_port = 9100
+    protocol        = "tcp"
+    from_port       = 9100
+    to_port         = 9100
     security_groups = var.monitoring_sg_ids
   }
 
@@ -64,7 +64,7 @@ resource "aws_instance" "ansible_controller" {
 
   vpc_security_group_ids = [aws_security_group.ansible_ctrl_sg.id]
 
-  tags = merge({ Name = "ansible-controller", MonitoringActive = var.monitoring_active}, var.tags)
+  tags = merge({ Name = "ansible-controller", MonitoringActive = var.monitoring_active }, var.tags)
 }
 
 resource "aws_route53_record" "oonith_service_alias" {

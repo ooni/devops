@@ -162,10 +162,10 @@ module "oonidevops_github_user" {
 module "oonipg" {
   source = "../../modules/postgresql"
 
-  name                     = "ooni-tier0-postgres"
-  aws_region               = var.aws_region
-  vpc_id                   = module.network.vpc_id
-  subnet_ids               = module.network.vpc_subnet_public[*].id
+  name       = "ooni-tier0-postgres"
+  aws_region = var.aws_region
+  vpc_id     = module.network.vpc_id
+  subnet_ids = module.network.vpc_subnet_public[*].id
 
   # By default, max_connections is computed as:
   # LEAST({DBInstanceClassMemory/9531392}, 5000)
@@ -262,6 +262,16 @@ resource "aws_secretsmanager_secret_version" "oonipg_url" {
   )
 }
 
+module "geoip_bucket" {
+  source = "../../modules/s3_bucket"
+
+  bucket_name         = "ooni-geoip-${var.aws_region}-private-${local.environment}"
+  public_read         = false
+  create_iam_user     = true
+  versioning_enabled  = false
+  object_lock_enabled = false
+}
+
 resource "random_id" "artifact_id" {
   byte_length = 4
 }
@@ -282,8 +292,9 @@ resource "aws_s3_bucket" "ooni_private_config_bucket" {
   bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
 }
 
+
 resource "aws_s3_bucket" "anoncred_manifests" {
-  bucket = "ooni-anoncreds-manifests-${var.aws_region}"
+  bucket              = "ooni-anoncreds-manifests-${var.aws_region}"
   object_lock_enabled = true
   versioning {
     enabled = true
@@ -352,7 +363,7 @@ resource "aws_s3_bucket_acl" "anonc_manifests" {
 # Stored here to be publicly available, verifiable, and version controlled
 resource "aws_s3_object" "manifest" {
   bucket = aws_s3_bucket.anoncred_manifests.id
-  key = "manifest.json"
+  key    = "manifest.json"
   content = jsonencode({
     nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
     submission_policy = {
@@ -484,14 +495,14 @@ module "ooni_clickhouse_proxy" {
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
-    from_port   = 9000,
-    to_port     = 9000,
-    protocol    = "tcp",
+    from_port = 9000,
+    to_port   = 9000,
+    protocol  = "tcp",
     cidr_blocks = concat(
       module.network.vpc_subnet_public[*].cidr_block,
       module.network.vpc_subnet_private[*].cidr_block,
       ["${module.ooni_fastpath.aws_instance_private_ip}/32",
-        "${module.ooni_fastpath.aws_instance_public_ip}/32"]
+      "${module.ooni_fastpath.aws_instance_public_ip}/32"]
     ),
     }, {
     // For the prometheus proxy:
@@ -614,8 +625,8 @@ module "ooniapi_cluster" {
   subnet_ids = module.network.vpc_subnet_public[*].id
 
   # You need be careful how these are tweaked.
-  asg_min     = 2
-  asg_max     = 10
+  asg_min = 2
+  asg_max = 10
 
   instance_type = "t3a.medium"
 
@@ -642,8 +653,8 @@ module "oonitier1plus_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 2
-  asg_max     = 5
+  asg_min = 2
+  asg_max = 5
 
   instance_type = "t3a.medium"
 
@@ -733,7 +744,7 @@ module "ooniapi_ooniprobe" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
-  task_memory = 256
+  task_memory              = 256
 
 
   task_secrets = {
@@ -758,13 +769,13 @@ module "ooniapi_ooniprobe" {
     module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 2
-  max_desired_count = 8
+  max_desired_count     = 8
   autoscale_policies = [
     {
-      resource_type = "memory"
-      name = "memory"
+      resource_type     = "memory"
+      name              = "memory"
       scaleout_treshold = 60
     }
   ]
@@ -1092,13 +1103,13 @@ module "ooniapi_oonimeasurements" {
     module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 4
-  max_desired_count = 32 # 8gb (total mem) / 256mb (mem per task) = 32 tasks
+  max_desired_count     = 32 # 8gb (total mem) / 256mb (mem per task) = 32 tasks
   autoscale_policies = [
     {
-      name = "memory"
-      resource_type = "memory"
+      name              = "memory"
+      resource_type     = "memory"
       scaleout_treshold = 60
     }
   ]
