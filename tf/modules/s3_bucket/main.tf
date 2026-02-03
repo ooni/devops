@@ -1,6 +1,6 @@
 resource "aws_s3_bucket" "bucket" {
-  bucket               = var.bucket_name
-  object_lock_enabled  = var.object_lock_enabled
+  bucket              = var.bucket_name
+  object_lock_enabled = var.object_lock_enabled
 }
 
 resource "aws_s3_bucket_versioning" "bucket" {
@@ -33,7 +33,7 @@ resource "aws_s3_bucket_acl" "bucket" {
 
   bucket = aws_s3_bucket.bucket.id
   acl    = "public-read"
-  
+
   depends_on = [
     aws_s3_bucket_ownership_controls.bucket,
     aws_s3_bucket_public_access_block.bucket,
@@ -46,22 +46,26 @@ resource "aws_s3_bucket_policy" "public" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "PublicList"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "s3:ListBucket"
-        Resource  = aws_s3_bucket.bucket.arn
-      },
-      {
-        Sid       = "PublicRead"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "s3:GetObject"
-        Resource  = "${aws_s3_bucket.bucket.arn}/*"
-      }
-    ]
+    Statement = concat(
+      [
+        for action in var.public_bucket_actions : {
+          Sid       = replace(action, ":", "")
+          Effect    = "Allow"
+          Principal = "*"
+          Action    = action
+          Resource  = aws_s3_bucket.bucket.arn
+        }
+      ],
+      [
+        for action in var.public_object_actions : {
+          Sid       = replace(action, ":", "")
+          Effect    = "Allow"
+          Principal = "*"
+          Action    = action
+          Resource  = "${aws_s3_bucket.bucket.arn}/*"
+        }
+      ]
+    )
   })
 }
 
@@ -79,9 +83,7 @@ resource "aws_iam_user_policy" "s3_access" {
     Statement = [
       {
         Effect = "Allow"
-        Action = [
-          "s3:*",
-        ]
+        Action = var.iam_user_permissions
         Resource = [
           aws_s3_bucket.bucket.arn,
           "${aws_s3_bucket.bucket.arn}/*"
