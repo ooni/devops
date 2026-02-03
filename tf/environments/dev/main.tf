@@ -465,12 +465,37 @@ resource "aws_elasticache_serverless_cache" "ooniapi" {
     }
   }
   major_engine_version = "8"
-  security_group_ids   = [module.ooniapi_cluster.web_security_group_id]
+  security_group_ids   = [
+    module.ooniapi_cluster.web_security_group_id,
+    aws_security_group.elasticache_sg.id
+  ]
   subnet_ids           = module.network.vpc_subnet_private[*].id
 }
 
 locals {
   ooniapi_valkey_url = "valkey://${aws_elasticache_serverless_cache.ooniapi.endpoint[0].address}:${aws_elasticache_serverless_cache.ooniapi.endpoint[0].port}"
+}
+
+
+resource "aws_security_group" "elasticache_sg" {
+  description = "Allows access to port 6379 for the cache service"
+  name_prefix = "ooni-elasticache"
+
+  vpc_id = module.network.vpc_id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group_rule" "elasticache_sg_rule" {
+
+  type = "ingress"
+  from_port         = 6379
+  to_port           = 6379
+  protocol          = "tcp"
+  cidr_blocks       = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block)
+  security_group_id =  aws_security_group.elasticache_sg.id
 }
 
 #### OONI Probe service
