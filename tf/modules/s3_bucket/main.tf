@@ -101,7 +101,7 @@ resource "aws_iam_access_key" "user_access_key" {
 resource "aws_ssm_parameter" "access_key_id" {
   count = var.create_iam_user ? 1 : 0
 
-  name  = "s3/${var.bucket_name}-user/access_key_id"
+  name  = "/s3/${var.bucket_name}-user/access_key_id"
   type  = "SecureString"
   value = aws_iam_access_key.user_access_key[0].id
 }
@@ -109,7 +109,7 @@ resource "aws_ssm_parameter" "access_key_id" {
 resource "aws_ssm_parameter" "secret_access_key" {
   count = var.create_iam_user ? 1 : 0
 
-  name  = "s3/${var.bucket_name}-user/secret_access_key"
+  name  = "/s3/${var.bucket_name}-user/secret_access_key"
   type  = "SecureString"
   value = aws_iam_access_key.user_access_key[0].secret
 }
