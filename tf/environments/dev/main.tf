@@ -473,7 +473,8 @@ resource "aws_elasticache_serverless_cache" "ooniapi" {
 }
 
 locals {
-  ooniapi_valkey_url = "valkey://${aws_elasticache_serverless_cache.ooniapi.endpoint[0].address}:${aws_elasticache_serverless_cache.ooniapi.endpoint[0].port}"
+  # ooniapi_valkey_url = "valkey://${aws_elasticache_serverless_cache.ooniapi.endpoint[0].address}:${aws_elasticache_serverless_cache.ooniapi.endpoint[0].port}"
+  ooniapi_valkey_url = "${aws_elasticache_serverless_cache.ooniapi.endpoint[0].address}"
 }
 
 
