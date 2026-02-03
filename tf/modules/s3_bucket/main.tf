@@ -93,6 +93,29 @@ resource "aws_iam_user_policy" "s3_access" {
   })
 }
 
+resource "aws_s3_bucket_policy" "bucket_iam_permissions" {
+  count  = var.create_iam_user ? 1 : 0
+  bucket = aws_s3_bucket.bucket.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+     Statement = [
+      {
+        Sid    = "IAMUserBucketPolicy",
+        Effect = "Allow",
+        Principal = {
+          AWS = aws_iam_user.bucket_user[0].arn
+        },
+        Action   = var.iam_user_permissions,
+        Resource = [
+          aws_s3_bucket.bucket.arn,
+          "${aws_s3_bucket.bucket.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_access_key" "user_access_key" {
   count = var.create_iam_user ? 1 : 0
   user  = aws_iam_user.bucket_user[0].name
