@@ -1241,7 +1241,7 @@ module "ooniapi_frontend" {
   ooniapi_ooniprobe_target_group_arn        = module.ooniapi_ooniprobe.alb_target_group_id
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
-  ooniapi_citizenlab_target_group_arn       = module.ooniapi_citizenlab.aws_instance_id
+  ooniapi_citizenlab_target_group_arn       = module.ooniapi_citizenlab.alb_target_group_id
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id,
