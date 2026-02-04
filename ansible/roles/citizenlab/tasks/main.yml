@@ -30,35 +30,16 @@
    - reload nftables
 
 # For incoming citizenlab traffic
-- name: Allow traffic on port 443
+- name: Allow traffic on port 80
   become: true
   tags: citizenlab
   blockinfile:
-    path: /etc/ooni/nftables/tcp/443.nft
+    path: /etc/ooni/nftables/tcp/80.nft
     create: yes
     block: |
-      add rule inet filter input tcp dport 443 counter accept comment "citizenlab"
+      add rule inet filter input tcp dport 80 counter accept comment "citizenlab"
   notify:
    - reload nftables
-
-# Docker seems to have problems with nftables, so this command will translate all iptables
-# commands to nftables commands
-# - name: Update alternatives for iptables
-#   tags: docker
-#   become: yes
-#   ansible.builtin.command: "update-alternatives --set iptables /usr/sbin/iptables-nft"
-#   notify:
-#    - restart docker
-
-# - name: Update alternatives for iptables
-#   tags: docker
-#   become: yes
-#   ansible.builtin.command: "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft"
-#   notify:
-#    - restart docker
-
-# - name: Flush all handlers # Required to apply iptables settings before docker runs
-#   meta: flush_handlers
 
 ### Create citizenlab user
 - name: Ensure the citizenlab group exists

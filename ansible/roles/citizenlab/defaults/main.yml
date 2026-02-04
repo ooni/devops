@@ -1,5 +1,3 @@
-tls_cert_dir: /var/lib/dehydrated/certs
-
 # citizenlab user
 citizenlab_user: citizenlab
 citizenlab_home: "/opt/{{ citizenlab_user }}"
