@@ -1,8 +1,8 @@
 ---
 - name: Deploy citizenlab
   hosts:
-    - citizenlab.dev.ooni.io
-    - citizenlab.prod.ooni.io
+    - citiz.dev.ooni.io
+    - citiz.prod.ooni.io
   become: true
   roles:
     - role: bootstrap
