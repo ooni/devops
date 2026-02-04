@@ -141,6 +141,8 @@
     network_mode: host
     # published_ports: # unused on network_mode: host
     #   - "8472:8472"
+    environment:
+      PORT: "{{listen_port}}"
     volumes:
       - /opt/{{citizenlab_user}}/backend/citizenlab/citizenlab.conf:/etc/ooni/citizenlab.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
