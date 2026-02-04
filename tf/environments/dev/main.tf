@@ -1099,7 +1099,7 @@ module "ooniapi_citizenlab" {
   dns_zone_ooni_io    = local.dns_zone_ooni_io
 
   key_name      = module.adm_iam_roles.oonidevops_key_name
-  instance_type = "t3a.nano"
+  instance_type = "t3a.micro"
 
   name = "oonictzlab"
   ingress_rules = [{
