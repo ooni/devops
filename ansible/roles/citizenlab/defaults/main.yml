@@ -1,0 +1,6 @@
+# citizenlab user
+citizenlab_user: citizenlab
+citizenlab_home: "/opt/{{ citizenlab_user }}"
+
+# citizenlab settings
+clickhouse_url: "" # fetch from aws secrets
