@@ -101,13 +101,6 @@
     owner: "{{citizenlab_user}}"
     group: "{{citizenlab_user}}"
 
-- name: Allow nginx access to the spool dir
-  become: true
-  ansible.builtin.user:
-    name: nginx
-    groups: "{{citizenlab_user}}"
-    append: yes
-
 - name: Get UID of a specific user
   command: id -u {{citizenlab_user}}
   register: user_uid
