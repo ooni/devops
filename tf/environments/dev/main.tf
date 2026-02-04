@@ -79,7 +79,6 @@ module "adm_iam_roles" {
     "arn:aws:iam::${local.ooni_main_org_id}:user/art",
     "arn:aws:iam::${local.ooni_main_org_id}:user/mehul",
     "arn:aws:iam::${local.ooni_main_org_id}:user/luis",
-    "arn:aws:iam::${local.ooni_main_org_id}:user/tony"
   ]
 }
 
@@ -244,7 +243,7 @@ resource "random_id" "artifact_id" {
 }
 
 resource "aws_s3_bucket" "anoncred_manifests" {
-  bucket = "ooni-anoncreds-manifests-dev-${var.aws_region}"
+  bucket              = "ooni-anoncreds-manifests-dev-${var.aws_region}"
   object_lock_enabled = true
   versioning {
     enabled = true
@@ -313,7 +312,7 @@ resource "aws_s3_bucket_acl" "anonc_manifests" {
 # Stored here to be publicly available, verifiable, and version controlled
 resource "aws_s3_object" "manifest" {
   bucket = aws_s3_bucket.anoncred_manifests.id
-  key = "manifest.json"
+  key    = "manifest.json"
   content = jsonencode({
     nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
     submission_policy = {
@@ -326,7 +325,7 @@ resource "aws_s3_object" "manifest" {
 # Test manifest used for integration tests
 resource "aws_s3_object" "test_manifest" {
   bucket = aws_s3_bucket.anoncred_manifests.id
-  key = "test_manifest.json"
+  key    = "test_manifest.json"
   content = jsonencode({
     nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
     submission_policy = {
@@ -401,8 +400,8 @@ module "ooniapi_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 2
-  asg_max     = 4
+  asg_min = 2
+  asg_max = 4
 
   instance_type = "t3a.micro"
 
@@ -429,8 +428,8 @@ module "oonitier1plus_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 1
-  asg_max     = 4
+  asg_min = 1
+  asg_max = 4
 
   instance_type = "t3a.micro"
 
@@ -451,6 +450,52 @@ module "oonitier1plus_cluster" {
 
 
 #### OONI Tier0
+
+resource "aws_elasticache_serverless_cache" "ooniapi" {
+  name   = "ooniapi-${local.environment}-cache"
+  engine = "valkey"
+  cache_usage_limits {
+    data_storage {
+      maximum = 10
+      unit    = "GB"
+    }
+    ecpu_per_second {
+      maximum = 5000
+    }
+  }
+  major_engine_version = "8"
+  security_group_ids   = [
+    module.ooniapi_cluster.web_security_group_id,
+    aws_security_group.elasticache_sg.id
+  ]
+  subnet_ids           = module.network.vpc_subnet_private[*].id
+}
+
+locals {
+  ooniapi_valkey_url = "valkeys://${aws_elasticache_serverless_cache.ooniapi.endpoint[0].address}:${aws_elasticache_serverless_cache.ooniapi.endpoint[0].port}"
+}
+
+
+resource "aws_security_group" "elasticache_sg" {
+  description = "Allows access to port 6379 for the cache service"
+  name_prefix = "ooni-elasticache"
+
+  vpc_id = module.network.vpc_id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group_rule" "elasticache_sg_rule" {
+
+  type = "ingress"
+  from_port         = 6379
+  to_port           = 6379
+  protocol          = "tcp"
+  cidr_blocks       = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block)
+  security_group_id =  aws_security_group.elasticache_sg.id
+}
 
 #### OONI Probe service
 
@@ -547,13 +592,13 @@ module "ooniapi_ooniprobe" {
     # module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 1
-  max_desired_count = 4
+  max_desired_count     = 4
   autoscale_policies = [
     {
-      resource_type = "memory"
-      name = "memory"
+      resource_type     = "memory"
+      name              = "memory"
       scaleout_treshold = 60
     }
   ]
@@ -1026,7 +1071,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "cusum-changepoint-api"
+  branch_name             = "rate-limiter"
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1064,19 +1109,20 @@ module "ooniapi_oonimeasurements" {
     OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
     BASE_URL         = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME   = "ooni-data-eu-fra-test"
+    VALKEY_URL       = local.ooniapi_valkey_url
   }
 
   ooniapi_service_security_groups = [
     module.oonitier1plus_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 1
-  max_desired_count = 8
+  max_desired_count     = 8
   autoscale_policies = [
     {
-      name = "memory"
-      resource_type = "memory"
+      name              = "memory"
+      resource_type     = "memory"
       scaleout_treshold = 60
     }
   ]
