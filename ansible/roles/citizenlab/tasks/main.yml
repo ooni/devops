@@ -101,12 +101,24 @@
     owner: "{{citizenlab_user}}"
     group: "{{citizenlab_user}}"
 
-- name: Allow nginx access to the spool dir
-  become: true
-  ansible.builtin.user:
-    name: nginx
-    groups: "{{citizenlab_user}}"
-    append: yes
+## Nginx ##
+- name: Overwrite API nginx conf
+  tags: citizenlab
+  template:
+    src: templates/nginx-api.conf
+    dest: /etc/nginx/sites-available/ooni-api.conf
+    mode: 0755
+    owner: root
+  vars:
+    # Uses dehydrated
+    certpath: /var/lib/dehydrated/certs/
+
+- name: Create symlink for API nginx conf
+  tags: citizenlab
+  file:
+    src=/etc/nginx/sites-available/ooni-api.conf
+    dest=/etc/nginx/sites-enabled/ooni-api.conf
+    state=link
 
 - name: Get UID of a specific user
   command: id -u {{citizenlab_user}}
