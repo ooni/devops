@@ -146,8 +146,7 @@
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from citizenlab to the statsd exporter without
     # creating a network with redirection rules to match the ports
-    published_ports:
-       - "8000:80"
+    network_mode: host
     volumes:
       - /opt/{{citizenlab_user}}/backend/citizenlab/citizenlab.conf:/etc/ooni/citizenlab.conf
       - /var/lib/ooniapi:/var/lib/ooniapi

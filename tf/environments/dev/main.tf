@@ -1217,7 +1217,7 @@ module "citizenlab_builder" {
 
   service_name            = "citizenlab"
   repo                    = "ooni/backend"
-  branch_name             = "add_citizenlab_url_management_with_porcelain.5"
+  branch_name             = "add_citizenlab_url_management_with_porcelain.6"
   buildspec_path          = "ooniapi/services/citizenlab/buildspec.yml"
   trigger_path            = "ooniapi/services/citizenlab/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
