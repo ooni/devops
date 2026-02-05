@@ -1151,6 +1151,7 @@ module "ooniapi_oonimeasurements" {
     BASE_URL       = "https://api.ooni.io"
     S3_BUCKET_NAME = "ooni-data-eu-fra"
     VALKEY_URL     = local.ooniapi_valkey_url
+    RATE_LIMITS    = "10000/minute;4000000/day;2000000/7day"
   }
 
   ooniapi_service_security_groups = [
