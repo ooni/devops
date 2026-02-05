@@ -455,6 +455,8 @@ module "oonitier1plus_cluster" {
 
 #### OONI Tier0
 
+##### Elasticache valkey cache
+
 resource "aws_elasticache_serverless_cache" "ooniapi" {
   name   = "ooniapi-${local.environment}-cache"
   engine = "valkey"
