@@ -102,6 +102,14 @@
     group: "{{citizenlab_user}}"
 
 ## Nginx ##
+- name: Ensure /etc/nginx/sites-available directory exists
+  file:
+    path: /etc/nginx/sites-available
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
 - name: Overwrite API nginx conf
   tags: citizenlab
   template:
