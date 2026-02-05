@@ -238,6 +238,10 @@ data "aws_ssm_parameter" "clickhouse_readonly_test_url" {
   name = "/oonidevops/secrets/clickhouse_readonly_test_url"
 }
 
+data "aws_ssm_parameter" "account_id_hashing_key" {
+  name = "/oonidevops/secrets/ooni_services/account_id_hashing_key"
+}
+
 resource "random_id" "artifact_id" {
   byte_length = 4
 }
@@ -464,11 +468,11 @@ resource "aws_elasticache_serverless_cache" "ooniapi" {
     }
   }
   major_engine_version = "8"
-  security_group_ids   = [
+  security_group_ids = [
     module.ooniapi_cluster.web_security_group_id,
     aws_security_group.elasticache_sg.id
   ]
-  subnet_ids           = module.network.vpc_subnet_private[*].id
+  subnet_ids = module.network.vpc_subnet_private[*].id
 }
 
 locals {
@@ -489,12 +493,12 @@ resource "aws_security_group" "elasticache_sg" {
 
 resource "aws_security_group_rule" "elasticache_sg_rule" {
 
-  type = "ingress"
+  type              = "ingress"
   from_port         = 6379
   to_port           = 6379
   protocol          = "tcp"
   cidr_blocks       = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block)
-  security_group_id =  aws_security_group.elasticache_sg.id
+  security_group_id = aws_security_group.elasticache_sg.id
 }
 
 #### OONI Probe service
@@ -1033,6 +1037,7 @@ module "ooniapi_ooniauth" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
 
     AWS_SECRET_ACCESS_KEY = module.ooniapi_user.aws_secret_access_key_arn
     AWS_ACCESS_KEY_ID     = module.ooniapi_user.aws_access_key_id_arn
@@ -1102,6 +1107,7 @@ module "ooniapi_oonimeasurements" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_test_url.arn
+    ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
   }
 
   task_environment = {
