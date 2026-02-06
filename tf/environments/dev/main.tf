@@ -1114,10 +1114,13 @@ module "ooniapi_oonimeasurements" {
 
   task_environment = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
-    BASE_URL         = "https://api.${local.environment}.ooni.io"
-    S3_BUCKET_NAME   = "ooni-data-eu-fra-test"
-    VALKEY_URL       = local.ooniapi_valkey_url
+    OTHER_COLLECTORS                = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
+    BASE_URL                        = "https://api.${local.environment}.ooni.io"
+    S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
+    VALKEY_URL                      = local.ooniapi_valkey_url
+    RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
+    RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
+    RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])
   }
 
   ooniapi_service_security_groups = [
