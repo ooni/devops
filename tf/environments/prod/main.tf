@@ -1148,10 +1148,12 @@ module "ooniapi_oonimeasurements" {
       "http://fastpath.${local.environment}.ooni.io:8475",
       "https://backend-fsn.ooni.org"
     ])
-    BASE_URL       = "https://api.ooni.io"
-    S3_BUCKET_NAME = "ooni-data-eu-fra"
-    VALKEY_URL     = local.ooniapi_valkey_url
-    RATE_LIMITS    = "10000/minute;4000000/day;2000000/7day"
+    BASE_URL                        = "https://api.ooni.io"
+    S3_BUCKET_NAME                  = "ooni-data-eu-fra"
+    VALKEY_URL                      = local.ooniapi_valkey_url
+    RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
+    RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
+    RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])
   }
 
   ooniapi_service_security_groups = [
