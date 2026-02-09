@@ -158,7 +158,9 @@ module "oonipg" {
   db_allocated_storage     = "5"
   db_max_allocated_storage = null
 
-  allow_cidr_blocks     = module.network.vpc_subnet_private[*].cidr_block
+  allow_cidr_blocks = [
+    "10.0.0.0/8"
+  ]
   allow_security_groups = [module.ooni_jumphost.ec2_sg_id]
 
   tags = merge(

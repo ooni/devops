@@ -1,5 +1,6 @@
 import os
 import csv
+import sys
 import hashlib
 
 ACCOUNT_ID_NEW = os.environ["HASH_PASS"]
@@ -10,7 +11,7 @@ def hash_email_address(email_address: str, key: str) -> str:
 
 
 values_list = []
-with open("dump.csv") as in_file:
+with open(sys.argv[1]) as in_file:
     csv_reader = csv.reader(in_file)
     next(csv_reader)
     for row in csv_reader:
