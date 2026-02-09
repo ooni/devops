@@ -701,7 +701,7 @@ module "ooni_clickhouse_proxy" {
     to_port     = 9000,
     protocol    = "tcp",
     cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, ["${module.ooni_fastpath.aws_instance_private_ip}/32", "${module.ooni_fastpath.aws_instance_public_ip}/32"],
-      ["${module.ooniapi_citizenlab.aws_instance_private_ip}/32", "${module.ooniapi_citizenlab.aws_instance_public_ip}/32"]),
+      ["${module.ooniapi_testlists.aws_instance_private_ip}/32", "${module.ooniapi_testlists.aws_instance_public_ip}/32"]),
     }, {
     // For the prometheus proxy:
     from_port   = 9200,
@@ -1145,8 +1145,8 @@ module "ooniapi_oonimeasurements" {
   )
 }
 
-### Tier2 Citizenlab service
-module "ooniapi_citizenlab" {
+### Tier2 testlists service
+module "ooniapi_testlists" {
   source = "../../modules/ec2"
 
   stage = local.environment
@@ -1208,30 +1208,30 @@ module "ooniapi_citizenlab" {
 
   tags = merge(
     local.tags,
-    { Name = "ooni-tier2-citizenlab" }
+    { Name = "ooni-tier2-testlists" }
   )
 }
 
-resource "aws_route53_record" "citizenlab_alias" {
+resource "aws_route53_record" "testlists_alias" {
   zone_id = local.dns_zone_ooni_io
-  name    = "citiz.${local.environment}.ooni.io"
+  name    = "testl.${local.environment}.ooni.io"
   type    = "CNAME"
   ttl     = 300
 
   records = [
-    module.ooniapi_citizenlab.aws_instance_public_dns
+    module.ooniapi_testlists.aws_instance_public_dns
   ]
 }
 
-module "citizenlab_builder" {
+module "testlists_builder" {
   source      = "../../modules/ooni_docker_build"
   trigger_tag = ""
 
-  service_name            = "citizenlab"
+  service_name            = "testlists"
   repo                    = "ooni/backend"
-  branch_name             = "add_citizenlab_url_management_with_porcelain"
-  buildspec_path          = "ooniapi/services/citizenlab/buildspec.yml"
-  trigger_path            = "ooniapi/services/citizenlab/**"
+  branch_name             = "add_testlists_url_management"
+  buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
+  trigger_path            = "ooniapi/services/testlists/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
@@ -1253,7 +1253,7 @@ module "ooniapi_frontend" {
   ooniapi_ooniprobe_target_group_arn        = module.ooniapi_ooniprobe.alb_target_group_id
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
-  ooniapi_citizenlab_target_group_arn       = module.ooniapi_citizenlab.alb_target_group_id
+  ooniapi_testlists_target_group_arn        = module.ooniapi_testlists.alb_target_group_id
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id,
@@ -1280,7 +1280,7 @@ locals {
     "oonirun.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "oonimeasurements.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "8.th.dev.ooni.io" : local.dns_zone_ooni_io,
-    "citizenlab.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
+    "testlists.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
   }
   ooniapi_frontend_main_domain_name         = "api.${local.environment}.ooni.io"
   ooniapi_frontend_main_domain_name_zone_id = local.dns_zone_ooni_io

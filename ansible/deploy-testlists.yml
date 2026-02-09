@@ -1,8 +1,8 @@
 ---
-- name: Deploy citizenlab
+- name: Deploy testlists
   hosts:
-    - citiz.dev.ooni.io
-    - citiz.prod.ooni.io
+    - testlists.dev.ooni.io
+    - testlists.prod.ooni.io
   become: true
   roles:
     - role: bootstrap
@@ -17,7 +17,7 @@
             proxy_pass: http://127.0.0.1:9100/metrics
     - role: geerlingguy.docker
       docker_users:
-        - citizenlab
+        - testlists
         - ubuntu
       docker_package_state: latest
-    - role: citizenlab
+    - role: testlists
