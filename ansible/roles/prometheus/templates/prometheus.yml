@@ -370,11 +370,11 @@ scrape_configs:
         target_label: "__metrics_path__"
         action: "replace"
 
-  - job_name: "citizenlab"
+  - job_name: "testlists"
     static_configs:
     - targets:
-      - citizenlab.dev.ooni.io:9102
-      - citizenlab.prod.ooni.io:9102
+      - testlists.dev.ooni.io:9102
+      - testlists.prod.ooni.io:9102
     scrape_interval: 5s
     scheme: https
     relabel_configs: # Change the host to the proxy host with relabeling

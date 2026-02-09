@@ -29,60 +29,60 @@
   notify:
    - reload nftables
 
-# For incoming citizenlab traffic
+# For incoming testlists traffic
 - name: Allow traffic on port 80
   become: true
-  tags: citizenlab
+  tags: testlists
   blockinfile:
     path: /etc/ooni/nftables/tcp/80.nft
     create: yes
     block: |
-      add rule inet filter input tcp dport 80 counter accept comment "citizenlab"
+      add rule inet filter input tcp dport 80 counter accept comment "testlists"
   notify:
    - reload nftables
 
-### Create citizenlab user
-- name: Ensure the citizenlab group exists
+### Create testlists user
+- name: Ensure the testlists group exists
   ansible.builtin.group:
-    name: "{{ citizenlab_user }}"
+    name: "{{ testlists_user }}"
     state: present
   become: yes
 
-- name: Create the citizenlab user
+- name: Create the testlists user
   ansible.builtin.user:
-    name: "{{ citizenlab_user }}"
-    home: "{{ citizenlab_home }}"
+    name: "{{ testlists_user }}"
+    home: "{{ testlists_home }}"
     shell: "/bin/bash"
-    group: "{{ citizenlab_user }}"
+    group: "{{ testlists_user }}"
     create_home: yes
     system: yes
   become: yes
 
-- name: Set ownership of the citizenlab directory
+- name: Set ownership of the testlists directory
   ansible.builtin.file:
-    path: "{{ citizenlab_home }}"
-    owner: "{{ citizenlab_user }}"
-    group: "{{ citizenlab_user }}"
+    path: "{{ testlists_home }}"
+    owner: "{{ testlists_user }}"
+    group: "{{ testlists_user }}"
     state: directory
     mode: "0700"
   become: yes
 
-### Run citizenlab
-- name: Make sure that the citizenlab configuration directory exists
+### Run testlists
+- name: Make sure that the testlists configuration directory exists
   ansible.builtin.file:
-    path: /opt/{{citizenlab_user}}/backend/citizenlab/
+    path: /opt/{{testlists_user}}/backend/testlists/
     state: directory
     mode: "0700"
-    owner: "{{citizenlab_user}}"
-    group: "{{citizenlab_user}}"
+    owner: "{{testlists_user}}"
+    group: "{{testlists_user}}"
 
 - name: Create configuration file
-  tags: citizenlab
+  tags: testlists
   template:
-    src: templates/citizenlab.conf
-    dest: "/opt/{{citizenlab_user}}/backend/citizenlab/citizenlab.conf"
+    src: templates/testlists.conf
+    dest: "/opt/{{testlists_user}}/backend/testlists/testlists.conf"
     mode: "0400"
-    owner: "{{citizenlab_user}}"
+    owner: "{{testlists_user}}"
   become: yes
 
 - name: Ensure ooniapi directory existence
@@ -90,16 +90,16 @@
     path: /var/lib/ooniapi
     state: directory
     mode: "0711"
-    owner: "{{citizenlab_user}}"
-    group: "{{citizenlab_user}}"
+    owner: "{{testlists_user}}"
+    group: "{{testlists_user}}"
 
-- name: Ensure citizenlab var dir exists
+- name: Ensure testlists var dir exists
   ansible.builtin.file:
-    path: /var/lib/citizenlab
+    path: /var/lib/testlists
     state: directory
     mode: "0700"
-    owner: "{{citizenlab_user}}"
-    group: "{{citizenlab_user}}"
+    owner: "{{testlists_user}}"
+    group: "{{testlists_user}}"
 
 ## Nginx ##
 - name: Ensure /etc/nginx/sites-available directory exists
@@ -111,7 +111,7 @@
     group: root
 
 - name: Overwrite API nginx conf
-  tags: citizenlab
+  tags: testlists
   template:
     src: templates/nginx-api.conf
     dest: /etc/nginx/sites-available/ooni-api.conf
@@ -122,36 +122,36 @@
     certpath: /var/lib/dehydrated/certs/
 
 - name: Create symlink for API nginx conf
-  tags: citizenlab
+  tags: testlists
   file:
     src=/etc/nginx/sites-available/ooni-api.conf
     dest=/etc/nginx/sites-enabled/ooni-api.conf
     state=link
 
 - name: Get UID of a specific user
-  command: id -u {{citizenlab_user}}
+  command: id -u {{testlists_user}}
   register: user_uid
   changed_when: false
 
 - name: Get GID of a specific user
-  command: id -g {{citizenlab_user}}
+  command: id -g {{testlists_user}}
   register: user_gid
   changed_when: false
 
-- name: Ensure citizenlab is running
+- name: Ensure testlists is running
   community.docker.docker_container:
     env:
       CLICKHOUSE_URL: "{{ clickhouse_url }}"
-    name: citizenlab
-    image: ooni/api-citizenlab:latest
+    name: testlists
+    image: ooni/api-testlists:latest
     state: started
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
-    # use network mode = host to allow traffic from citizenlab to the statsd exporter without
+    # use network mode = host to allow traffic from testlists to the statsd exporter without
     # creating a network with redirection rules to match the ports
     network_mode: host
     volumes:
-      - /opt/{{citizenlab_user}}/backend/citizenlab/citizenlab.conf:/etc/ooni/citizenlab.conf
+      - /opt/{{testlists_user}}/backend/testlists/testlists.conf:/etc/ooni/testlists.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
-      - /var/lib/citizenlab:/var/lib/citizenlab
+      - /var/lib/testlists:/var/lib/testlists
   tags:
-    - citizenlab
+    - testlists
