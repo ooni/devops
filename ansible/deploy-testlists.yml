@@ -1,8 +1,8 @@
 ---
 - name: Deploy testlists
   hosts:
-    - testlists.dev.ooni.io
-    - testlists.prod.ooni.io
+    - testl.dev.ooni.io
+    - testl.prod.ooni.io
   become: true
   roles:
     - role: bootstrap
