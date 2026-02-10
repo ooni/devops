@@ -20,11 +20,4 @@ groups:
     annotations:
       summary: '{{ $labels.instance }} has `{{ $labels.device }}` silent for {{ $value | humanizeDuration }}'
 
-  - alert: MirrorDiverged
-    expr: scalar(max(ooni_web_mtime)) - ooni_web_mtime > 0
-    for: 11m # job_name=ooni-web scrape_interval is 5m, 8m10s is still "ordinary" delay
-    annotations:
-      summary: 'Mirror {{ $labels.instance }} lags by {{ $value | humanizeDuration }}'
-      description: '{{ if eq $labels.instance "ooni.torproject.org:443" }}Run `make update-site`.{{ end }}'
-
 ...
