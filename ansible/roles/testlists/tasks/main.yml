@@ -123,6 +123,16 @@
   community.docker.docker_container:
     env:
       CLICKHOUSE_URL: "{{ clickhouse_url }}"
+      JWT_ENCRYPTION_KEY: "{{ jwt_encryption_key }}"
+      WORKING_DIR: "/var/lib/ooniapi/testlists"
+      GITHUB_TOKEN: "{{ github_token }}"
+      GITHUB_USER: "ooni-bot"
+      ORIGIN_REPO: "citizenlab/test-lists"
+      PUSH_REPO: "ooni/test-lists"
+      LOG_LEVEL: "{{ log_level }}"
+      USER: "ooniapi"
+      EMAIL: "ooniapi@test-lists.ooni.org"
+
     name: testlists
     image: ooni/api-testlists:latest
     state: started
