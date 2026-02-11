@@ -1,2 +1,3 @@
 jwt_encryption_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_services/jwt_secret', profile='oonidevops_user_dev') }}"
 github_token: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/ooni_services/testlists_github_token', profile='oonidevops_user_dev') }}"
+log_level: "debug"

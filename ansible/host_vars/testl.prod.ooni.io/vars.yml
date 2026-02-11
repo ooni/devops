@@ -1,1 +1,2 @@
 jwt_encryption_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_services/jwt_secret', profile='oonidevops_user_prod') }}"
+log_level: "info"
