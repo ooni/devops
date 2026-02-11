@@ -68,22 +68,6 @@
   become: yes
 
 ### Run testlists
-- name: Make sure that the testlists configuration directory exists
-  ansible.builtin.file:
-    path: /opt/{{testlists_user}}/backend/testlists/
-    state: directory
-    mode: "0700"
-    owner: "{{testlists_user}}"
-    group: "{{testlists_user}}"
-
-- name: Create configuration file
-  tags: testlists
-  template:
-    src: templates/testlists.conf
-    dest: "/opt/{{testlists_user}}/backend/testlists/testlists.conf"
-    mode: "0400"
-    owner: "{{testlists_user}}"
-  become: yes
 
 - name: Ensure ooniapi directory existence
   ansible.builtin.file:
@@ -93,9 +77,9 @@
     owner: "{{testlists_user}}"
     group: "{{testlists_user}}"
 
-- name: Ensure testlists var dir exists
+- name: Ensure testlists users var dir exists
   ansible.builtin.file:
-    path: /var/lib/testlists
+    path: /var/lib/ooniapi/testlists/users
     state: directory
     mode: "0700"
     owner: "{{testlists_user}}"
