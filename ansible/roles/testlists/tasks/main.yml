@@ -131,8 +131,6 @@
     # creating a network with redirection rules to match the ports
     network_mode: host
     volumes:
-      - /opt/{{testlists_user}}/backend/testlists/testlists.conf:/etc/ooni/testlists.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
-      - /var/lib/testlists:/var/lib/testlists
   tags:
     - testlists
