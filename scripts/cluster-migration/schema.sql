@@ -216,7 +216,7 @@ SETTINGS index_granularity = 8192;
 ALTER TABLE event_detector_changepoints ON CLUSTER oonidata_cluster ADD COLUMN `block_type` String;
 
 -- faulty measurements
-CREATE TABLE IF NOT EXISTS default.faulty_measurements ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
 (
     `time` DateTime DEFAULT now(),
     `type` String,
