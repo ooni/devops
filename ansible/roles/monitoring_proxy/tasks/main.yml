@@ -50,9 +50,9 @@
   register: swapfile_stat
   tags: swap
 
-- name: Create 4GB swap file
+- name: Create 2GB swap file
   ansible.builtin.command:
-    cmd: fallocate -l 4G /swapfile
+    cmd: fallocate -l 2G /swapfile
   when: not swapfile_stat.stat.exists
   become: yes
   tags: swap
