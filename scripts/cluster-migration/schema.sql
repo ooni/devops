@@ -214,3 +214,20 @@ ORDER BY (probe_asn, probe_cc, domain)
 SETTINGS index_granularity = 8192;
 
 ALTER TABLE event_detector_changepoints ON CLUSTER oonidata_cluster ADD COLUMN `block_type` String;
+
+-- faulty measurements
+CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
+(
+    `ts` DateTime64(3, 'UTC'),
+    `type` String,
+    -- geoip lookup result for the probe IP
+    `probe_cc` String,
+    `probe_asn` UInt32,
+    -- JSON-encoded details about the anomaly
+    `details` String
+)
+ENGINE = ReplicatedReplacingMergeTree (
+        '/clickhouse/{cluster}/tables/ooni/faulty_measurements/{shard}',
+        '{replica}'
+)
+ORDER BY (ts, type, probe_cc, probe_asn);
