@@ -101,6 +101,9 @@
     dest: /etc/nginx/sites-available/ooni-api.conf
     mode: 0755
     owner: root
+  vars:
+    # Uses dehydrated
+    certpath: /var/lib/dehydrated/certs/
 
 - name: Create symlink for API nginx conf
   tags: testlists
