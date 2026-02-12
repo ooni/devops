@@ -1159,7 +1159,7 @@ module "ooniapi_testlists" {
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3a.micro"
 
-  name = "oonictzlab"
+  name = "oonitestlists"
   ingress_rules = [{
     from_port   = 22,
     to_port     = 22,
@@ -1201,8 +1201,8 @@ module "ooniapi_testlists" {
     ipv6_cidr_blocks = ["::/0"]
   }]
 
-  sg_prefix = "ooniciti"
-  tg_prefix = "citi"
+  sg_prefix = "oonitestl"
+  tg_prefix = "tstl"
 
   disk_size = 20
 
