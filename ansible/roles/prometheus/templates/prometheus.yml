@@ -203,7 +203,6 @@ scrape_configs:
       - ooni.io:443
       - ooni.torproject.org:443
       - openobservatory.github.io:443
-      - ooni.netlify.app:443
 
 
   # See ansible/roles/ooni-backend/tasks/main.yml for the scraping targets
