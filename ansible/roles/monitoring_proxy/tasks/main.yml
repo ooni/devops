@@ -42,3 +42,49 @@
   notify:
     - reload nginx
     - restart nginx
+
+# Setup swap
+- name: Check if swap file exists
+  ansible.builtin.stat:
+    path: /swapfile
+  register: swapfile_stat
+  tags: swap
+
+- name: Create 4GB swap file
+  ansible.builtin.command:
+    cmd: fallocate -l 4G /swapfile
+  when: not swapfile_stat.stat.exists
+  become: yes
+  tags: swap
+
+- name: Set swap file permissions
+  ansible.builtin.file:
+    path: /swapfile
+    mode: '0600'
+    owner: root
+    group: root
+  become: yes
+  tags: swap
+
+- name: Format swap file
+  ansible.builtin.command:
+    cmd: mkswap /swapfile
+  when: not swapfile_stat.stat.exists
+  become: yes
+  tags: swap
+
+- name: Enable swap
+  ansible.builtin.command:
+    cmd: swapon /swapfile
+  when: not swapfile_stat.stat.exists
+  become: yes
+  tags: swap
+
+- name: Add swap to /etc/fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: /swapfile none swap sw 0 0
+    regexp: '^/swapfile'
+    state: present
+  become: yes
+  tags: swap
