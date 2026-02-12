@@ -6,6 +6,11 @@
   become: true
   roles:
     - role: bootstrap
+    - role: dehydrated
+      vars:
+        ssl_domains:
+          - "{{ inventory_hostname }}"
+        tls_cert_dir: /var/lib/dehydrated/certs
     - role: nginx
     - role: prometheus_node_exporter
       vars:
