@@ -1,6 +1,6 @@
 ---
 # For prometheus scrape requests
-- name: Flush all handlers 
+- name: Flush all handlers
   meta: flush_handlers
 - name: Allow traffic on port 9200
   tags: prometheus-proxy
@@ -10,7 +10,7 @@
     block: |
       add rule inet filter input tcp dport 9200 counter accept comment "prometheus"
   notify:
-    - reload nftables  
+    - reload nftables
 
 # TODO remove this task when the monitoring proxy is deployed
 - name: Allow traffic on port 9100
@@ -21,7 +21,7 @@
     block: |
       add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
   notify:
-    - reload nftables  
+    - reload nftables
 
 - name: Create the modules-enabled directory if not exists
   tags: webserv
