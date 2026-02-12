@@ -108,6 +108,8 @@
     src=/etc/nginx/sites-available/ooni-api.conf
     dest=/etc/nginx/sites-enabled/ooni-api.conf
     state=link
+  notify:
+    - reload nginx
 
 - name: Get UID of a specific user
   command: id -u {{testlists_user}}
