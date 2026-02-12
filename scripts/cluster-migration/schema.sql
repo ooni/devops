@@ -218,7 +218,7 @@ ALTER TABLE event_detector_changepoints ON CLUSTER oonidata_cluster ADD COLUMN `
 -- faulty measurements
 CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
 (
-    `time` DateTime DEFAULT now(),
+    `ts` DateTime64(3, 'UTC'),
     `type` String,
     -- geoip lookup result for the probe IP
     `probe_cc` String,
@@ -230,4 +230,4 @@ ENGINE = ReplicatedReplacingMergeTree (
         '/clickhouse/{cluster}/tables/ooni/faulty_measurements/{shard}',
         '{replica}'
 )
-ORDER BY (time, type, probe_cc, probe_asn);
+ORDER BY (ts, type, probe_cc, probe_asn);
