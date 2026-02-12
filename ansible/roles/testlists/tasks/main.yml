@@ -113,6 +113,7 @@
     state=link
   notify:
     - reload nginx
+    - restart nginx
 
 - name: Get UID of a specific user
   command: id -u {{testlists_user}}
