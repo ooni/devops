@@ -1,0 +1,19 @@
+---
+- name: Deploy citizenlab
+  hosts:
+    - citizenlab.dev.ooni.io
+    - citizenlab.prod.ooni.io
+  become: true
+  roles:
+    - role: bootstrap
+    - role: prometheus_node_exporter
+      vars:
+        use_https: false
+        node_exporter_port: 9100
+        node_exporter_host: "0.0.0.0"
+    - role: geerlingguy.docker
+      docker_users:
+        - citizenlab
+        - ubuntu
+      docker_package_state: latest
+    - role: citizenlab

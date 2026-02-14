@@ -9,6 +9,9 @@
 - name: Include notebook playbook
   ansible.builtin.import_playbook: deploy-notebook.yml
 
+- name: Include citizenlab playbook
+  ansible.builtin.import_playbook: deploy-citizenlab.yml
+
 # commented out due to the fact it requires manual config of ~/.ssh/config
 #- name: Setup codesign box
 #  hosts: codesign-box
