@@ -339,6 +339,27 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
   }
 }
 
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 121
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
+  }
+
+  # anonymous credentials
+  condition {
+    path_pattern {
+      values = [
+        "/api/v1/manifest*",
+        "/api/v1/sign_credential*",
+        "/api/v1/submit_measurement/*"
+      ]
+    }
+  }
+}
+
 resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_host" {
   listener_arn = aws_alb_listener.ooniapi_listener_https.arn
   priority     = 125
@@ -423,7 +444,6 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_1" {
   condition {
     path_pattern {
       values = [
-        # "/unimplemented"
         "/api/v1/measurements/*",
         "/api/v1/raw_measurement",
         "/api/v1/measurement_meta",
