@@ -20,25 +20,25 @@ resource "aws_security_group" "ec2_sg" {
 resource "aws_security_group_rule" "ec2_sg_ingress" {
   count = length(var.ingress_rules)
 
-  type = "ingress"
+  type              = "ingress"
   from_port         = var.ingress_rules[count.index].from_port
   to_port           = var.ingress_rules[count.index].to_port
   protocol          = var.ingress_rules[count.index].protocol
   cidr_blocks       = var.ingress_rules[count.index].cidr_blocks
   ipv6_cidr_blocks  = var.ingress_rules[count.index].ipv6_cidr_blocks
-  security_group_id =  aws_security_group.ec2_sg.id
+  security_group_id = aws_security_group.ec2_sg.id
 }
 
 resource "aws_security_group_rule" "ec2_sg_egress" {
   count = length(var.egress_rules)
 
-  type = "egress"
+  type              = "egress"
   from_port         = var.egress_rules[count.index].from_port
   to_port           = var.egress_rules[count.index].to_port
   protocol          = var.egress_rules[count.index].protocol
   cidr_blocks       = var.egress_rules[count.index].cidr_blocks
   ipv6_cidr_blocks  = var.egress_rules[count.index].ipv6_cidr_blocks
-  security_group_id =  aws_security_group.ec2_sg.id
+  security_group_id = aws_security_group.ec2_sg.id
 }
 
 data "cloudinit_config" "ooni_ec2" {
@@ -47,7 +47,7 @@ data "cloudinit_config" "ooni_ec2" {
   part {
     filename     = "init.cfg"
     content_type = "text/cloud-config"
-    content = templatefile("${path.module}/templates/cloud-init.yml", {})
+    content      = templatefile("${path.module}/templates/cloud-init.yml", {})
   }
 
 }
@@ -87,15 +87,15 @@ resource "aws_instance" "ooni_ec2" {
 
   lifecycle {
     create_before_destroy = true
-    ignore_changes = [ user_data, launch_template ]
+    ignore_changes        = [user_data, launch_template]
   }
 
   root_block_device {
-    volume_size = var.disk_size  # Size in GB
+    volume_size = var.disk_size # Size in GB
     volume_type = "gp2"
   }
 
-  tags = merge(var.tags, {MonitoringActive = var.monitoring_active})
+  tags = merge(var.tags, { MonitoringActive = var.monitoring_active })
 }
 
 resource "aws_alb_target_group" "ooni_ec2" {

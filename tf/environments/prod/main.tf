@@ -41,6 +41,11 @@ provider "aws" {
 }
 
 data "aws_availability_zones" "available" {}
+#
+# Manually managed with the AWS console
+data "aws_ssm_parameter" "anonc_secret_key" {
+  name = "/oonidevops/secrets/zkp/secret_key"
+}
 
 data "aws_secretsmanager_secret" "do_token" {
   name = "oonidevops/digitalocean_access_token"
@@ -87,8 +92,8 @@ module "adm_iam_roles" {
   authorized_accounts = [
     "arn:aws:iam::${local.ooni_main_org_id}:user/art",
     "arn:aws:iam::${local.ooni_main_org_id}:user/luis",
-    "arn:aws:iam::${local.ooni_main_org_id}:user/mehul",
-    "arn:aws:iam::${local.ooni_main_org_id}:user/tony"
+    "arn:aws:iam::${local.ooni_main_org_id}:user/aaron",
+    "arn:aws:iam::${local.ooni_main_org_id}:user/mehul"
   ]
 }
 
@@ -156,10 +161,10 @@ module "oonidevops_github_user" {
 module "oonipg" {
   source = "../../modules/postgresql"
 
-  name                     = "ooni-tier0-postgres"
-  aws_region               = var.aws_region
-  vpc_id                   = module.network.vpc_id
-  subnet_ids               = module.network.vpc_subnet_public[*].id
+  name       = "ooni-tier0-postgres"
+  aws_region = var.aws_region
+  vpc_id     = module.network.vpc_id
+  subnet_ids = module.network.vpc_subnet_public[*].id
 
   # By default, max_connections is computed as:
   # LEAST({DBInstanceClassMemory/9531392}, 5000)
@@ -183,7 +188,8 @@ module "oonipg" {
     # ams-ps
     "37.218.245.90/32",
     # Jumphost
-    "${module.ooni_jumphost.aws_instance_private_ip}/32"
+    "${module.ooni_jumphost.aws_instance_private_ip}/32",
+    "${module.ooni_jumphost.aws_instance_public_ip}/32",
   ]
   allow_security_groups = [module.ooni_jumphost.ec2_sg_id]
 
@@ -231,6 +237,10 @@ data "aws_ssm_parameter" "clickhouse_readonly_url" {
   name = "/oonidevops/secrets/clickhouse_readonly_url"
 }
 
+data "aws_ssm_parameter" "account_id_hashing_key" {
+  name = "/oonidevops/secrets/ooni_services/account_id_hashing_key"
+}
+
 # Manually managed with the AWS console
 data "aws_ssm_parameter" "prometheus_metrics_password" {
   name = "/oonidevops/ooni_services/prometheus_metrics_password"
@@ -255,6 +265,16 @@ resource "aws_secretsmanager_secret_version" "oonipg_url" {
   )
 }
 
+module "geoip_bucket" {
+  source = "../../modules/s3_bucket"
+
+  bucket_name         = "ooni-geoip-${var.aws_region}-private-${local.environment}"
+  public_read         = false
+  create_iam_user     = true
+  versioning_enabled  = false
+  object_lock_enabled = false
+}
+
 resource "random_id" "artifact_id" {
   byte_length = 4
 }
@@ -273,6 +293,87 @@ resource "aws_s3_bucket" "oonith_codepipeline_bucket" {
 
 resource "aws_s3_bucket" "ooni_private_config_bucket" {
   bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
+}
+
+
+resource "aws_s3_bucket" "anoncred_manifests" {
+  bucket              = "ooni-anoncreds-manifests-${var.aws_region}"
+  object_lock_enabled = true
+  versioning {
+    enabled = true
+  }
+}
+
+resource "aws_s3_bucket_versioning" "anoncred_manifests_version" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_policy" "anonc_manifests_policy" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicList"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:ListBucket"
+        Resource  = aws_s3_bucket.anoncred_manifests.arn
+      },
+      {
+        Sid       = "PublicRead"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.anoncred_manifests.arn}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_ownership_controls" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_acl" "anonc_manifests" {
+  depends_on = [
+    aws_s3_bucket_ownership_controls.anonc_manifests,
+    aws_s3_bucket_public_access_block.anonc_manifests,
+  ]
+
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  acl    = "public-read"
+}
+
+# Anonymous credentials manifest.
+#
+# Stored here to be publicly available, verifiable, and version controlled
+resource "aws_s3_object" "manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key    = "manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAAQuyVwuNRQJrFaYWNoTRktq7raodC5dwqXFBNlB5yPxoBIAAAAAAAAACySi3MEUQH886Jymv1Ft8ic+1w2gmmKmr6Kmse0C+mWwMAAAAAAAAAIAAAAAAAAAAW614MmIZZmvRrwG9vvEO5znoEkG413cUSDwVc/cstaCAAAAAAAAAAfo7B0TYG+ytQ5cEs6vENzPPkXOHNuLE+uVaC5upvgFMgAAAAAAAAAMhi0YHpOV60CphCTxCo0BO95oOdpz3VwOPcp4DNuOkN"
+  })
 }
 
 data "aws_secretsmanager_secret_version" "deploy_key" {
@@ -397,14 +498,14 @@ module "ooni_clickhouse_proxy" {
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
-    from_port   = 9000,
-    to_port     = 9000,
-    protocol    = "tcp",
+    from_port = 9000,
+    to_port   = 9000,
+    protocol  = "tcp",
     cidr_blocks = concat(
       module.network.vpc_subnet_public[*].cidr_block,
       module.network.vpc_subnet_private[*].cidr_block,
       ["${module.ooni_fastpath.aws_instance_private_ip}/32",
-        "${module.ooni_fastpath.aws_instance_public_ip}/32"]
+      "${module.ooni_fastpath.aws_instance_public_ip}/32"]
     ),
     }, {
     // For the prometheus proxy:
@@ -527,8 +628,8 @@ module "ooniapi_cluster" {
   subnet_ids = module.network.vpc_subnet_public[*].id
 
   # You need be careful how these are tweaked.
-  asg_min     = 2
-  asg_max     = 10
+  asg_min = 2
+  asg_max = 10
 
   instance_type = "t3a.medium"
 
@@ -555,8 +656,8 @@ module "oonitier1plus_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 2
-  asg_max     = 5
+  asg_min = 2
+  asg_max = 5
 
   instance_type = "t3a.medium"
 
@@ -576,6 +677,55 @@ module "oonitier1plus_cluster" {
 
 #### OONI Tier0
 
+##### Elasticache valkey cache
+
+resource "aws_elasticache_serverless_cache" "ooniapi" {
+  name   = "ooniapi-${local.environment}-cache"
+  engine = "valkey"
+  cache_usage_limits {
+    data_storage {
+      maximum = 10
+      unit    = "GB"
+    }
+    ecpu_per_second {
+      maximum = 5000
+    }
+  }
+  major_engine_version = "8"
+  security_group_ids = [
+    module.ooniapi_cluster.web_security_group_id,
+    aws_security_group.elasticache_sg.id
+  ]
+  subnet_ids = module.network.vpc_subnet_private[*].id
+}
+
+locals {
+  ooniapi_valkey_url = "valkeys://${aws_elasticache_serverless_cache.ooniapi.endpoint[0].address}:${aws_elasticache_serverless_cache.ooniapi.endpoint[0].port}"
+}
+
+
+resource "aws_security_group" "elasticache_sg" {
+  description = "Allows access to port 6379 for the cache service"
+  name_prefix = "ooni-elasticache"
+
+  vpc_id = module.network.vpc_id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group_rule" "elasticache_sg_rule" {
+
+  type              = "ingress"
+  from_port         = 6379
+  to_port           = 6379
+  protocol          = "tcp"
+  cidr_blocks       = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block)
+  security_group_id = aws_security_group.elasticache_sg.id
+}
+
+
 #### OONI Probe service
 
 # For accessing the s3 bucket
@@ -584,7 +734,7 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
   role = module.ooniapi_cluster.container_host_role.name
 
   policy = <<EOF
-  {
+{
 	"Version": "2012-10-17",
 	"Statement": [
 		{
@@ -598,9 +748,21 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Effect": "Allow",
 			"Action": "s3:GetObject",
 			"Resource": "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
+		},
+		{
+    		"Sid": "",
+    		"Effect": "Allow",
+    		"Action": "s3:GetObject",
+    		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
+		},
+		{
+    		"Sid": "",
+    		"Effect": "Allow",
+    		"Action": "s3:ListBucket",
+    		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
 		}
 	]
-  }
+}
 EOF
 }
 
@@ -634,7 +796,7 @@ module "ooniapi_ooniprobe" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
-  task_memory = 256
+  task_memory              = 256
 
 
   task_secrets = {
@@ -642,6 +804,7 @@ module "ooniapi_ooniprobe" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
   }
 
   task_environment = {
@@ -650,19 +813,21 @@ module "ooniapi_ooniprobe" {
     COLLECTOR_ID          = 4 # be sure this is different from dev
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
     TOR_TARGETS           = "tor_targets.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
   }
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 2
-  max_desired_count = 8
+  max_desired_count     = 8
   autoscale_policies = [
     {
-      resource_type = "memory"
-      name = "memory"
+      resource_type     = "memory"
+      name              = "memory"
       scaleout_treshold = 60
     }
   ]
@@ -902,6 +1067,7 @@ module "ooniapi_ooniauth" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
 
     AWS_SECRET_ACCESS_KEY = module.ooniapi_user.aws_secret_access_key_arn
     AWS_ACCESS_KEY_ID     = module.ooniapi_user.aws_access_key_id_arn
@@ -973,6 +1139,7 @@ module "ooniapi_oonimeasurements" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
   }
 
   task_environment = {
@@ -981,8 +1148,12 @@ module "ooniapi_oonimeasurements" {
       "http://fastpath.${local.environment}.ooni.io:8475",
       "https://backend-fsn.ooni.org"
     ])
-    BASE_URL       = "https://api.ooni.io"
-    S3_BUCKET_NAME = "ooni-data-eu-fra"
+    BASE_URL                        = "https://api.ooni.io"
+    S3_BUCKET_NAME                  = "ooni-data-eu-fra"
+    VALKEY_URL                      = local.ooniapi_valkey_url
+    RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
+    RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
+    RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])
   }
 
   ooniapi_service_security_groups = [
@@ -990,13 +1161,13 @@ module "ooniapi_oonimeasurements" {
     module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 4
-  max_desired_count = 8
+  max_desired_count     = 32 # 8gb (total mem) / 256mb (mem per task) = 32 tasks
   autoscale_policies = [
     {
-      name = "memory"
-      resource_type = "memory"
+      name              = "memory"
+      resource_type     = "memory"
       scaleout_treshold = 60
     }
   ]

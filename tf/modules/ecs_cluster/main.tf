@@ -117,14 +117,14 @@ resource "aws_security_group" "container_host" {
 
     security_groups = concat([
       aws_security_group.web.id,
-    ],
+      ],
     var.monitoring_sg_ids)
   }
 
   ingress {
-    protocol = "tcp"
+    protocol  = "tcp"
     from_port = 9100
-    to_port = 9100
+    to_port   = 9100
 
     security_groups = var.monitoring_sg_ids
   }
@@ -152,8 +152,8 @@ resource "aws_launch_template" "container_host" {
   instance_type = var.instance_type
 
   user_data = base64encode(templatefile("${path.module}/templates/ecs-setup.sh", {
-    ecs_cluster_name = var.name,
-    ecs_cluster_tags = var.tags
+    ecs_cluster_name   = var.name,
+    ecs_cluster_tags   = var.tags
     node_exporter_port = var.node_exporter_port
   }))
 
@@ -228,17 +228,17 @@ resource "aws_ecs_capacity_provider" "capacity_provider" {
   name = "${var.name}-capacity-provider"
 
   auto_scaling_group_provider {
-      auto_scaling_group_arn         = aws_autoscaling_group.container_host.arn
-      managed_termination_protection = "ENABLED"
-      # managed_draining = "ENABLED"
+    auto_scaling_group_arn         = aws_autoscaling_group.container_host.arn
+    managed_termination_protection = "ENABLED"
+    # managed_draining = "ENABLED"
 
-      managed_scaling {
-        maximum_scaling_step_size = 1000
-        minimum_scaling_step_size = 1
-        status                    = "ENABLED"
-        target_capacity           = 100
-      }
+    managed_scaling {
+      maximum_scaling_step_size = 1000
+      minimum_scaling_step_size = 1
+      status                    = "ENABLED"
+      target_capacity           = 100
     }
+  }
 }
 
 // You also need to link the capacity provider to the cluster

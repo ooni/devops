@@ -206,7 +206,7 @@ resource "aws_codepipeline" "oonidkr" {
 
     git_configuration {
       source_action_name = "Source"
-      
+
       push {
         branches {
           includes = [var.branch_name]

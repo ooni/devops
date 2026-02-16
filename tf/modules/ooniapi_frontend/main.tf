@@ -67,12 +67,12 @@ resource "aws_s3_bucket_policy" "alb_logs_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "AWSLoadBalancerLogging"
-        Effect    = "Allow"
+        Sid    = "AWSLoadBalancerLogging"
+        Effect = "Allow"
         Principal = {
           AWS = "arn:aws:iam::${var.region_to_account_id[var.aws_region]}:root"
         }
-        Action = "s3:PutObject"
+        Action   = "s3:PutObject"
         Resource = "${aws_s3_bucket.load_balancer_logs.arn}/*"
       }
     ]
@@ -107,8 +107,8 @@ resource "aws_athena_database" "load_balancer_logs" {
 }
 
 resource "aws_athena_named_query" "create_alb_logs_table" {
-  name      = "create_alb_logs_table"
-  database  = aws_athena_database.load_balancer_logs.name
+  name     = "create_alb_logs_table"
+  database = aws_athena_database.load_balancer_logs.name
 
   query     = <<EOT
 CREATE EXTERNAL TABLE IF NOT EXISTS alb_access_logs (
@@ -155,7 +155,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS alb_access_logs (
             )
         LOCATION 's3://${aws_s3_bucket.load_balancer_logs.bucket}/AWSLogs/'
         EOT
-    workgroup = aws_athena_workgroup.ooni_workgroup.name
+  workgroup = aws_athena_workgroup.ooni_workgroup.name
 }
 
 resource "aws_athena_workgroup" "ooni_workgroup" {
@@ -351,6 +351,28 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3" {
     target_group_arn = var.ooniapi_ooniprobe_target_group_arn
   }
 
+  # anonymous credentials
+  condition {
+    path_pattern {
+      values = [
+        "/api/v1/manifest*",
+        "/api/v1/sign_credential*",
+        "/api/v1/submit_measurement/*"
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_4" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 123
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
+  }
+
+  # URL prioritization
   condition {
     path_pattern {
       values = [
@@ -445,7 +467,6 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_1" {
   condition {
     path_pattern {
       values = [
-        # "/unimplemented"
         "/api/v1/measurements/*",
         "/api/v1/raw_measurement",
         "/api/v1/measurement_meta",
@@ -471,10 +492,10 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
   condition {
     path_pattern {
       values = [
-         "/api/v1/aggregation",
-         "/api/v1/aggregation/*",
-         "/api/v1/observations",
-         "/api/v1/analysis",
+        "/api/v1/aggregation",
+        "/api/v1/aggregation/*",
+        "/api/v1/observations",
+        "/api/v1/analysis",
       ]
     }
   }

@@ -75,10 +75,10 @@ module "adm_iam_roles" {
   source = "../../modules/adm_iam_roles"
 
   authorized_accounts = [
+    "arn:aws:iam::${local.ooni_main_org_id}:user/aaron",
     "arn:aws:iam::${local.ooni_main_org_id}:user/art",
     "arn:aws:iam::${local.ooni_main_org_id}:user/mehul",
     "arn:aws:iam::${local.ooni_main_org_id}:user/luis",
-    "arn:aws:iam::${local.ooni_main_org_id}:user/tony"
   ]
 }
 
@@ -158,7 +158,9 @@ module "oonipg" {
   db_allocated_storage     = "5"
   db_max_allocated_storage = null
 
-  allow_cidr_blocks     = module.network.vpc_subnet_private[*].cidr_block
+  allow_cidr_blocks = [
+    "10.0.0.0/8"
+  ]
   allow_security_groups = [module.ooni_jumphost.ec2_sg_id]
 
   tags = merge(
@@ -206,6 +208,11 @@ data "aws_ssm_parameter" "prometheus_metrics_password" {
   name = "/oonidevops/ooni_services/prometheus_metrics_password"
 }
 
+# Manually managed with the AWS console
+data "aws_ssm_parameter" "anonc_secret_key" {
+  name = "/oonidevops/secrets/zkp/secret_key"
+}
+
 resource "aws_secretsmanager_secret" "oonipg_url" {
   name = "oonidevops/ooni-tier0-postgres/postgresql_url"
   tags = local.tags
@@ -233,8 +240,105 @@ data "aws_ssm_parameter" "clickhouse_readonly_test_url" {
   name = "/oonidevops/secrets/clickhouse_readonly_test_url"
 }
 
+data "aws_ssm_parameter" "account_id_hashing_key" {
+  name = "/oonidevops/secrets/ooni_services/account_id_hashing_key"
+}
+
 resource "random_id" "artifact_id" {
   byte_length = 4
+}
+
+resource "aws_s3_bucket" "anoncred_manifests" {
+  bucket              = "ooni-anoncreds-manifests-dev-${var.aws_region}"
+  object_lock_enabled = true
+  versioning {
+    enabled = true
+  }
+}
+
+resource "aws_s3_bucket_versioning" "anoncred_manifests_version" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_policy" "anonc_manifests_policy" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicList"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:ListBucket"
+        Resource  = aws_s3_bucket.anoncred_manifests.arn
+      },
+      {
+        Sid       = "PublicRead"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.anoncred_manifests.arn}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket_ownership_controls" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "anonc_manifests" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+resource "aws_s3_bucket_acl" "anonc_manifests" {
+  depends_on = [
+    aws_s3_bucket_ownership_controls.anonc_manifests,
+    aws_s3_bucket_public_access_block.anonc_manifests,
+  ]
+
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  acl    = "public-read"
+}
+
+# Anonymous credentials manifest.
+#
+# Stored here to be publicly available, verifiable, and version controlled
+resource "aws_s3_object" "manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key    = "manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAApNRh7fk+riQoD24/O1deyv96zzUKrPl/iVfFArlNGjABIAAAAAAAAADcq4aiJe0vkFuO1YnByaMEiB8ZA/rqf1d4O/SzFec8bAMAAAAAAAAAIAAAAAAAAAD+Z9JjHXAYvJdxloiGdIaqUQF208Oq7YTdvRYDrZY8SyAAAAAAAAAAUGiViBIvG4Xd7Cv29tLNuC/y0lTINIw63Je/Zm0XXGQgAAAAAAAAAFbDFU/rX+kMZEwVlx4ZeaqYLTbYO30Kz37W8DNx2Cw3"
+  })
+}
+
+# Test manifest used for integration tests
+resource "aws_s3_object" "test_manifest" {
+  bucket = aws_s3_bucket.anoncred_manifests.id
+  key    = "test_manifest.json"
+  content = jsonencode({
+    nym_scope = "ooni.org/{probe_cc}/{probe_asn}"
+    submission_policy = {
+      "*/*" = "*"
+    }
+    public_parameters = "ASAAAAAAAAAAIKrSuwbE4aYXbC1VvFTCtPo1vUILohyRb/n6mkNQx3kBIAAAAAAAAABszBl0xj4qhFI5QwT7PQ0xji+ol5GBL13C2unPmDARUQMAAAAAAAAAIAAAAAAAAACWDzG7YtM9HEwD1B3cRXOxU8i0BbYlew0K+Gu6QKGwTSAAAAAAAAAAZPVqGmnoY9XSyzWyfgX05kZ8L21DZ+Pt6l5lsQXpezcgAAAAAAAAAOQ0W+VAKzDLrac3x2msH90sef2c+VLl0aHdOX/lMlVa"
+  })
 }
 
 resource "aws_s3_bucket" "ooniprobe_failed_reports" {
@@ -302,8 +406,8 @@ module "ooniapi_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 2
-  asg_max     = 4
+  asg_min = 2
+  asg_max = 4
 
   instance_type = "t3a.micro"
 
@@ -330,8 +434,8 @@ module "oonitier1plus_cluster" {
   vpc_id     = module.network.vpc_id
   subnet_ids = module.network.vpc_subnet_private[*].id
 
-  asg_min     = 1
-  asg_max     = 4
+  asg_min = 1
+  asg_max = 4
 
   instance_type = "t3a.micro"
 
@@ -352,6 +456,54 @@ module "oonitier1plus_cluster" {
 
 
 #### OONI Tier0
+
+##### Elasticache valkey cache
+
+resource "aws_elasticache_serverless_cache" "ooniapi" {
+  name   = "ooniapi-${local.environment}-cache"
+  engine = "valkey"
+  cache_usage_limits {
+    data_storage {
+      maximum = 10
+      unit    = "GB"
+    }
+    ecpu_per_second {
+      maximum = 5000
+    }
+  }
+  major_engine_version = "8"
+  security_group_ids = [
+    module.ooniapi_cluster.web_security_group_id,
+    aws_security_group.elasticache_sg.id
+  ]
+  subnet_ids = module.network.vpc_subnet_private[*].id
+}
+
+locals {
+  ooniapi_valkey_url = "valkeys://${aws_elasticache_serverless_cache.ooniapi.endpoint[0].address}:${aws_elasticache_serverless_cache.ooniapi.endpoint[0].port}"
+}
+
+
+resource "aws_security_group" "elasticache_sg" {
+  description = "Allows access to port 6379 for the cache service"
+  name_prefix = "ooni-elasticache"
+
+  vpc_id = module.network.vpc_id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group_rule" "elasticache_sg_rule" {
+
+  type              = "ingress"
+  from_port         = 6379
+  to_port           = 6379
+  protocol          = "tcp"
+  cidr_blocks       = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block)
+  security_group_id = aws_security_group.elasticache_sg.id
+}
 
 #### OONI Probe service
 
@@ -375,6 +527,18 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 			"Effect": "Allow",
 			"Action": "s3:GetObject",
 			"Resource": "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
+		},
+		{
+  		"Sid": "",
+  		"Effect": "Allow",
+  		"Action": "s3:GetObject",
+  		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
+		},
+		{
+  		"Sid": "",
+  		"Effect": "Allow",
+  		"Action": "s3:ListBucket",
+  		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
 		}
 	]
 }
@@ -386,7 +550,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "geoip-heuristic"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -419,6 +583,7 @@ module "ooniapi_ooniprobe" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
   }
 
   task_environment = {
@@ -427,19 +592,21 @@ module "ooniapi_ooniprobe" {
     COLLECTOR_ID          = 3 # use a different one in prod
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
     TOR_TARGETS           = "tor_targets.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
   }
 
   ooniapi_service_security_groups = [
     # module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 1
-  max_desired_count = 4
+  max_desired_count     = 4
   autoscale_policies = [
     {
-      resource_type = "memory"
-      name = "memory"
+      resource_type     = "memory"
+      name              = "memory"
       scaleout_treshold = 60
     }
   ]
@@ -874,6 +1041,7 @@ module "ooniapi_ooniauth" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
 
     AWS_SECRET_ACCESS_KEY = module.ooniapi_user.aws_secret_access_key_arn
     AWS_ACCESS_KEY_ID     = module.ooniapi_user.aws_access_key_id_arn
@@ -912,7 +1080,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "cusum-changepoint-api"
+  branch_name             = "master"
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -943,26 +1111,31 @@ module "ooniapi_oonimeasurements" {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_test_url.arn
+    ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
   }
 
   task_environment = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
-    BASE_URL         = "https://api.${local.environment}.ooni.io"
-    S3_BUCKET_NAME   = "ooni-data-eu-fra-test"
+    OTHER_COLLECTORS                = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
+    BASE_URL                        = "https://api.${local.environment}.ooni.io"
+    S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
+    VALKEY_URL                      = local.ooniapi_valkey_url
+    RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
+    RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
+    RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])
   }
 
   ooniapi_service_security_groups = [
     module.oonitier1plus_cluster.web_security_group_id
   ]
 
-  use_autoscaling = true
+  use_autoscaling       = true
   service_desired_count = 1
-  max_desired_count = 8
+  max_desired_count     = 8
   autoscale_policies = [
     {
-      name = "memory"
-      resource_type = "memory"
+      name              = "memory"
+      resource_type     = "memory"
       scaleout_treshold = 60
     }
   ]
