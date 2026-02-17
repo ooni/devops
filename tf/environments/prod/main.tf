@@ -807,7 +807,7 @@ module "ooniapi_ooniprobe" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_write_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
     ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
   }
 
@@ -826,7 +826,7 @@ module "ooniapi_ooniprobe" {
   ]
 
   use_autoscaling       = true
-  service_desired_count = 2
+  service_desired_count = 4
   max_desired_count     = 8
   autoscale_policies = [
     {
