@@ -333,6 +333,9 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
     path_pattern {
       values = [
         "/api/v1/test-helpers*",
+        "/api/v1/geolookup*",
+        "/api/v1/collectors*",
+        "/bouncer/net-tests*",
         "/report*"
       ]
     }
@@ -355,6 +358,26 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3" {
         "/api/v1/manifest*",
         "/api/v1/sign_credential*",
         "/api/v1/submit_measurement/*"
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_4" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 123
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
+  }
+
+  # URL prioritization
+  condition {
+    path_pattern {
+      values = [
+        "/api/_/show_countries_prioritization*",
+        "/api/_/debug_prioritization*",
       ]
     }
   }
