@@ -241,7 +241,7 @@ data "aws_ssm_parameter" "clickhouse_readonly_test_url" {
 }
 
 data "aws_ssm_parameter" "clickhouse_write_url" {
-  name = "/oonidevops/secrets/clickhouse_write_password"
+  name = "/oonidevops/secrets/clickhouse_write_url"
 }
 
 data "aws_ssm_parameter" "account_id_hashing_key" {
