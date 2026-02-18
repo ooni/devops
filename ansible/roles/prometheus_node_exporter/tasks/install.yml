@@ -27,10 +27,16 @@
     node_exporter_download_check is changed
     or node_exporter_version_check.stdout | length == 0
 
+- name: Create node_exporter group.
+  group:
+    name: "{{ prometheus_group }}"
+    state: present
+
 - name: Create node_exporter user.
   user:
-    name: node_exporter
+    name: "{{ prometheus_user }}"
     shell: /sbin/nologin
+    group: "{{ prometheus_group }}"
     state: present
 
 - name: Copy the node_exporter systemd unit file.
