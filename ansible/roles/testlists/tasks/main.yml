@@ -14,17 +14,6 @@
   notify:
    - reload nftables
 
-- name: Allow traffic on port 9102
-  become: true
-  tags: prometheus-proxy
-  blockinfile:
-    path: /etc/ooni/nftables/tcp/9102.nft
-    create: yes
-    block: |
-      add rule inet filter input tcp dport 9102 counter accept comment "node exporter"
-  notify:
-   - reload nftables
-
 # For incoming testlists traffic
 - name: Allow traffic on port 80
   become: true
