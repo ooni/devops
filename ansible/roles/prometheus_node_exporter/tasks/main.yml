@@ -19,7 +19,7 @@
 
 - name: Add a user to a password file and ensure permissions are set
   community.general.htpasswd:
-    path: /etc/ooni/prometheus_passwd
+    path: "{{ node_exporter_htpasswd }}"
     name: prom
     password: "{{ prometheus_metrics_password }}"
     owner: root
