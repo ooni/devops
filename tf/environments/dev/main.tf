@@ -241,7 +241,7 @@ data "aws_ssm_parameter" "clickhouse_readonly_test_url" {
 }
 
 data "aws_ssm_parameter" "clickhouse_write_url" {
-  name = "/oonidevops/secrets/clickhouse_write_password"
+  name = "/oonidevops/secrets/clickhouse_write_url"
 }
 
 data "aws_ssm_parameter" "account_id_hashing_key" {
@@ -554,7 +554,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "geoip-heuristic"
+  branch_name             = "master"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
