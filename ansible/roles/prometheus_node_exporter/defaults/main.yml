@@ -2,6 +2,9 @@ prometheus_nginx_proxy_config:
   - location: /metrics/node_exporter
     proxy_pass: http://127.0.0.1:8100/metrics
 
+prometheus_user: 'node_exporter'
+prometheus_group: 'node_exporter'
+
 node_exporter_version: '1.8.2'
 node_exporter_arch: 'amd64'
 node_exporter_download_url: https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}.tar.gz
