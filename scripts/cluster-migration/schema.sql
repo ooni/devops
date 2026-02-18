@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
 (
     `ts` DateTime64(3, 'UTC'),
     `type` String,
-    `measurement_uid` String,
+    `uid` UUID64 DEFAULT toUUID64(generateUUIDv4()),
     -- geoip lookup result for the probe IP
     `probe_cc` String,
     `probe_asn` UInt32,
