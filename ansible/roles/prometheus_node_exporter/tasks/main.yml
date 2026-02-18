@@ -3,6 +3,7 @@
   tags:
     - nginx
     - node_exporter
+  when: use_nginx
 
 - include_tasks: install.yml
 
@@ -22,7 +23,7 @@
     name: prom
     password: "{{ prometheus_metrics_password }}"
     owner: root
-    group: nginx
+    group: "{{ 'nginx' if use_nginx else prometheus_group }}"
     mode: 0640
   tags:
     - monitoring
@@ -40,3 +41,4 @@
     - monitoring
     - node_exporter
     - config
+  when: use_nginx
