@@ -218,7 +218,7 @@ ALTER TABLE event_detector_changepoints ON CLUSTER oonidata_cluster ADD COLUMN `
 -- faulty measurements
 CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
 (
-    `ts` DateTime64(3, 'UTC'),
+    `ts` DateTime64(3, 'UTC') DEFAULT now64(),
     `type` String,
     `uid` UUID DEFAULT generateUUIDv4(),
     -- geoip lookup result for the probe IP
