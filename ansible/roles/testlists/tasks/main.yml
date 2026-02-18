@@ -14,10 +14,6 @@
   notify:
    - reload nftables
 
-# For statsd importer metrics
-- name: Flush all handlers
-  meta: flush_handlers
-
 - name: Allow traffic on port 9102
   become: true
   tags: prometheus-proxy
@@ -84,36 +80,6 @@
     mode: "0700"
     owner: "{{testlists_user}}"
     group: "{{testlists_user}}"
-
-## Nginx ##
-- name: Ensure /etc/nginx/sites-available directory exists
-  file:
-    path: /etc/nginx/sites-available
-    state: directory
-    mode: '0755'
-    owner: root
-    group: root
-
-- name: Overwrite API nginx conf
-  tags: testlists
-  template:
-    src: templates/nginx-api.conf
-    dest: /etc/nginx/sites-available/ooni-api.conf
-    mode: 0755
-    owner: root
-  vars:
-    # Uses dehydrated
-    certpath: /var/lib/dehydrated/certs/
-
-- name: Create symlink for API nginx conf
-  tags: testlists
-  file:
-    src=/etc/nginx/sites-available/ooni-api.conf
-    dest=/etc/nginx/sites-enabled/ooni-api.conf
-    state=link
-  notify:
-    - reload nginx
-    - restart nginx
 
 - name: Get UID of a specific user
   command: id -u {{testlists_user}}

@@ -4,15 +4,6 @@
     - nginx
     - node_exporter
 
-- ansible.builtin.include_role:
-    name: dehydrated
-  tags:
-    - oonidata
-    - dehydrated
-  vars:
-    ssl_domains:
-      - "{{ inventory_hostname }}"
-
 - include_tasks: install.yml
 
 - name: create ooni configuration directory
