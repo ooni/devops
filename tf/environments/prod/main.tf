@@ -237,6 +237,10 @@ data "aws_ssm_parameter" "clickhouse_readonly_url" {
   name = "/oonidevops/secrets/clickhouse_readonly_url"
 }
 
+data "aws_ssm_parameter" "clickhouse_write_url" {
+  name = "/oonidevops/secrets/clickhouse_write_url"
+}
+
 data "aws_ssm_parameter" "account_id_hashing_key" {
   name = "/oonidevops/secrets/ooni_services/account_id_hashing_key"
 }
@@ -822,7 +826,7 @@ module "ooniapi_ooniprobe" {
   ]
 
   use_autoscaling       = true
-  service_desired_count = 2
+  service_desired_count = 4
   max_desired_count     = 8
   autoscale_policies = [
     {
