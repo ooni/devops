@@ -231,4 +231,4 @@ ENGINE = ReplicatedReplacingMergeTree (
         '/clickhouse/{cluster}/tables/ooni/faulty_measurements/{shard}',
         '{replica}'
 )
-ORDER BY (ts, type, probe_cc, probe_asn, measurement_uid);
+ORDER BY (ts, type, probe_cc, probe_asn, uid);
