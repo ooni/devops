@@ -80,6 +80,14 @@
   register: user_gid
   changed_when: false
 
+- name: Make containerd use nftables backend
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    line: 'firewall-backend="nftables"'
+    state: present
+  notify:
+   - restart docker
+
 - name: Ensure testlists is running
   community.docker.docker_container:
     env:
@@ -100,7 +108,8 @@
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from testlists to the statsd exporter without
     # creating a network with redirection rules to match the ports
-    network_mode: host
+    ports:
+      - "80:80"
     volumes:
       - /var/lib/ooniapi:/var/lib/ooniapi
   tags:
