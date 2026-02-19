@@ -51,6 +51,21 @@
     - monitoring
     - node_exporter
     - config
+  when: use_nginx
+
+- name: Copy ooni CA cert for client authentication
+  copy:
+    src: scraper_ca.cert
+    dest: /etc/ssl/certs/scraper_ca.cert
+    mode: 0644
+    owner: root
+    group: root
+
+- name: Copy node_exporter web_config
+  template:
+    src: node_exporter_web_config.j2
+    dest: /etc/ooni/node_exporter_web_config.yml
+    mode: 0644
 
 - name: Copy the node_exporter systemd unit file.
   template:

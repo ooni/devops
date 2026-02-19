@@ -4,7 +4,7 @@ Description=NodeExporter
 [Service]
 TimeoutStartSec=0
 User=node_exporter
-ExecStart={{ node_exporter_bin_path }} --web.listen-address={{ node_exporter_host }}:{{ node_exporter_port }} {{ node_exporter_options }}
+ExecStart={{ node_exporter_bin_path }} --web.listen-address={{ node_exporter_host }}:{{ node_exporter_port }} --web.config.file={{node_exporter_web_config }} {{ node_exporter_options }}
 Restart={{ node_exporter_restart }}
 
 [Install]

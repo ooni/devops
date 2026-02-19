@@ -12,7 +12,6 @@
         use_nginx: false
         node_exporter_port: 9100
         node_exporter_host: "0.0.0.0"
-        node_exporter_options: "--web.auth.file={{ node_exporter_htpasswd }}"
     - role: geerlingguy.docker
       docker_users:
         - testlists

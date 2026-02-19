@@ -1,0 +1,32 @@
+tls_server_config:
+  cert_file: "{{ tls_cert_file }}"   # Certificate file for server authentication.
+  key_file: "{{ tls_key_file }}"     # Key file for server authentication.
+  client_auth_type: "{{ tls_client_auth_type | default('NoClientCert') }}"  # Server policy for client authentication.
+  client_ca_file: "{{ tls_client_ca_file }}"  # CA certificate file for client authentication.
+  client_allowed_sans: 
+    - {{ tls_client_allowed_sans | map('tojson') | join(', ') }}  # SAN matches for client certificate.
+  min_version: "{{ tls_min_version | default('TLS12') }}"  # Minimum acceptable TLS version.
+  max_version: "{{ tls_max_version | default('TLS13') }}"  # Maximum acceptable TLS version.
+  cipher_suites: 
+    - {{ tls_cipher_suites | map('tojson') | join(', ') }}  # Supported cipher suites.
+  prefer_server_cipher_suites: {{ tls_prefer_server_cipher_suites | default(true) }}  # Server cipher suite preference.
+  curve_preferences:
+    - {{ tls_curve_preferences | map('tojson') | join(', ') }}  # Elliptic curves for ECDHE handshake.
+
+http_server_config:
+  http2: {{ http2_enabled | default(true) }}  # Enable HTTP/2 support.
+  headers:
+    Content-Security-Policy: "{{ http_csp }}"  # Content-Security-Policy for HTTP responses.
+    X-Frame-Options: "{{ http_x_frame_options }}"  # X-Frame-Options for HTTP responses.
+    X-Content-Type-Options: "{{ http_x_content_type_options }}"  # X-Content-Type-Options for responses.
+    X-XSS-Protection: "{{ http_x_xss_protection }}"  # X-XSS-Protection for responses.
+    Strict-Transport-Security: "{{ http_strict_transport_security }}"  # Strict-Transport-Security for responses.
+
+basic_auth_users:
+  {% for user, pass in basic_auth_users.items() %}
+  {{ user }}: "{{ pass }}"
+  {% endfor %}
+
+rate_limit:
+  interval: "{{ rate_limit_interval }}"  # Time interval between requests.
+  burst: "{{ rate_limit_burst }}"  # Permits a burst of requests.

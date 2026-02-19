@@ -13,8 +13,47 @@ node_exporter_bin_path: /usr/local/bin/node_exporter
 node_exporter_host: 'localhost'
 node_exporter_port: 8100
 node_exporter_htpasswd: '/etc/ooni/prometheus_passwd'
+node_exporter_web_config: '/etc/ooni/node_exporter_web_config.yml'
 node_exporter_options: ''
 
 node_exporter_state: started
 node_exporter_enabled: true
 node_exporter_restart: on-failure
+
+tls_cert_file: "/var/lib/dehydrated/certs/{{ inventory_hostname }}/fullchain.pem"
+tls_key_file: "/var/lib/dehydrated/certs/{{ inventory_hostname }}/privkey.pem"
+
+tls_client_auth_type: "RequireAndVerifyClientCert"  # Enforce client authentication.
+
+tls_client_ca_file: "/etc/ssl/certs/scraper_ca.cert"  # Path to the CA certificate file for clients.
+
+tls_client_allowed_sans:
+  - "DNS:monitoringproxy.dev.ooni.io"  # Allow this SAN to match.
+  - "DNS:monitoringproxy.prod.ooni.io"  # Allow this SAN to match.
+
+tls_min_version: "TLS12"  # Minimum TLS version allowed.
+tls_max_version: "TLS13"  # Maximum TLS version allowed.
+
+tls_cipher_suites:
+  - "TLS_AES_128_GCM_SHA256"
+  - "TLS_AES_256_GCM_SHA384"
+  - "TLS_CHACHA20_POLY1305"  # Modern, secure cipher suites.
+
+tls_prefer_server_cipher_suites: true  # Prefer server cipher suites.
+
+tls_curve_preferences:
+  - "X25519"  # Preferred curves for ECDHE.
+
+http2_enabled: true  # Enable HTTP/2 support.
+
+# Default HTTP headers
+http_csp: "default-src 'self';"  # Content-Security-Policy.
+http_x_frame_options: "DENY"  # X-Frame-Options.
+http_x_content_type_options: "nosniff"  # X-Content-Type-Options.
+http_x_xss_protection: "1; mode=block"  # X-XSS-Protection.
+http_strict_transport_security: "max-age=63072000; includeSubDomains; preload"  # HSTS settings.
+
+basic_auth_users: {}  # No basic authentication by default.
+
+rate_limit_interval: "10s"  # Time interval between requests.
+rate_limit_burst: 20  # Allow a burst of 20 requests.
