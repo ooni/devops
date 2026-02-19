@@ -39,6 +39,19 @@
     group: "{{ prometheus_group }}"
     state: present
 
+- name: Add a user to a password file and ensure permissions are set
+  community.general.htpasswd:
+    path: "{{ node_exporter_htpasswd }}"
+    name: prom
+    password: "{{ prometheus_metrics_password }}"
+    owner: root
+    group: "{{ 'nginx' if use_nginx else prometheus_group }}"
+    mode: 0640
+  tags:
+    - monitoring
+    - node_exporter
+    - config
+
 - name: Copy the node_exporter systemd unit file.
   template:
     src: node_exporter.service.j2

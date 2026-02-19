@@ -5,26 +5,11 @@
     - node_exporter
   when: use_nginx
 
-- include_tasks: install.yml
-
 - name: create ooni configuration directory
   ansible.builtin.file:
     path: "/etc/ooni/"
     state: directory
     owner: root
-  tags:
-    - monitoring
-    - node_exporter
-    - config
-
-- name: Add a user to a password file and ensure permissions are set
-  community.general.htpasswd:
-    path: "{{ node_exporter_htpasswd }}"
-    name: prom
-    password: "{{ prometheus_metrics_password }}"
-    owner: root
-    group: "{{ 'nginx' if use_nginx else prometheus_group }}"
-    mode: 0640
   tags:
     - monitoring
     - node_exporter
@@ -42,3 +27,5 @@
     - node_exporter
     - config
   when: use_nginx
+
+- include_tasks: install.yml
