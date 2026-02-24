@@ -41,6 +41,10 @@ variable "ooniapi_testlists_target_group_arn" {
   description = "arn for the target group of the testlists service"
 }
 
+variable "ooni_slackin_target_group_arn" {
+  description = "arn for the target group of the slack inviter service"
+}
+
 variable "dns_zone_ooni_io" {
   description = "id of the DNS zone for ooni_io"
 }

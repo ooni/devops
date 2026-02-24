@@ -51,3 +51,5 @@ jumphost.dev.ooni.io
 jumphost.prod.ooni.io
 testl.dev.ooni.io
 testl.prod.ooni.io
+slack.dev.ooni.io
+slack.prod.ooni.io

@@ -1,0 +1,12 @@
+---
+- name: Deploy slackin container
+  docker_container:
+    name: slackin
+    image: ooni/slackin
+    restart_policy: unless-stopped
+    state: started
+    published_ports: "80:80"
+    env:
+      SLACKIN_VERSION: latest
+      SLACK_SUBDOMAIN: "{{ slackin_org }}"
+      SLACK_API_TOKEN: "{{ slackin_token }}"

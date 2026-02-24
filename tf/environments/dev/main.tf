@@ -1244,6 +1244,94 @@ module "testlists_builder" {
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
+### Tier2 slackin service
+module "ooni_slackin" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.nano"
+
+  name = "oonislackin"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 80,
+    to_port     = 80,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    // For the prometheus proxy:
+    from_port   = 9200,
+    to_port     = 9200,
+    protocol    = "tcp"
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
+    }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"]
+  }]
+
+  sg_prefix = "oonislack"
+  tg_prefix = "slck"
+
+  disk_size = 20
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier2-slackin" }
+  )
+}
+
+resource "aws_route53_record" "slackin_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "slack.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_slackin.aws_instance_public_dns
+  ]
+}
+
+module "slackin_builder" {
+  source      = "../../modules/ooni_docker_build"
+  trigger_tag = ""
+
+  service_name            = "slackin"
+  repo                    = "ooni/slackin-extended"
+  branch_name             = "add_makefile_buildspec"
+  buildspec_path          = "buildspec.yml"
+  trigger_path            = "**"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+}
+
 #### OONI Tier0 API Frontend
 
 module "ooniapi_frontend" {
@@ -1259,6 +1347,7 @@ module "ooniapi_frontend" {
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
   ooniapi_testlists_target_group_arn        = module.ooniapi_testlists.alb_target_group_id
+  ooni_slackin_target_group_arn             = module.ooni_slackin.alb_target_group_id
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id,
@@ -1286,6 +1375,7 @@ locals {
     "oonimeasurements.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "8.th.dev.ooni.io" : local.dns_zone_ooni_io,
     "testlists.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
+    "slackin.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
   }
   ooniapi_frontend_main_domain_name         = "api.${local.environment}.ooni.io"
   ooniapi_frontend_main_domain_name_zone_id = local.dns_zone_ooni_io
