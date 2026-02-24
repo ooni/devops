@@ -232,3 +232,10 @@ ENGINE = ReplicatedReplacingMergeTree (
         '{replica}'
 )
 ORDER BY (ts, type, probe_cc, probe_asn, uid);
+
+-- Anonymous Credentials fields
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `is_verified` Int8;
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `nym` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `zkp_request` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `age_range` Nullable(String);
+ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `msm_range` Nullable(String);
