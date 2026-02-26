@@ -478,23 +478,24 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
   }
 }
 
-resource "aws_lb_listener_rule" "ooniapi_testlists_rule" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 143
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_testlists_target_group_arn
-  }
-  condition {
-    path_pattern {
-      values = [
-        "/api/_/url-submission/test-list/*",
-        "/api/_/url-priorities/list",
-        "/api/_/url-priorities/update",
-        "/api/v1/url-submission/submit",
-        "/api/v1/url-submission/update-url",
-      ]
-    }
-  }
-}
+// commented out until ready to deploy to prod
+//resource "aws_lb_listener_rule" "ooniapi_testlists_rule" {
+//  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+//  priority     = 143
+//
+//  action {
+//    type             = "forward"
+//    target_group_arn = var.ooniapi_testlists_target_group_arn
+//  }
+//  condition {
+//    path_pattern {
+//      values = [
+//        "/api/_/url-submission/test-list/*",
+//        "/api/_/url-priorities/list",
+//        "/api/_/url-priorities/update",
+//        "/api/v1/url-submission/submit",
+//        "/api/v1/url-submission/update-url",
+//      ]
+//    }
+//  }
+//}
