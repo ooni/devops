@@ -1155,7 +1155,7 @@ module "ooniapi_oonimeasurements" {
     BASE_URL                        = "https://api.ooni.io"
     S3_BUCKET_NAME                  = "ooni-data-eu-fra"
     VALKEY_URL                      = local.ooniapi_valkey_url
-    RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
+    RATE_LIMITS                     = "10000/hour;400000/day;200000/7day"
     RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
     RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])
   }
