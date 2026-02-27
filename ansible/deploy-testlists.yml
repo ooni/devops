@@ -1,0 +1,21 @@
+---
+- name: Deploy testlists
+  hosts:
+    - testl.dev.ooni.io
+    - testl.prod.ooni.io
+  become: true
+  roles:
+    - role: bootstrap
+    - role: prometheus_node_exporter
+      vars:
+        use_https: false
+        use_nginx: false
+        node_exporter_port: 9100
+        node_exporter_host: "0.0.0.0"
+        node_exporter_options: ""
+    - role: geerlingguy.docker
+      docker_users:
+        - testlists
+        - ubuntu
+      docker_package_state: latest
+    - role: testlists
