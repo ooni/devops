@@ -14,21 +14,6 @@
   notify:
    - reload nftables
 
-# For statsd importer metrics
-- name: Flush all handlers
-  meta: flush_handlers
-
-- name: Allow traffic on port 9102
-  become: true
-  tags: prometheus-proxy
-  blockinfile:
-    path: /etc/ooni/nftables/tcp/9102.nft
-    create: yes
-    block: |
-      add rule inet filter input tcp dport 9102 counter accept comment "node exporter"
-  notify:
-   - reload nftables
-
 # For incoming testlists traffic
 - name: Allow traffic on port 80
   become: true
@@ -85,30 +70,6 @@
     owner: "{{testlists_user}}"
     group: "{{testlists_user}}"
 
-## Nginx ##
-- name: Ensure /etc/nginx/sites-available directory exists
-  file:
-    path: /etc/nginx/sites-available
-    state: directory
-    mode: '0755'
-    owner: root
-    group: root
-
-- name: Overwrite API nginx conf
-  tags: testlists
-  template:
-    src: templates/nginx-api.conf
-    dest: /etc/nginx/sites-available/ooni-api.conf
-    mode: 0755
-    owner: root
-
-- name: Create symlink for API nginx conf
-  tags: testlists
-  file:
-    src=/etc/nginx/sites-available/ooni-api.conf
-    dest=/etc/nginx/sites-enabled/ooni-api.conf
-    state=link
-
 - name: Get UID of a specific user
   command: id -u {{testlists_user}}
   register: user_uid
@@ -118,6 +79,14 @@
   command: id -g {{testlists_user}}
   register: user_gid
   changed_when: false
+
+- name: Make containerd use nftables backend
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    line: 'firewall-backend="nftables"'
+    state: present
+  notify:
+   - restart docker
 
 - name: Ensure testlists is running
   community.docker.docker_container:
@@ -139,7 +108,8 @@
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from testlists to the statsd exporter without
     # creating a network with redirection rules to match the ports
-    network_mode: host
+    ports:
+      - "80:80"
     volumes:
       - /var/lib/ooniapi:/var/lib/ooniapi
   tags:

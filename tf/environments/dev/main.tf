@@ -240,6 +240,10 @@ data "aws_ssm_parameter" "clickhouse_readonly_test_url" {
   name = "/oonidevops/secrets/clickhouse_readonly_test_url"
 }
 
+data "aws_ssm_parameter" "clickhouse_write_url" {
+  name = "/oonidevops/secrets/clickhouse_write_url"
+}
+
 data "aws_ssm_parameter" "account_id_hashing_key" {
   name = "/oonidevops/secrets/ooni_services/account_id_hashing_key"
 }
@@ -550,7 +554,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "test-userauth"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -582,7 +586,7 @@ module "ooniapi_ooniprobe" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_write_url.arn
     ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
   }
 
