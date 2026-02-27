@@ -1262,7 +1262,7 @@ module "testlists_builder" {
 
   service_name            = "testlists"
   repo                    = "ooni/backend"
-  branch_name             = "add_testlists_url_management"
+  branch_name             = "master"
   buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
   trigger_path            = "ooniapi/services/testlists/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
