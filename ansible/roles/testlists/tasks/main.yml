@@ -1,0 +1,116 @@
+---
+# For prometheus scrape requests
+- name: Flush all handlers
+  meta: flush_handlers
+
+- name: Allow traffic on port 9100
+  become: true
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9100.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
+  notify:
+   - reload nftables
+
+# For incoming testlists traffic
+- name: Allow traffic on port 80
+  become: true
+  tags: testlists
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/80.nft
+    create: yes
+    block: |
+      add rule inet filter input tcp dport 80 counter accept comment "testlists"
+  notify:
+   - reload nftables
+
+### Create testlists user
+- name: Ensure the testlists group exists
+  ansible.builtin.group:
+    name: "{{ testlists_user }}"
+    state: present
+  become: yes
+
+- name: Create the testlists user
+  ansible.builtin.user:
+    name: "{{ testlists_user }}"
+    home: "{{ testlists_home }}"
+    shell: "/bin/bash"
+    group: "{{ testlists_user }}"
+    create_home: yes
+    system: yes
+  become: yes
+
+- name: Set ownership of the testlists directory
+  ansible.builtin.file:
+    path: "{{ testlists_home }}"
+    owner: "{{ testlists_user }}"
+    group: "{{ testlists_user }}"
+    state: directory
+    mode: "0700"
+  become: yes
+
+### Run testlists
+
+- name: Ensure ooniapi directory existence
+  ansible.builtin.file:
+    path: /var/lib/ooniapi
+    state: directory
+    mode: "0711"
+    owner: "{{testlists_user}}"
+    group: "{{testlists_user}}"
+
+- name: Ensure testlists users var dir exists
+  ansible.builtin.file:
+    path: /var/lib/ooniapi/testlists/users
+    state: directory
+    mode: "0700"
+    owner: "{{testlists_user}}"
+    group: "{{testlists_user}}"
+
+- name: Get UID of a specific user
+  command: id -u {{testlists_user}}
+  register: user_uid
+  changed_when: false
+
+- name: Get GID of a specific user
+  command: id -g {{testlists_user}}
+  register: user_gid
+  changed_when: false
+
+- name: Make containerd use nftables backend
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    line: 'firewall-backend="nftables"'
+    state: present
+  notify:
+   - restart docker
+
+- name: Ensure testlists is running
+  community.docker.docker_container:
+    env:
+      CLICKHOUSE_URL: "{{ clickhouse_url }}"
+      JWT_ENCRYPTION_KEY: "{{ jwt_encryption_key }}"
+      WORKING_DIR: "/var/lib/ooniapi/testlists"
+      GITHUB_TOKEN: "{{ github_token }}"
+      GITHUB_USER: "ooni-bot"
+      ORIGIN_REPO: "citizenlab/test-lists"
+      PUSH_REPO: "ooni/test-lists"
+      LOG_LEVEL: "{{ log_level }}"
+      USER: "ooniapi"
+      EMAIL: "ooniapi@test-lists.ooni.org"
+
+    name: testlists
+    image: ooni/api-testlists:latest
+    state: started
+    user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
+    # use network mode = host to allow traffic from testlists to the statsd exporter without
+    # creating a network with redirection rules to match the ports
+    ports:
+      - "80:80"
+    volumes:
+      - /var/lib/ooniapi:/var/lib/ooniapi
+  tags:
+    - testlists

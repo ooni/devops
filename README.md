@@ -7,6 +7,8 @@ flowchart TB
     apiorg([api.ooni.org])-->alb
     apiio([api.ooni.io])-->backend
     ecs[Backend API ECS]<-->ch[(Clickhouse Cluster)]
+    cz[Citizenlab API EC2]<-->ch
+
     subgraph Hetzner
         backend[OONI Backend Monolith]<-->ch
         monitoring[Monitoring host]
@@ -15,6 +17,7 @@ flowchart TB
     subgraph AWS
     alb[API Load Balancer]<-->ecs
     alb-->backend
+    alb-->cz
     ecs<-->s3[(OONI S3 Buckets)]
     s3<-->backend
     end

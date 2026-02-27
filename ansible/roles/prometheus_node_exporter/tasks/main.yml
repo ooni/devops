@@ -3,36 +3,13 @@
   tags:
     - nginx
     - node_exporter
-
-- ansible.builtin.include_role:
-    name: dehydrated
-  tags:
-    - oonidata
-    - dehydrated
-  vars:
-    ssl_domains:
-      - "{{ inventory_hostname }}"
-
-- include_tasks: install.yml
+  when: use_nginx
 
 - name: create ooni configuration directory
   ansible.builtin.file:
     path: "/etc/ooni/"
     state: directory
     owner: root
-  tags:
-    - monitoring
-    - node_exporter
-    - config
-
-- name: Add a user to a password file and ensure permissions are set
-  community.general.htpasswd:
-    path: /etc/ooni/prometheus_passwd
-    name: prom
-    password: "{{ prometheus_metrics_password }}"
-    owner: root
-    group: nginx
-    mode: 0640
   tags:
     - monitoring
     - node_exporter
@@ -49,3 +26,6 @@
     - monitoring
     - node_exporter
     - config
+  when: use_nginx
+
+- include_tasks: install.yml
