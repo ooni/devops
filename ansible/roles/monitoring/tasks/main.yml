@@ -71,10 +71,10 @@
     owner: ecs_discovery
     group: ecs_discovery
 
-- name: Add script for ecs-discovery 
+- name: Add script for ecs-discovery
   tags: monitoring, prometheus
-  template: 
-    src: templates/ecs-discovery.py 
+  template:
+    src: templates/ecs-discovery.py
     dest: /usr/bin/
     mode: '555'
     owner: ecs_discovery
@@ -93,14 +93,14 @@
   tags: monitoring, prometheus
   template:
     src: templates/ecs_discovery_wrapper.sh
-    dest: /usr/bin/ecs_discovery_wrapper.sh 
+    dest: /usr/bin/ecs_discovery_wrapper.sh
     mode: '500'
     owner: ecs_discovery
     group: ecs_discovery
 
-- name: Add cronjob for running the ecs-discovery script 
+- name: Add cronjob for running the ecs-discovery script
   tags: monitoring, prometheus, cron
-  cron: 
+  cron:
     name: "ECS Service Discovery"
     user: ecs_discovery
     minute: "*/5"
@@ -118,6 +118,13 @@
     cache_valid_time: 86400
     name:
       - grafana
+
+# see: https://grafana.com/grafana/plugins/netsage-sankey-panel
+- name: Install Grafana netsage-sankey-panel plugin # For sankey-style charts
+  tags: monitoring, grafana
+  command: grafana-cli plugins install netsage-sankey-panel
+  args:
+    creates: /var/lib/grafana/plugins/netsage-sankey-panel
 
 - name: Configure grafana
   tags: monitoring, grafana
