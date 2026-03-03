@@ -34,7 +34,7 @@ resource "digitalocean_droplet" "ooni_th_docker" {
 
   lifecycle {
     create_before_destroy = true
-    ignore_changes = all
+    ignore_changes        = all
   }
 }
 resource "aws_route53_record" "ooni_th" {

@@ -148,10 +148,10 @@ resource "aws_alb_target_group" "ooniapi_service" {
 
 resource "aws_appautoscaling_target" "ecs_target" {
   // Use count to support conditional resource creation
-  count = var.use_autoscaling ? 1 : 0
+  count              = var.use_autoscaling ? 1 : 0
   service_namespace  = "ecs"
   scalable_dimension = "ecs:service:DesiredCount"
-  resource_id        = "${reverse(split(":", aws_ecs_service.ooniapi_service.id))[0]}"
+  resource_id        = reverse(split(":", aws_ecs_service.ooniapi_service.id))[0]
 
   min_capacity = var.service_desired_count
   max_capacity = var.max_desired_count
@@ -172,11 +172,11 @@ resource "aws_appautoscaling_policy" "policies" {
   target_tracking_scaling_policy_configuration {
     predefined_metric_specification {
       predefined_metric_type = lookup({
-        cpu = "ECSServiceAverageCPUUtilization"
+        cpu    = "ECSServiceAverageCPUUtilization"
         memory = "ECSServiceAverageMemoryUtilization"
-      },
-      each.value.resource_type,
-      "ECSServiceAverageMemoryUtilization"
+        },
+        each.value.resource_type,
+        "ECSServiceAverageMemoryUtilization"
       )
     }
 

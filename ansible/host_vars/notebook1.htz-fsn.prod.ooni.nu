@@ -119,7 +119,7 @@ ssh_users:
     login: aagbsn
     comment: Aaron Gibson
     keys:
-      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINCW9YqNPaMRhNw84sk3NCea0RETVEg4EQS0f4CO020/ aagbsn@extc.org"
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC91p0KabJ1OGKKVLiOlECaP7nYBPUStXUVUsFw/pis2 aaron@openobservatory.org"
   iyp:
     login: iyp
     comment: Internet Yellow Pages (Romain Fontugne / Malte Tashiro)

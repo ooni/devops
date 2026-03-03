@@ -145,16 +145,20 @@
   command: id -u {{fastpath_user}}
   register: user_uid
   changed_when: false
+  tags:
+    - fastpath
 
 - name: Get GID of a specific user
   command: id -g {{fastpath_user}}
   register: user_gid
   changed_when: false
+  tags:
+    - fastpath
 
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
-    image: ooni/fastpath:v0.88
+    image: ooni/fastpath:v0.89
     state: started
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from fastpath to the statsd exporter without

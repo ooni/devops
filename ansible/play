@@ -12,4 +12,4 @@ export ANSIBLE_SLACK_CMD
 if [[ ! " $* " =~ " --check " && ! " $* " =~ " -C " ]]; then
     ansible localhost --module-name include_role --args name=notify-slack --vault-password-file password-pipe
 fi
-ansible-playbook --vault-password-file password-pipe "$@"
+ansible-playbook --vault-password-file password-pipe --diff "$@"

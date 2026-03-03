@@ -27,12 +27,12 @@ variable "dns_zone_ooni_io" {
 
 variable "monitoring_sg_ids" {
   description = "Ids of the security groups used for monitoring"
-  default = []
-  type = list(string)
+  default     = []
+  type        = list(string)
 }
 
 variable "monitoring_active" {
   description = "If the monitoring system should consider the ansible controller machine. Set it to 'true' to activate it, anything else to deactivate it"
-  default = "true"
-  type = string
+  default     = "true"
+  type        = string
 }
