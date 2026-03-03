@@ -56,7 +56,7 @@ resource "aws_route53_record" "docs-ooni-org-_CNAME_" {
 
 resource "aws_route53_record" "explorer-ooni-org-_CNAME_" {
   name    = "explorer.ooni.org"
-  records = ["cname.vercel-dns.com"]
+  records = ["f462d39237d3f6d3.vercel-dns-016.com"]
   ttl     = "300"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_org
@@ -64,7 +64,15 @@ resource "aws_route53_record" "explorer-ooni-org-_CNAME_" {
 
 resource "aws_route53_record" "explorer-test-ooni-org-_CNAME_" {
   name    = "explorer.test.ooni.org"
-  records = ["cname.vercel-dns.com"]
+  records = ["f462d39237d3f6d3.vercel-dns-016.com"]
+  ttl     = "300"
+  type    = "CNAME"
+  zone_id = local.dns_root_zone_ooni_org
+}
+
+resource "aws_route53_record" "explorer-dev-ooni-org-_CNAME_" {
+  name    = "explorer.dev.ooni.org"
+  records = ["f462d39237d3f6d3.vercel-dns-016.com"]
   ttl     = "300"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_org
@@ -248,7 +256,7 @@ resource "aws_route53_record" "prometheus-ooni-org-_CNAME_" {
 
 resource "aws_route53_record" "run-ooni-org-_CNAME_" {
   name    = "run.ooni.org"
-  records = ["cname.vercel-dns.com"]
+  records = ["42ef53bfb2ba44cc.vercel-dns-016.com"]
   ttl     = "300"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_org
@@ -256,7 +264,7 @@ resource "aws_route53_record" "run-ooni-org-_CNAME_" {
 
 resource "aws_route53_record" "run-test-ooni-org-_CNAME_" {
   name    = "run.test.ooni.org"
-  records = ["cname.vercel-dns.com"]
+  records = ["42ef53bfb2ba44cc.vercel-dns-016.com"]
   ttl     = "300"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_org
@@ -472,7 +480,7 @@ resource "aws_route53_record" "echoth-ooni-io-_A_" {
 
 resource "aws_route53_record" "explorer-ooni-io-_CNAME_" {
   name    = "explorer.ooni.io"
-  records = ["cname.vercel-dns.com"]
+  records = ["f462d39237d3f6d3.vercel-dns-016.com"]
   ttl     = "60"
   type    = "CNAME"
   zone_id = local.dns_root_zone_ooni_io
