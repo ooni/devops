@@ -9,7 +9,7 @@ groups:
 
   # including http scraping failure
   - alert: InstanceDown
-    expr: up != 1
+    expr: up{job!="ecs-tasks"} != 1
     for: 5m
     annotations:
       summary: '{{ $labels.instance }} {{if $labels.ec2_host}} ({{$labels.ec2_host}}) {{end}} is not `up`'
