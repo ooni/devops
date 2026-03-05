@@ -232,6 +232,8 @@ scrape_configs:
     relabel_configs: &ec2_relabeling # Change the host to the proxy host with relabeling
       - source_labels: [__meta_ec2_tag_Environment] # take environment from tags
         target_label: env
+      - source_labels: [__meta_ec2_tag_Name] # EC2 instance Name tag
+        target_label: ec2_name
       - source_labels: [__address__]
         regex: "([0-9\\.]+):([0-9]+)" # <ip>:<port>"
         replacement: "$1"
