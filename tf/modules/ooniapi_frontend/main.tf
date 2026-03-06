@@ -478,11 +478,31 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
   }
 }
 
+resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_3" {
+  # hotfix: to allow us to deploy the frontend without the measurements service
+
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 143
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
+  }
+
+  condition {
+    path_pattern {
+      values = [
+        "/api/v1/detector/changepoints",
+      ]
+    }
+  }
+}
+
 resource "aws_lb_listener_rule" "ooniapi_testlists_rule" {
   # hotfix: to allow us to deploy the frontend without the testlists service
   count = var.ooniapi_testlists_target_group_arn != null ? 1 : 0
   listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 143
+  priority     = 144
 
   action {
     type             = "forward"
