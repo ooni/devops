@@ -55,7 +55,7 @@ groups:
   - alert: OOM
     expr: round(rate(node_vmstat_oom_kill[5m]) * 300, 1) > 0
     annotations:
-      summary: '{{ $labels.instance }} had {{ $value }} OOMs in 5m'
+      summary: '{{if $labels.ec2_name}}{{$labels.ec2_name}}{{else}}{{$labels.instance}}{{end}} had {{ $value }} OOMs in 5m'
 
   - alert: NodeSwapping
     expr: rate(node_vmstat_pgmajfault[1m]) > 100 # and instance:node_memory_available:ratio < 0.05
