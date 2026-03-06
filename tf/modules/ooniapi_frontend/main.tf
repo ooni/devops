@@ -479,7 +479,6 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
 }
 
 resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_3" {
-  # hotfix: to allow us to deploy the frontend without the measurements service
 
   listener_arn = aws_alb_listener.ooniapi_listener_https.arn
   priority     = 143
