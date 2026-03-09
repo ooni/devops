@@ -214,16 +214,16 @@ scrape_configs:
   #    - targets:
   #      - backend-hel.ooni.org:444
 
-  # EC2 instances monitoring: 
+  # EC2 instances monitoring:
   - job_name: 'ooni-aws-ec2-dev'
     scrape_interval: 5s
-    scheme: https 
-    metrics_path: "/metrics" 
+    scheme: https
+    metrics_path: "/metrics"
     ec2_sd_configs:
-      - access_key: "{{prometheus_aws_access_key_dev}}" 
+      - access_key: "{{prometheus_aws_access_key_dev}}"
         secret_key: "{{prometheus_aws_secret_key_dev}}"
         region: "eu-central-1"
-        port: 9100  
+        port: 9100
         filters: &instance_filters
           - name: instance-state-name
             values: ['running']
@@ -232,6 +232,8 @@ scrape_configs:
     relabel_configs: &ec2_relabeling # Change the host to the proxy host with relabeling
       - source_labels: [__meta_ec2_tag_Environment] # take environment from tags
         target_label: env
+      - source_labels: [__meta_ec2_tag_Name] # EC2 instance Name tag
+        target_label: ec2_name
       - source_labels: [__address__]
         regex: "([0-9\\.]+):([0-9]+)" # <ip>:<port>"
         replacement: "$1"
@@ -267,14 +269,14 @@ scrape_configs:
 
   - job_name: 'ooni-aws-ec2-prod'
     scrape_interval: 5s
-    scheme: https 
-    metrics_path: "/metrics" 
+    scheme: https
+    metrics_path: "/metrics"
     ec2_sd_configs:
-      - access_key: "{{prometheus_aws_access_key_prod}}" 
+      - access_key: "{{prometheus_aws_access_key_prod}}"
         secret_key: "{{prometheus_aws_secret_key_prod}}"
         region: "eu-central-1"
-        port: 9100  
-        filters: 
+        port: 9100
+        filters:
           *instance_filters
     relabel_configs: # Change the host to the proxy host with relabeling
       *ec2_relabeling
@@ -287,7 +289,7 @@ scrape_configs:
       username: 'prom'
       password: '{{ prometheus_metrics_password }}'
     file_sd_configs:
-      - files: 
+      - files:
         - '/var/lib/prometheus/file_discovery/*.json'
     relabel_configs: # Change the host to the proxy host with relabeling
       # Store ip in ecs_host
@@ -326,7 +328,7 @@ scrape_configs:
 
   - job_name: "fastpath"
     static_configs:
-    - targets: 
+    - targets:
       - fastpath.dev.ooni.io:9102
       - fastpath.prod.ooni.io:9102
     scrape_interval: 5s
@@ -374,7 +376,7 @@ scrape_configs:
     static_configs:
     - targets:
       - testlists.dev.ooni.io:9102
-      - testlists.prod.ooni.io:9102
+      # - testlists.prod.ooni.io:9102
     scrape_interval: 5s
     scheme: https
     relabel_configs: # Change the host to the proxy host with relabeling
