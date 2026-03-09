@@ -160,6 +160,7 @@
     name: fastpath
     image: ooni/fastpath:v0.89
     state: started
+    restart_policy: always
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from fastpath to the statsd exporter without
     # creating a network with redirection rules to match the ports
