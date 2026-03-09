@@ -1214,7 +1214,7 @@ module "ooniapi_testlists" {
 
 resource "aws_route53_record" "testlists_alias" {
   zone_id = local.dns_zone_ooni_io
-  name    = "testl.${local.environment}.ooni.io"
+  name    = "testlist-ec2.${local.environment}.ooni.io"
   type    = "CNAME"
   ttl     = 300
 
