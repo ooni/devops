@@ -12,6 +12,9 @@
 - name: Include testlists playbook
   ansible.builtin.import_playbook: deploy-testlists.yml
 
+- name: Include slackin playbook
+  ansible.builtin.import_playbook: deploy-slackin.yml
+
 # commented out due to the fact it requires manual config of ~/.ssh/config
 #- name: Setup codesign box
 #  hosts: codesign-box

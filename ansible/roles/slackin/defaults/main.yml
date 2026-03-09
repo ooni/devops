@@ -1,0 +1,2 @@
+slackin_org: "openobservatory"
+slackin_token: {{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ansible_slack_token', profile='oonidevops_user_prod') }}

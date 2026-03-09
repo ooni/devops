@@ -518,3 +518,19 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_3" {
 //    }
 //  }
 //}
+
+resource "aws_lb_listener_rule" "slack_inviter_rule" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 144
+
+  action {
+    type = "forward"
+    target_group_arn = var.ooni_slackin_target_group_arn
+  }
+
+  condition {
+    host_header {
+      values = ["slack.ooni.org"]
+    }
+  }
+}
