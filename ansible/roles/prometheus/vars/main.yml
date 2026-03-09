@@ -116,6 +116,11 @@ blackbox_jobs:
       - "https://api.ooni.org/api/v2/oonirun/links/10009"
       - "https://api.ooni.org/api/v2/oonirun/links/10009/revisions"
 
+  - name: "Changepoints API"
+    module: "http_2xx_json"
+    targets:
+      - "https://oonimeasurements.prod.ooni.io/api/v1/detector/changepoints"
+
   # end of API #
 
   - name: "countly.ooni.io ping"
