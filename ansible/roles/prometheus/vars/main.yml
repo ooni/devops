@@ -72,6 +72,8 @@ blackbox_jobs:
     targets:
       - "https://api.ooni.io/api/v1/measurements"
       - "https://api.ooni.org/api/v1/measurements"
+      - "https://oonimeasurements.prod.ooni.io/api/v1/measurements" # this one bypasses cache
+      - "https://api.ooni.io/api/v1/measurements" # this one bypasses cache
 
   - name: "ooni API test-list urls"
     module: "https_2xx_json_meta"
@@ -120,6 +122,15 @@ blackbox_jobs:
     module: "http_2xx_json"
     targets:
       - "https://oonimeasurements.prod.ooni.io/api/v1/detector/changepoints"
+
+  - name: "API Services Health"
+    module: "http_2xx_json"
+    targets:
+      - "https://oonimeasurements.prod.ooni.io/health"
+      - "https://ooniprobe.prod.ooni.io/health"
+      - "https://oonirun.prod.ooni.io/health"
+      - "https://ooniauth.prod.ooni.io/health"
+      - "https://oonifindings.prod.ooni.io/health"
 
   # end of API #
 
