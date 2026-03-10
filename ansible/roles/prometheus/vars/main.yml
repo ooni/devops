@@ -72,8 +72,9 @@ blackbox_jobs:
     targets:
       - "https://api.ooni.io/api/v1/measurements"
       - "https://api.ooni.org/api/v1/measurements"
-      - "https://oonimeasurements.prod.ooni.io/api/v1/measurements" # this one bypasses cache
-      - "https://api.ooni.io/api/v1/measurements" # this one bypasses cache
+      # oonimeasurements.* ones bypass cache
+      - "https://oonimeasurements.prod.ooni.io/api/v1/measurements"
+      - "https://oonimeasurements.prod.ooni.io/api/v1/aggregation"
 
   - name: "ooni API test-list urls"
     module: "https_2xx_json_meta"
@@ -111,6 +112,7 @@ blackbox_jobs:
     targets:
       - "https://api.ooni.io/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
       - "https://api.ooni.org/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
+      - "https://oonimeasurements.prod.ooni.io/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
 
   - name: "OONI Run v2 API"
     module: "https_2xx_json"
