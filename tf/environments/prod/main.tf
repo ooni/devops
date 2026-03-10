@@ -426,6 +426,7 @@ module "ooniapi_reverseproxy_deployer" {
   service_name            = "reverseproxy"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/reverseproxy/**"
   buildspec_path          = "ooniapi/services/reverseproxy/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -778,6 +779,7 @@ module "ooniapi_ooniprobe_deployer" {
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -927,6 +929,7 @@ module "fastpath_builder" {
   service_name            = "fastpath"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -945,6 +948,7 @@ module "ooniapi_oonirun_deployer" {
   service_name            = "oonirun"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/oonirun/**"
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -994,6 +998,7 @@ module "ooniapi_oonifindings_deployer" {
   service_name            = "oonifindings"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/oonifindings/**"
   buildspec_path          = "ooniapi/services/oonifindings/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1044,6 +1049,7 @@ module "ooniapi_ooniauth_deployer" {
   service_name            = "ooniauth"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/ooniauth/**"
   buildspec_path          = "ooniapi/services/ooniauth/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1113,6 +1119,7 @@ module "ooniapi_oonimeasurements_deployer" {
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1263,6 +1270,7 @@ module "testlists_builder" {
   service_name            = "testlists"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
   trigger_path            = "ooniapi/services/testlists/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
