@@ -160,4 +160,13 @@ modules:
     prober: http
     timeout: 30s
 
+  # for POST /report
+  ooni_http_post_report:
+    prober: http
+    timeout: 30s
+    http:
+      method: POST
+      headers:
+        Content-Type: application/json
+      body: '{"data_format_version":"v1.0","format":"json","probe_asn":"AS0","probe_cc":"ZZ","software_name":"black-box","software_version":"1","test_name":"test","test_start_time":"","test_version":"1"}'
 ...

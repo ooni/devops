@@ -87,6 +87,7 @@ blackbox_jobs:
     targets:
       - "https://api.ooni.io/api/v1/test-helpers"
       - "https://api.ooni.org/api/v1/test-helpers"
+      - "https://ooniprobe.prod.ooni.io/api/v1/test-helpers"
 
   - name: "ooni API priv global overview"
     module: "https_2xx_json"
@@ -133,6 +134,22 @@ blackbox_jobs:
       - "https://oonirun.prod.ooni.io/health"
       - "https://ooniauth.prod.ooni.io/health"
       - "https://oonifindings.prod.ooni.io/health"
+
+  - name: "OONI Probe GET"
+    module: "http_2xx_json"
+    targets:
+      # Anonymous Credentials
+      - "https://ooniprobe.prod.ooni.io/api/v1/manifest"
+
+  - name: "OONI Probe report"
+    module: "ooni_http_post_report"
+    targets:
+      - "https://ooniprobe.prod.ooni.io/api/v1/report"
+
+  - name: "OONI Probe check-in"
+    module: "http_post_2xx"
+    targets:
+      - "https://ooniprobe.prod.ooni.io/api/v1/check-in"
 
   # end of API #
 
