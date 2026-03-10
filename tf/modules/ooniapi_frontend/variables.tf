@@ -39,6 +39,7 @@ variable "ooniapi_oonimeasurements_target_group_arn" {
 
 variable "ooniapi_testlists_target_group_arn" {
   description = "arn for the target group of the testlists service"
+  default     = null
 }
 
 variable "dns_zone_ooni_io" {
