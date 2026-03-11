@@ -167,6 +167,8 @@
     network_mode: host
     # published_ports: # unused on network_mode: host
     #   - "8472:8472"
+    env:
+      GUNICORN_CMD_ARGS: "--bind=0.0.0.0:8472 --workers=10"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
