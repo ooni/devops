@@ -797,12 +797,12 @@ module "ooniapi_ooniprobe" {
   vpc_id = module.network.vpc_id
 
   service_name             = "ooniprobe"
-  default_docker_image_url = "ooni/api-ooniprobe:latest"
+  default_docker_image_url = "ooni/api-ooniprobe:20260310-75fc910b"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
-  task_memory              = 512
+  task_memory              = 256
 
 
   task_secrets = {
