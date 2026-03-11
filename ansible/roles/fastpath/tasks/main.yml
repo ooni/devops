@@ -53,25 +53,6 @@
   notify:
    - reload nftables
 
-# Docker seems to have problems with nftables, so this command will translate all iptables
-# commands to nftables commands
-# - name: Update alternatives for iptables
-#   tags: docker
-#   become: yes
-#   ansible.builtin.command: "update-alternatives --set iptables /usr/sbin/iptables-nft"
-#   notify:
-#    - restart docker
-
-# - name: Update alternatives for iptables
-#   tags: docker
-#   become: yes
-#   ansible.builtin.command: "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft"
-#   notify:
-#    - restart docker
-
-# - name: Flush all handlers # Required to apply iptables settings before docker runs
-#   meta: flush_handlers
-
 ### Create fastpath user
 - name: Ensure the fastpath group exists
   ansible.builtin.group:
@@ -154,6 +135,14 @@
   changed_when: false
   tags:
     - fastpath
+
+- name: Make containerd use nftables backend
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    line: 'firewall-backend="nftables"'
+    state: present
+  notify:
+   - restart docker
 
 - name: Ensure fastpath is running
   community.docker.docker_container:
