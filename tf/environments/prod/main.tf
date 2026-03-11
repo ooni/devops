@@ -814,7 +814,7 @@ module "ooniapi_ooniprobe" {
   }
 
   task_environment = {
-    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
+    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8479"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 4 # be sure this is different from dev
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
@@ -828,7 +828,7 @@ module "ooniapi_ooniprobe" {
   ]
 
   use_autoscaling = false
-  # service_desired_count = 2
+  service_desired_count = 2
   # max_desired_count     = 8
   # autoscale_policies = [
   #   {
@@ -867,6 +867,11 @@ module "ooni_fastpath" {
     }, {
     from_port   = 8472,
     to_port     = 8472,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 8479,
+    to_port     = 8479,
     protocol    = "tcp",
     cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
