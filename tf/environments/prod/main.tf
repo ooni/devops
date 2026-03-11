@@ -829,7 +829,7 @@ module "ooniapi_ooniprobe" {
     module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling = false
+  use_autoscaling       = false
   service_desired_count = 2
   # max_desired_count     = 8
   # autoscale_policies = [
