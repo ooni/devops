@@ -168,5 +168,14 @@ modules:
       method: POST
       headers:
         Content-Type: application/json
-      body: '{"data_format_version":"v1.0","format":"json","probe_asn":"AS0","probe_cc":"ZZ","software_name":"black-box","software_version":"1","test_name":"test","test_start_time":"","test_version":"1"}'
+      body: '{"run_type":"timed","charging":false,"probe_cc":"ZZ","probe_asn":"AS0","on_wifi":true,"software_name":"black-box","software_version":"1.0.0","web_connectivity":{"url":"https://example.com/","options":{}}}'
+
+  ooni_http_post_checkin:
+    prober: http
+    timeout: 30s
+    http:
+      method: POST
+      headers:
+        Content-Type: application/json
+      body: '{"data_format_version":"v1.0","format":"json","probe_asn":"AS0","probe_cc":"ZZ","software_name":"black-box","software_version":"1","test_name":"black-box","test_start_time":"","test_version":"1"}'
 ...

@@ -147,7 +147,7 @@ blackbox_jobs:
       - "https://ooniprobe.prod.ooni.io/report"
 
   - name: "OONI Probe check-in"
-    module: "http_post_2xx"
+    module: "ooni_http_post_checkin"
     targets:
       - "https://ooniprobe.prod.ooni.io/api/v1/check-in"
 
