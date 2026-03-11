@@ -802,7 +802,7 @@ module "ooniapi_ooniprobe" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
-  task_memory              = 256
+  task_memory              = 512
 
 
   task_secrets = {
