@@ -122,12 +122,12 @@ blackbox_jobs:
       - "https://api.ooni.org/api/v2/oonirun/links/10009/revisions"
 
   - name: "Changepoints API"
-    module: "http_2xx_json"
+    module: "http_2xx"
     targets:
       - "https://oonimeasurements.prod.ooni.io/api/v1/detector/changepoints"
 
   - name: "API Services Health"
-    module: "http_2xx_json"
+    module: "http_2xx"
     targets:
       - "https://oonimeasurements.prod.ooni.io/health"
       - "https://ooniprobe.prod.ooni.io/health"
@@ -136,7 +136,7 @@ blackbox_jobs:
       - "https://oonifindings.prod.ooni.io/health"
 
   - name: "OONI Probe GET"
-    module: "http_2xx_json"
+    module: "http_2xx"
     targets:
       # Anonymous Credentials
       - "https://ooniprobe.prod.ooni.io/api/v1/manifest"
