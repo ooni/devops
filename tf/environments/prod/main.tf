@@ -996,7 +996,7 @@ module "ooni_fastpath_2" {
   )
 }
 
-resource "aws_route53_record" "fastpath_alias" {
+resource "aws_route53_record" "fastpath_alias_2" {
   zone_id = local.dns_zone_ooni_io
   name    = "fastpath2.${local.environment}.ooni.io"
   type    = "CNAME"
