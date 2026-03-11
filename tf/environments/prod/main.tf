@@ -1407,18 +1407,19 @@ resource "aws_acm_certificate_validation" "ooniapi_frontend" {
 
 ## Code signing setup
 
-module "codesigning" {
-  source = "../../modules/cloudhsm"
-
-  vpc_id             = module.network.vpc_id
-  subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
-  subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
-  key_name           = module.adm_iam_roles.oonidevops_key_name
-  tags = {
-    Environment = local.environment
-  }
-  monitoring_active = "false"
-}
+# this has been manually created on EC2
+#module "codesigning" {
+#  source = "../../modules/cloudhsm"
+#
+#  vpc_id             = module.network.vpc_id
+#  subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
+#  subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
+#  key_name           = module.adm_iam_roles.oonidevops_key_name
+#  tags = {
+#    Environment = local.environment
+#  }
+#  monitoring_active = "false"
+#}
 
 ## Ansible controller setup
 
