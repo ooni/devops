@@ -828,15 +828,15 @@ module "ooniapi_ooniprobe" {
   ]
 
   use_autoscaling       = false
-  service_desired_count = 2
-  max_desired_count     = 8
-  autoscale_policies = [
-    {
-      resource_type     = "memory"
-      name              = "memory"
-      scaleout_treshold = 60
-    }
-  ]
+  # service_desired_count = 2
+  # max_desired_count     = 8
+  # autoscale_policies = [
+  #   {
+  #     resource_type     = "memory"
+  #     name              = "memory"
+  #     scaleout_treshold = 60
+  #   }
+  # ]
 
   tags = merge(
     local.tags,
