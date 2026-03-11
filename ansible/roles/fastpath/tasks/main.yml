@@ -179,6 +179,30 @@
   tags:
     - fastpath
 
+- name: Ensure fastpath 2 is running
+  community.docker.docker_container:
+    name: fastpath2
+    image: ooni/fastpath:20260311-7934497d
+    state: started
+    restart_policy: always
+    user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
+    # use network mode = host to allow traffic from fastpath to the statsd exporter without
+    # creating a network with redirection rules to match the ports
+    network_mode: host
+    # published_ports: # unused on network_mode: host
+    #   - "8472:8472"
+    command: ["python", "/home/fastpath/app/run_fastpath", "--write-to-disk", "--debug"]
+    env:
+      GUNICORN_CMD_ARGS: "--bind=0.0.0.0:8479 --log-level debug"
+      LOG_LEVEL: "DEBUG"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
+      - /var/lib/ooniapi:/var/lib/ooniapi
+      - /var/lib/fastpath:/var/lib/fastpath
+  tags:
+    - fastpath
+
 ### Serve jsonl from spool dir for oonimeasurements
 - name: Add nginx config file for serving spool dir measurements
   tags: fastpath
