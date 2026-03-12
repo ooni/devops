@@ -37,3 +37,8 @@ variable "ecs_cluster_name" {
 variable "trigger_path" {
   description = "path filter for push changes which trigger the codepipeline eg. ooniapi/services/oonirun/**"
 }
+
+variable "environment" {
+  description = "Deployment environment (e.g., prod, dev)"
+  type        = string
+}

@@ -38,3 +38,7 @@ variable "ecs_service_name" {
   description = "id of the service in the cluster to deploy"
 }
 
+variable "environment" {
+  description = "Deployment environment (e.g., prod, dev)"
+  type        = string
+}
