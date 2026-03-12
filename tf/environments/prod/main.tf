@@ -816,7 +816,7 @@ module "ooniapi_ooniprobe" {
   }
 
   task_environment = {
-    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8479"
+    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 4 # be sure this is different from dev
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
