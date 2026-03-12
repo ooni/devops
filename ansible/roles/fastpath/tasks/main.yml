@@ -215,6 +215,7 @@
       - "9102:9102" # for /metrics
       - "8125:9125" # for reporting metrics
       - "8125:9125/udp"
+  tags: fastpath
 
 ### API Uploader set up
 - name: configure api uploader using s3 bucket
