@@ -103,7 +103,7 @@
   cron:
     name: "ECS Service Discovery"
     user: ecs_discovery
-    minute: "*/5"
+    minute: "*/2"
     hour: "*"
     day: "*"
     month: "*"
