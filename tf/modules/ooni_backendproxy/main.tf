@@ -1,5 +1,5 @@
-data "aws_ssm_parameter" "ubuntu_22_ami" {
-  name = "/aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id"
+data "aws_ssm_parameter" "ubuntu_24_ami" {
+  name = "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 }
 
 # Important note about security groups:
@@ -73,7 +73,7 @@ data "cloudinit_config" "ooni_backendproxy" {
 
 resource "aws_launch_template" "ooni_backendproxy" {
   name_prefix   = "${var.name}-bkprx-tmpl-"
-  image_id      = data.aws_ssm_parameter.ubuntu_22_ami.value
+  image_id      = data.aws_ssm_parameter.ubuntu_24_ami.value
   instance_type = var.instance_type
   key_name      = var.key_name
 
