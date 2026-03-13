@@ -940,7 +940,7 @@ module "ooni_fastpath_2" {
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "c6i.large"
 
-  name = "oonifastpath"
+  name = "oonifastpath2"
   ingress_rules = [{
     from_port   = 22,
     to_port     = 22,
@@ -985,8 +985,8 @@ module "ooni_fastpath_2" {
     ipv6_cidr_blocks = ["::/0"],
   }]
 
-  sg_prefix = "oonifastpath"
-  tg_prefix = "fstp"
+  sg_prefix = "oonifastpath2"
+  tg_prefix = "fstp2"
 
   disk_size = 150
 
