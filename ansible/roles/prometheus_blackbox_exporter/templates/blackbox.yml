@@ -168,7 +168,7 @@ modules:
       method: POST
       headers:
         Content-Type: application/json
-      body: '{"run_type":"timed","charging":false,"probe_cc":"ZZ","probe_asn":"AS0","on_wifi":true,"software_name":"black-box","software_version":"1.0.0","web_connectivity":{"url":"https://example.com/","options":{}}}'
+      body: '{"data_format_version":"v1.0","format":"json","probe_asn":"AS0","probe_cc":"ZZ","software_name":"black-box","software_version":"1.0.0","test_name":"blackbox_probe","test_start_time":"2025-01-01T00:00:00Z","test_version":"1.0.0"}'
 
   ooni_http_post_checkin:
     prober: http
