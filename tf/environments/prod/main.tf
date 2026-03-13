@@ -509,7 +509,11 @@ module "ooni_clickhouse_proxy" {
       module.network.vpc_subnet_public[*].cidr_block,
       module.network.vpc_subnet_private[*].cidr_block,
       ["${module.ooni_fastpath.aws_instance_private_ip}/32",
-      "${module.ooni_fastpath.aws_instance_public_ip}/32"]
+      "${module.ooni_fastpath.aws_instance_public_ip}/32"],
+      ["${module.ooni_fastpath_2.aws_instance_private_ip}/32",
+      "${module.ooni_fastpath_2.aws_instance_public_ip}/32"],
+      ["${module.ooniapi_testlists.aws_instance_private_ip}/32",
+      "${module.ooniapi_testlists.aws_instance_public_ip}/32"],
     ),
     }, {
     // For the prometheus proxy:
@@ -825,16 +829,16 @@ module "ooniapi_ooniprobe" {
     module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling       = true
-  service_desired_count = 4
-  max_desired_count     = 8
-  autoscale_policies = [
-    {
-      resource_type     = "memory"
-      name              = "memory"
-      scaleout_treshold = 60
-    }
-  ]
+  use_autoscaling       = false
+  service_desired_count = 2
+  # max_desired_count     = 8
+  # autoscale_policies = [
+  #   {
+  #     resource_type     = "memory"
+  #     name              = "memory"
+  #     scaleout_treshold = 60
+  #   }
+  # ]
 
   tags = merge(
     local.tags,
@@ -865,6 +869,11 @@ module "ooni_fastpath" {
     }, {
     from_port   = 8472,
     to_port     = 8472,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 8479,
+    to_port     = 8479,
     protocol    = "tcp",
     cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
@@ -915,6 +924,86 @@ resource "aws_route53_record" "fastpath_alias" {
 
   records = [
     module.ooni_fastpath.aws_instance_public_dns
+  ]
+}
+
+module "ooni_fastpath_2" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "c6i.large"
+
+  name = "oonifastpath"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 8472,
+    to_port     = 8472,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 8479,
+    to_port     = 8479,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 8475, # for serving jsonl files
+    to_port     = 8475,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    }, {
+    from_port   = 9102, # For fastpath metrics
+    to_port     = 9102,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32", "${module.ooni_monitoring_proxy.aws_instance_public_ip}/32"]
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "oonifastpath"
+  tg_prefix = "fstp"
+
+  disk_size = 150
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-fastpath" }
+  )
+}
+
+resource "aws_route53_record" "fastpath_alias_2" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "fastpath2.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_fastpath_2.aws_instance_public_dns
   ]
 }
 
@@ -1182,6 +1271,94 @@ module "ooniapi_oonimeasurements" {
   )
 }
 
+### Tier2 testlists service
+module "ooniapi_testlists" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.micro"
+
+  name = "oonitestlists"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 80,
+    to_port     = 80,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    // For the prometheus proxy:
+    from_port   = 9200,
+    to_port     = 9200,
+    protocol    = "tcp"
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
+    }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"]
+  }]
+
+  sg_prefix = "oonitestl"
+  tg_prefix = "tstl"
+
+  disk_size = 20
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier2-testlists" }
+  )
+}
+
+resource "aws_route53_record" "testlists_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "testlist-ec2.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooniapi_testlists.aws_instance_public_dns
+  ]
+}
+
+module "testlists_builder" {
+  source      = "../../modules/ooni_docker_build"
+  trigger_tag = ""
+
+  service_name            = "testlists"
+  repo                    = "ooni/backend"
+  branch_name             = "master"
+  buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
+  trigger_path            = "ooniapi/services/testlists/**"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+}
+
 #### OONI Tier0 API Frontend
 
 module "ooniapi_frontend" {
@@ -1196,6 +1373,7 @@ module "ooniapi_frontend" {
   ooniapi_ooniprobe_target_group_arn        = module.ooniapi_ooniprobe.alb_target_group_id
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
+  ooniapi_testlists_target_group_arn        = module.ooniapi_testlists.alb_target_group_id
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id,
@@ -1242,6 +1420,7 @@ locals {
     "oonirun.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "oonimeasurements.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "oonifindings.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
+    "testlists.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
   }
 
   ooniapi_frontend_main_domain_name         = "api.${local.environment}.ooni.io"
@@ -1315,18 +1494,19 @@ resource "aws_acm_certificate_validation" "ooniapi_frontend" {
 
 ## Code signing setup
 
-module "codesigning" {
-  source = "../../modules/cloudhsm"
-
-  vpc_id             = module.network.vpc_id
-  subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
-  subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
-  key_name           = module.adm_iam_roles.oonidevops_key_name
-  tags = {
-    Environment = local.environment
-  }
-  monitoring_active = "false"
-}
+# this has been manually created on EC2
+#module "codesigning" {
+#  source = "../../modules/cloudhsm"
+#
+#  vpc_id             = module.network.vpc_id
+#  subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
+#  subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
+#  key_name           = module.adm_iam_roles.oonidevops_key_name
+#  tags = {
+#    Environment = local.environment
+#  }
+#  monitoring_active = "false"
+#}
 
 ## Ansible controller setup
 

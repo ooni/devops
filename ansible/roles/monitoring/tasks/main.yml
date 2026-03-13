@@ -55,7 +55,7 @@
 
 # Prometheus service discovery
 - name: Create service discovery user
-  tags: monitoring, prometheus
+  tags: monitoring, prometheus, ecs-discovery
   user:
     name: "ecs_discovery"
     comment: "(Created by Ansible) System user that runs the service discovery script to find scrape targets in ECS"
@@ -64,7 +64,7 @@
     system: true
 
 - name: Create file-discovery directory for prometheus
-  tags: monitoring, prometheus
+  tags: monitoring, prometheus, ecs-discovery
   file:
     path: /var/lib/prometheus/file_discovery
     state: directory
@@ -72,7 +72,7 @@
     group: ecs_discovery
 
 - name: Add script for ecs-discovery
-  tags: monitoring, prometheus
+  tags: monitoring, prometheus, ecs-discovery
   template:
     src: templates/ecs-discovery.py
     dest: /usr/bin/
@@ -81,7 +81,7 @@
     group: ecs_discovery
 
 - name: Add settings file for ecs-discovery
-  tags: monitoring, prometheus
+  tags: monitoring, prometheus, ecs-discovery
   template:
     src: templates/ecs_discovery_settings.sh
     dest: /etc/ooni/ecs_discovery_settings.sh
@@ -90,7 +90,7 @@
     group: ecs_discovery
 
 - name: Add the wrapper script for ecs-discovery
-  tags: monitoring, prometheus
+  tags: monitoring, prometheus, ecs-discovery
   template:
     src: templates/ecs_discovery_wrapper.sh
     dest: /usr/bin/ecs_discovery_wrapper.sh
@@ -99,11 +99,11 @@
     group: ecs_discovery
 
 - name: Add cronjob for running the ecs-discovery script
-  tags: monitoring, prometheus, cron
+  tags: monitoring, prometheus, cron, ecs-discovery
   cron:
     name: "ECS Service Discovery"
     user: ecs_discovery
-    minute: "*/5"
+    minute: "*/2"
     hour: "*"
     day: "*"
     month: "*"

@@ -105,6 +105,7 @@
     name: testlists
     image: ooni/api-testlists:latest
     state: started
+    restart_policy: always
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from testlists to the statsd exporter without
     # creating a network with redirection rules to match the ports

@@ -554,7 +554,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "test-userauth"
+  branch_name             = "async-wrap-upload"
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1177,11 +1177,6 @@ module "ooniapi_testlists" {
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
-    from_port   = 443,
-    to_port     = 443,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
     // For the prometheus proxy:
     from_port   = 9200,
     to_port     = 9200,
@@ -1219,7 +1214,7 @@ module "ooniapi_testlists" {
 
 resource "aws_route53_record" "testlists_alias" {
   zone_id = local.dns_zone_ooni_io
-  name    = "testl.${local.environment}.ooni.io"
+  name    = "testlist-ec2.${local.environment}.ooni.io"
   type    = "CNAME"
   ttl     = 300
 
