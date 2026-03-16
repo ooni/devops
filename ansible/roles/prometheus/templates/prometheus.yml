@@ -31,6 +31,10 @@ scrape_configs:
 {% for target in (bbjob.targets|sort) %}
         - "{{ target }}"
 {% endfor %}
+{% if bbjob.ignore_instance_down | default(false) %}
+        labels:
+          ignore_instance_down: "true"
+{% endif %}
     relabel_configs:
       - source_labels: [__address__]
         regex: (.*)(:80)?

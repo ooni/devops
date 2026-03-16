@@ -69,6 +69,7 @@ blackbox_jobs:
 
   - name: "ooni API measurements"
     module: "http_2xx"
+    ignore_instance_down: true
     targets:
       - "https://api.ooni.io/api/v1/measurements"
       - "https://api.ooni.org/api/v1/measurements"
@@ -84,6 +85,7 @@ blackbox_jobs:
 
   - name: "ooni API test-helpers"
     module: "https_2xx_json"
+    ignore_instance_down: true
     targets:
       - "https://api.ooni.io/api/v1/test-helpers"
       - "https://api.ooni.org/api/v1/test-helpers"
@@ -110,6 +112,7 @@ blackbox_jobs:
 
   - name: "OONI API raw_measurement"
     module: "https_2xx_json"
+    ignore_instance_down: true
     targets:
       - "https://api.ooni.io/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
       - "https://api.ooni.org/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
@@ -128,6 +131,7 @@ blackbox_jobs:
 
   - name: "API Services Health"
     module: "http_2xx"
+    ignore_instance_down: true
     targets:
       - "https://oonimeasurements.prod.ooni.io/health"
       - "https://ooniprobe.prod.ooni.io/health"
@@ -137,17 +141,20 @@ blackbox_jobs:
 
   - name: "OONI Probe GET"
     module: "http_2xx"
+    ignore_instance_down: true
     targets:
       # Anonymous Credentials
       - "https://ooniprobe.prod.ooni.io/api/v1/manifest"
 
   - name: "OONI Probe report"
     module: "ooni_http_post_report"
+    ignore_instance_down: true
     targets:
       - "https://ooniprobe.prod.ooni.io/report"
 
   - name: "OONI Probe check-in"
     module: "ooni_http_post_checkin"
+    ignore_instance_down: true
     targets:
       - "https://ooniprobe.prod.ooni.io/api/v1/check-in"
 
