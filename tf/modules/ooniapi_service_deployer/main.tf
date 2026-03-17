@@ -4,7 +4,7 @@ data "aws_caller_identity" "current" {}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
-  env_label = var.environment == "prod" ? "latest" : "dev"
+  env_label  = var.environment == "prod" ? "latest" : "dev"
 }
 
 resource "aws_iam_policy" "codebuild" {
@@ -125,7 +125,7 @@ resource "aws_codebuild_project" "ooniapi" {
     type                        = "LINUX_CONTAINER"
 
     environment_variable {
-      name = "ENV_LABEL"
+      name  = "ENV_LABEL"
       value = local.env_label
     }
   }
