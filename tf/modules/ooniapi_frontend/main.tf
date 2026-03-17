@@ -137,7 +137,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS alb_connection_logs (
          'input.regex' =
           '([^ ]*) ([^ ]*) ([0-9]*) ([0-9]*) ([A-Za-z0-9.-]*) ([^ ]*) ([-.0-9]*) \"([^\"]*)\" ([^ ]*) ([^ ]*) ([^ ]*) ?([^ ]*)?( .*)?'
          )
-         LOCATION 's3://${aws_s3_bucket.load_balancer_logs.bucket}/connection_logs/'
+         LOCATION 's3://${aws_s3_bucket.load_balancer_logs.bucket}/connection_log/AWSLogs/'
     EOT
   workgroup = aws_athena_workgroup.ooni_workgroup.name
 }
