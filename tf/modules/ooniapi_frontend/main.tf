@@ -116,7 +116,7 @@ resource "aws_athena_named_query" "create_alb_connection_logs_table" {
   name     = "create_alb_connection_logs_table"
   database = aws_athena_database.load_balancer_logs.name
 
-  query = <<EOT
+  query     = <<EOT
 CREATE EXTERNAL TABLE IF NOT EXISTS alb_connection_logs (
          time string,
          client_ip string,
