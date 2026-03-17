@@ -695,7 +695,7 @@ resource "aws_elasticache_serverless_cache" "ooniapi" {
       unit    = "GB"
     }
     ecpu_per_second {
-      maximum = 5000
+      maximum = 80100
     }
   }
   major_engine_version = "8"
