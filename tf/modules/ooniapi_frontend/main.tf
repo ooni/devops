@@ -12,6 +12,12 @@ resource "aws_alb" "ooniapi" {
     enabled = true
   }
 
+  connection_logs {
+    bucket  = aws_s3_bucket.load_balancer_logs.bucket
+    enabled = true
+    prefix  = "connection_log"
+  }
+
   lifecycle {
     create_before_destroy = true
   }
@@ -106,6 +112,36 @@ resource "aws_athena_database" "load_balancer_logs" {
   bucket = aws_s3_bucket.athena_results.bucket
 }
 
+resource "aws_athena_named_query" "create_alb_connection_logs_table" {
+  name     = "create_alb_connection_logs_table"
+  database = aws_athena_database.load_balancer_logs.name
+
+  query = <<EOT
+CREATE EXTERNAL TABLE IF NOT EXISTS alb_connection_logs (
+         time string,
+         client_ip string,
+         client_port int,
+         listener_port int,
+         tls_protocol string,
+         tls_cipher string,
+         tls_handshake_latency double,
+         leaf_client_cert_subject string,
+         leaf_client_cert_validity string,
+         leaf_client_cert_serial_number string,
+         tls_verify_status string,
+         conn_trace_id string
+         )
+         ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.RegexSerDe'
+         WITH SERDEPROPERTIES (
+         'serialization.format' = '1',
+         'input.regex' =
+          '([^ ]*) ([^ ]*) ([0-9]*) ([0-9]*) ([A-Za-z0-9.-]*) ([^ ]*) ([-.0-9]*) \"([^\"]*)\" ([^ ]*) ([^ ]*) ([^ ]*) ?([^ ]*)?( .*)?'
+         )
+         LOCATION 's3://${aws_s3_bucket.load_balancer_logs.bucket}/connection_log/AWSLogs/'
+    EOT
+  workgroup = aws_athena_workgroup.ooni_workgroup.name
+}
+
 resource "aws_athena_named_query" "create_alb_logs_table" {
   name     = "create_alb_logs_table"
   database = aws_athena_database.load_balancer_logs.name
@@ -151,7 +187,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS alb_access_logs (
             WITH SERDEPROPERTIES (
             'serialization.format' = '1',
             'input.regex' =
-        '([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*):([0-9]*) ([^ ]*)[:-]([0-9]*) ([-.0-9]*) ([-.0-9]*) ([-.0-9]*) (|[-0-9]*) (-|[-0-9]*) ([-0-9]*) ([-0-9]*) \"([^ ]*) (.*) (- |[^ ]*)\" \"([^\"]*)\" ([A-Z0-9-_]+) ([A-Za-z0-9.-]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^\"]*)\" ([-.0-9]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^ ]*)\" \"([^\\s]+?)\" \"([^\\s]+)\" \"([^ ]*)\" \"([^ ]*)\" ?([^ ]*)?'
+        '([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*):([0-9]*) ([^ ]*)[:-]([0-9]*) ([-.0-9]*) ([-.0-9]*) ([-.0-9]*) (|[-0-9]*) (-|[-0-9]*) ([-0-9]*) ([-0-9]*) \"([^ ]*) (.*) (- |[^ ]*)\" \"([^\"]*)\" ([A-Z0-9-_]+) ([A-Za-z0-9.-]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^\"]*)\" ([-.0-9]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^ ]*)\" \"([^\\s]+?)\" \"([^\\s]+)\" \"([^ ]*)\" \"([^ ]*)\" ?([^ ]*)?.*'
             )
         LOCATION 's3://${aws_s3_bucket.load_balancer_logs.bucket}/AWSLogs/'
         EOT
