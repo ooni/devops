@@ -122,7 +122,7 @@ groups:
       summary: "{{ $labels.instance }} endpoint down"
 
   - alert: BlackboxDown
-    expr: probe_success{job!~"onion .+"} == 0
+    expr: probe_success{job!~"onion .+", ignore_instance_down!="true"} == 0
     for: 10m
     annotations:
       summary: "{{ $labels.instance }} endpoint down"
