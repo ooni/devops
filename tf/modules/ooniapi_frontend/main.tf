@@ -332,6 +332,7 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
     path_pattern {
       values = [
         "/api/v1/test-helpers*",
+        "/api/v1/test-list/urls",
         "/report*",
         "/api/_/show_countries_prioritization",
         "/api/_/debug_prioritization"
