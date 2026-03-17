@@ -349,8 +349,7 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule" {
         "/api/v1/login",
         "/api/v1/register",
         "/api/v1/update/*",
-        # Activate this when the DB is connected in prod
-        "/api/v1/check-in*",
+        "/api/v1/check-in*"
       ]
     }
   }
@@ -369,7 +368,10 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
     path_pattern {
       values = [
         "/api/v1/test-helpers*",
-        "/report*"
+        "/api/v1/test-list/urls",
+        "/report*",
+        "/api/_/show_countries_prioritization",
+        "/api/_/debug_prioritization"
       ]
     }
   }
