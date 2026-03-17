@@ -4,6 +4,7 @@ data "aws_caller_identity" "current" {}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
+  env_label  = var.environment == "prod" ? "latest" : "dev"
 }
 
 resource "aws_iam_policy" "codebuild" {
@@ -122,6 +123,11 @@ resource "aws_codebuild_project" "oonidkr" {
     image_pull_credentials_type = "CODEBUILD"
     privileged_mode             = "true"
     type                        = "LINUX_CONTAINER"
+
+    environment_variable {
+      name  = "ENV_LABEL"
+      value = local.env_label
+    }
   }
 
   logs_config {

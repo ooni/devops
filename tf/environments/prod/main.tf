@@ -426,6 +426,7 @@ module "ooniapi_reverseproxy_deployer" {
   service_name            = "reverseproxy"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/reverseproxy/**"
   buildspec_path          = "ooniapi/services/reverseproxy/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -694,7 +695,7 @@ resource "aws_elasticache_serverless_cache" "ooniapi" {
       unit    = "GB"
     }
     ecpu_per_second {
-      maximum = 5000
+      maximum = 80100
     }
   }
   major_engine_version = "8"
@@ -778,6 +779,7 @@ module "ooniapi_ooniprobe_deployer" {
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -827,16 +829,16 @@ module "ooniapi_ooniprobe" {
     module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling       = true
-  service_desired_count = 4
-  max_desired_count     = 8
-  autoscale_policies = [
-    {
-      resource_type     = "memory"
-      name              = "memory"
-      scaleout_treshold = 60
-    }
-  ]
+  use_autoscaling       = false
+  service_desired_count = 2
+  # max_desired_count     = 8
+  # autoscale_policies = [
+  #   {
+  #     resource_type     = "memory"
+  #     name              = "memory"
+  #     scaleout_treshold = 60
+  #   }
+  # ]
 
   tags = merge(
     local.tags,
@@ -867,6 +869,11 @@ module "ooni_fastpath" {
     }, {
     from_port   = 8472,
     to_port     = 8472,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 8479,
+    to_port     = 8479,
     protocol    = "tcp",
     cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
     }, {
@@ -927,6 +934,7 @@ module "fastpath_builder" {
   service_name            = "fastpath"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -945,6 +953,7 @@ module "ooniapi_oonirun_deployer" {
   service_name            = "oonirun"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/oonirun/**"
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -994,6 +1003,7 @@ module "ooniapi_oonifindings_deployer" {
   service_name            = "oonifindings"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/oonifindings/**"
   buildspec_path          = "ooniapi/services/oonifindings/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1044,6 +1054,7 @@ module "ooniapi_ooniauth_deployer" {
   service_name            = "ooniauth"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/ooniauth/**"
   buildspec_path          = "ooniapi/services/ooniauth/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1113,6 +1124,7 @@ module "ooniapi_oonimeasurements_deployer" {
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1167,16 +1179,16 @@ module "ooniapi_oonimeasurements" {
     module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling       = true
+  use_autoscaling       = false
   service_desired_count = 4
-  max_desired_count     = 32 # 8gb (total mem) / 256mb (mem per task) = 32 tasks
-  autoscale_policies = [
-    {
-      name              = "memory"
-      resource_type     = "memory"
-      scaleout_treshold = 60
-    }
-  ]
+  # max_desired_count     = 32 # 8gb (total mem) / 256mb (mem per task) = 32 tasks
+  # autoscale_policies = [
+  #   {
+  #     name              = "memory"
+  #     resource_type     = "memory"
+  #     scaleout_treshold = 60
+  #   }
+  # ]
 
   tags = merge(
     local.tags,
@@ -1263,6 +1275,7 @@ module "testlists_builder" {
   service_name            = "testlists"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
   trigger_path            = "ooniapi/services/testlists/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1407,18 +1420,19 @@ resource "aws_acm_certificate_validation" "ooniapi_frontend" {
 
 ## Code signing setup
 
-module "codesigning" {
-  source = "../../modules/cloudhsm"
-
-  vpc_id             = module.network.vpc_id
-  subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
-  subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
-  key_name           = module.adm_iam_roles.oonidevops_key_name
-  tags = {
-    Environment = local.environment
-  }
-  monitoring_active = "false"
-}
+# this has been manually created on EC2
+#module "codesigning" {
+#  source = "../../modules/cloudhsm"
+#
+#  vpc_id             = module.network.vpc_id
+#  subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
+#  subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
+#  key_name           = module.adm_iam_roles.oonidevops_key_name
+#  tags = {
+#    Environment = local.environment
+#  }
+#  monitoring_active = "false"
+#}
 
 ## Ansible controller setup
 
