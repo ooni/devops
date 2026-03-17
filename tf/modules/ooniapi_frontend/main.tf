@@ -15,7 +15,7 @@ resource "aws_alb" "ooniapi" {
   connection_logs {
     bucket  = aws_s3_bucket.load_balancer_logs.bucket
     enabled = true
-    prefix  = "connection_logs"
+    prefix  = "connection_log"
   }
 
   lifecycle {
@@ -112,7 +112,7 @@ resource "aws_athena_database" "load_balancer_logs" {
   bucket = aws_s3_bucket.athena_results.bucket
 }
 
-resource "aws_athena_named_query" "create_alb_logs_table" {
+resource "aws_athena_named_query" "create_alb_connection_logs_table" {
   name     = "create_alb_connection_logs_table"
   database = aws_athena_database.load_balancer_logs.name
 
