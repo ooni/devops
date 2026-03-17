@@ -555,6 +555,7 @@ module "ooniapi_ooniprobe_deployer" {
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
   branch_name             = "test-userauth"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -576,7 +577,7 @@ module "ooniapi_ooniprobe" {
   vpc_id = module.network.vpc_id
 
   service_name             = "ooniprobe"
-  default_docker_image_url = "ooni/api-ooniprobe:latest"
+  default_docker_image_url = "ooni/api-ooniprobe:dev"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
@@ -629,6 +630,7 @@ module "ooniapi_reverseproxy_deployer" {
   service_name            = "reverseproxy"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/reverseproxy/**"
   buildspec_path          = "ooniapi/services/reverseproxy/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -650,7 +652,7 @@ module "ooniapi_reverseproxy" {
   vpc_id = module.network.vpc_id
 
   service_name             = "reverseproxy"
-  default_docker_image_url = "ooni/api-reverseproxy:latest"
+  default_docker_image_url = "ooni/api-reverseproxy:dev"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
@@ -902,6 +904,7 @@ module "fastpath_builder" {
   service_name            = "fastpath"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -919,6 +922,7 @@ module "ooniapi_oonirun_deployer" {
   service_name            = "oonirun"
   repo                    = "ooni/backend"
   branch_name             = "oonirun-v2-1"
+  environment             = local.environment
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
   trigger_path            = "ooniapi/services/oonirun/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -937,7 +941,7 @@ module "ooniapi_oonirun" {
   vpc_id = module.network.vpc_id
 
   service_name             = "oonirun"
-  default_docker_image_url = "ooni/api-oonirun:latest"
+  default_docker_image_url = "ooni/api-oonirun:dev"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
@@ -968,6 +972,7 @@ module "ooniapi_oonifindings_deployer" {
   service_name            = "oonifindings"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/oonifindings/**"
   buildspec_path          = "ooniapi/services/oonifindings/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -986,7 +991,7 @@ module "ooniapi_oonifindings" {
   vpc_id = module.network.vpc_id
 
   service_name             = "oonifindings"
-  default_docker_image_url = "ooni/api-oonifindings:latest"
+  default_docker_image_url = "ooni/api-oonifindings:dev"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
@@ -1018,6 +1023,7 @@ module "ooniapi_ooniauth_deployer" {
   service_name            = "ooniauth"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   buildspec_path          = "ooniapi/services/ooniauth/buildspec.yml"
   trigger_path            = "ooniapi/services/ooniauth/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1036,7 +1042,7 @@ module "ooniapi_ooniauth" {
   vpc_id = module.network.vpc_id
 
   service_name             = "ooniauth"
-  default_docker_image_url = "ooni/api-ooniauth:latest"
+  default_docker_image_url = "ooni/api-ooniauth:dev"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
@@ -1086,6 +1092,7 @@ module "ooniapi_oonimeasurements_deployer" {
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
   branch_name             = "event-detector"
+  environment             = local.environment
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
@@ -1105,7 +1112,7 @@ module "ooniapi_oonimeasurements" {
   vpc_id    = module.network.vpc_id
 
   service_name             = "oonimeasurements"
-  default_docker_image_url = "ooni/api-oonimeasurements:latest"
+  default_docker_image_url = "ooni/api-oonimeasurements:dev"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
@@ -1230,6 +1237,7 @@ module "testlists_builder" {
   service_name            = "testlists"
   repo                    = "ooni/backend"
   branch_name             = "master"
+  environment             = local.environment
   buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
   trigger_path            = "ooniapi/services/testlists/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
