@@ -31,9 +31,17 @@ scrape_configs:
 {% for target in (bbjob.targets|sort) %}
         - "{{ target }}"
 {% endfor %}
-{% if bbjob.ignore_instance_down | default(false) %}
+# Adds custom labels to metrics for this job
+{% if (bbjob.ignore_instance_down | default(false)) or (bbjob.labels is defined) %}
         labels:
+{% if bbjob.ignore_instance_down | default(false) %}
           ignore_instance_down: "true"
+{% endif %}
+{% if bbjob.labels is defined %}
+{% for k, v in bbjob.labels.items() %}
+          {{ k }}: "{{ v }}"
+{% endfor %}
+{% endif %}
 {% endif %}
     relabel_configs:
       - source_labels: [__address__]

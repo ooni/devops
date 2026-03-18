@@ -113,6 +113,8 @@ blackbox_jobs:
   - name: "OONI API raw_measurement"
     module: "https_2xx_json"
     ignore_instance_down: true
+    labels:
+      tier: "tier-1"
     targets:
       - "https://api.ooni.io/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
       - "https://api.ooni.org/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
@@ -120,20 +122,33 @@ blackbox_jobs:
 
   - name: "OONI Run v2 API"
     module: "https_2xx_json"
+    labels:
+      tier: "tier-1"
     targets:
       - "https://api.ooni.org/api/v2/oonirun/links/10009"
       - "https://api.ooni.org/api/v2/oonirun/links/10009/revisions"
 
   - name: "Changepoints API"
     module: "http_2xx"
+    labels:
+      tier: "tier-1"
     targets:
       - "https://oonimeasurements.prod.ooni.io/api/v1/detector/changepoints"
 
-  - name: "API Services Health"
+  - name: "API Services Health - tier 1"
     module: "http_2xx"
     ignore_instance_down: true
+    labels:
+      tier: "tier-1"
     targets:
       - "https://oonimeasurements.prod.ooni.io/health"
+
+  - name: "API Services Health - tier 0"
+    module: "http_2xx"
+    ignore_instance_down: true
+    labels:
+      tier: "tier-0"
+    targets:
       - "https://ooniprobe.prod.ooni.io/health"
       - "https://oonirun.prod.ooni.io/health"
       - "https://ooniauth.prod.ooni.io/health"
