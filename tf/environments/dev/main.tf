@@ -951,6 +951,7 @@ module "ooniapi_oonirun" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
   }
 
   ooniapi_service_security_groups = [
