@@ -122,6 +122,11 @@ groups:
       summary: "{{ $labels.instance }} endpoint down"
 
   - alert: BlackboxDown
+  # Some blackbox jobs are marked with `ignore_instance_down="true"`, this is a custom label
+  #
+  # This does not disable monitoring for those targets in general; it only
+  # suppresses the immediate "endpoint down" alert from this rule. API service
+  # alerting is driven from Grafana uptime dashboards instead.
     expr: probe_success{job!~"onion .+", ignore_instance_down!="true"} == 0
     for: 10m
     annotations:
