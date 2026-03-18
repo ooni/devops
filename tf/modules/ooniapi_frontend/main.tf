@@ -398,6 +398,24 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3" {
   }
 }
 
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_4" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 123
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
+  }
+
+  condition {
+    path_pattern {
+      values = [
+        "/bouncer/net-tests*"
+      ]
+    }
+  }
+}
+
 resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_host" {
   listener_arn = aws_alb_listener.ooniapi_listener_https.arn
   priority     = 125
