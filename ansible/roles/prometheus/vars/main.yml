@@ -70,6 +70,8 @@ blackbox_jobs:
   - name: "ooni API measurements"
     module: "http_2xx"
     ignore_instance_down: true
+    labels:
+      tier: "tier-1"
     targets:
       - "https://api.ooni.io/api/v1/measurements"
       - "https://api.ooni.org/api/v1/measurements"
@@ -79,6 +81,8 @@ blackbox_jobs:
 
   - name: "ooni API test-list urls"
     module: "https_2xx_json_meta"
+    labels:
+      tier: "tier-0"
     targets:
       - "https://api.ooni.io/api/v1/test-list/urls?country_code=US"
       - "https://api.ooni.org/api/v1/test-list/urls?country_code=US"
@@ -86,6 +90,8 @@ blackbox_jobs:
   - name: "ooni API test-helpers"
     module: "https_2xx_json"
     ignore_instance_down: true
+    labels:
+      tier: "tier-0"
     targets:
       - "https://api.ooni.io/api/v1/test-helpers"
       - "https://api.ooni.org/api/v1/test-helpers"
@@ -99,6 +105,8 @@ blackbox_jobs:
 
   - name: "ooni API findings listing"
     module: "https_2xx_json"
+    labels:
+      tier: "tier-1"
     targets:
       - "https://api.ooni.io/api/v1/incidents/search"
       - "https://api.ooni.org/api/v1/incidents/search"
