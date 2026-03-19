@@ -24,7 +24,7 @@
 - name: Download and unarchive statsd_exporter
   ansible.builtin.unarchive:
     src: "{{ statsd_exporter_download_url }}"
-    dest: /tmp
+    dest: /tmp/
     remote_src: true
     mode: "0755"
   when: exporter_installed.rc != 0 # return code (rc) is != 0 when not installed
@@ -33,7 +33,7 @@
 
 - name: Move statsd_exporter binary into place
   ansible.builtin.copy:
-    src: "/tmp/statsd_exporter"
+    src: "/tmp/{{ statsd_exporter_filename }}"
     dest: "{{ statsd_exporter_bin_path }}"
     mode: "0755"
     remote_src: true

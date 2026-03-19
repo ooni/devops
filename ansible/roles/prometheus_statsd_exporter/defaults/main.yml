@@ -1,7 +1,8 @@
 ---
 # statsd_exporter_version: '0.28.0'
 # statsd_exporter_arch: 'amd64'
-statsd_exporter_download_url: "https://github.com/prometheus/statsd_exporter/releases/download/v0.28.0/statsd_exporter-0.28.0.linux-amd64.tar.gz"
+statsd_exporter_filename: "statsd_exporter-0.28.0.linux-amd64"
+statsd_exporter_download_url: "https://github.com/prometheus/statsd_exporter/releases/download/v0.28.0/{{statsd_exporter_filename}}.tar.gz"
 statsd_exporter_bin_path: /usr/local/bin/statsd_exporter
 statsd_exporter_statsd_listen_udp: ':8125'
 statsd_exporter_web_listen_address: '127.0.0.1:9102'
