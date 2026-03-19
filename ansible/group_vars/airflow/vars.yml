@@ -11,7 +11,7 @@ airflow_webserver_secret_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secr
 airflow_executor: "LocalExecutor"
 airflow_database_conn: "postgresql+psycopg2://airflow:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/airflow_postgresql_password', profile='oonidevops_user_prod') }}@ooni-tier0-postgres.c7mgscca82no.eu-central-1.rds.amazonaws.com/airflow"
 
-# TODO Uncomment this when the prometheus exporter is running as well
+# TODO uncomment when exporter is running 
 # # StatsD metrics, sent to the local prometheus statsd_exporter
 # # These variables come from the airflow role used by this playbook
 # # https://github.com/ooni/airflow-role/blob/5ba757e17c3fd63a4dc794a74ad1912f624d84d7/defaults/main/airflow-cfg.yml#L85-L95
