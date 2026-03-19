@@ -69,21 +69,33 @@ blackbox_jobs:
 
   - name: "ooni API measurements"
     module: "http_2xx"
+    ignore_instance_down: true
+    labels:
+      tier: "tier-1"
     targets:
       - "https://api.ooni.io/api/v1/measurements"
       - "https://api.ooni.org/api/v1/measurements"
+      # oonimeasurements.* ones bypass cache
+      - "https://oonimeasurements.prod.ooni.io/api/v1/measurements"
+      - "https://oonimeasurements.prod.ooni.io/api/v1/aggregation"
 
   - name: "ooni API test-list urls"
     module: "https_2xx_json_meta"
+    labels:
+      tier: "tier-0"
     targets:
       - "https://api.ooni.io/api/v1/test-list/urls?country_code=US"
       - "https://api.ooni.org/api/v1/test-list/urls?country_code=US"
 
   - name: "ooni API test-helpers"
     module: "https_2xx_json"
+    ignore_instance_down: true
+    labels:
+      tier: "tier-0"
     targets:
       - "https://api.ooni.io/api/v1/test-helpers"
       - "https://api.ooni.org/api/v1/test-helpers"
+      - "https://ooniprobe.prod.ooni.io/api/v1/test-helpers"
 
   - name: "ooni API priv global overview"
     module: "https_2xx_json"
@@ -93,6 +105,8 @@ blackbox_jobs:
 
   - name: "ooni API findings listing"
     module: "https_2xx_json"
+    labels:
+      tier: "tier-1"
     targets:
       - "https://api.ooni.io/api/v1/incidents/search"
       - "https://api.ooni.org/api/v1/incidents/search"
@@ -106,20 +120,66 @@ blackbox_jobs:
 
   - name: "OONI API raw_measurement"
     module: "https_2xx_json"
+    ignore_instance_down: true
+    labels:
+      tier: "tier-1"
     targets:
       - "https://api.ooni.io/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
       - "https://api.ooni.org/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
+      - "https://oonimeasurements.prod.ooni.io/api/v1/raw_measurement?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
 
   - name: "OONI Run v2 API"
     module: "https_2xx_json"
+    labels:
+      tier: "tier-1"
     targets:
       - "https://api.ooni.org/api/v2/oonirun/links/10009"
       - "https://api.ooni.org/api/v2/oonirun/links/10009/revisions"
 
   - name: "Changepoints API"
-    module: "http_2xx_json"
+    module: "http_2xx"
+    labels:
+      tier: "tier-1"
     targets:
       - "https://oonimeasurements.prod.ooni.io/api/v1/detector/changepoints"
+
+  - name: "API Services Health - tier 1"
+    module: "http_2xx"
+    ignore_instance_down: true
+    labels:
+      tier: "tier-1"
+    targets:
+      - "https://oonimeasurements.prod.ooni.io/health"
+
+  - name: "API Services Health - tier 0"
+    module: "http_2xx"
+    ignore_instance_down: true
+    labels:
+      tier: "tier-0"
+    targets:
+      - "https://ooniprobe.prod.ooni.io/health"
+      - "https://oonirun.prod.ooni.io/health"
+      - "https://ooniauth.prod.ooni.io/health"
+      - "https://oonifindings.prod.ooni.io/health"
+
+  - name: "OONI Probe GET"
+    module: "http_2xx"
+    ignore_instance_down: true
+    targets:
+      # Anonymous Credentials
+      - "https://ooniprobe.prod.ooni.io/api/v1/manifest"
+
+  - name: "OONI Probe report"
+    module: "ooni_http_post_report"
+    ignore_instance_down: true
+    targets:
+      - "https://ooniprobe.prod.ooni.io/report"
+
+  - name: "OONI Probe check-in"
+    module: "ooni_http_post_checkin"
+    ignore_instance_down: true
+    targets:
+      - "https://ooniprobe.prod.ooni.io/api/v1/check-in"
 
   # end of API #
 
