@@ -37,7 +37,7 @@
     dest: "{{ statsd_exporter_bin_path }}"
     mode: "0755"
     remote_src: true
-  when: exporter_downloaded is changed
+  when: exporter_installed.rc != 0
   notify: restart statsd_exporter
   become: true
 
