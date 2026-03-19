@@ -433,7 +433,10 @@ scrape_configs:
   - job_name: "airflow"
     scheme: https
     metrics_path: /metrics/statsd_exporter
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password }}'
     static_configs:
       - targets:
-        - data1.htz-fsn.prod.ooni.nu
+        - airflow.prod.ooni.io
 ...
