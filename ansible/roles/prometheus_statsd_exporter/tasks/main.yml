@@ -46,7 +46,6 @@
     src: statsd_exporter.service
     dest: /etc/systemd/system/statsd_exporter.service
     mode: "0644"
-  register: statsd_exporter_service
   become: true
   notify: restart statsd_exporter
 
