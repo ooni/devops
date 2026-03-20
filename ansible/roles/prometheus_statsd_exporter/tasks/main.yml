@@ -50,12 +50,6 @@
   become: true
   notify: restart statsd_exporter
 
-- name: Reload systemd daemon if statsd_exporter unit file changed
-  ansible.builtin.systemd:
-    daemon_reload: true
-  when: statsd_exporter_service is changed
-  become: true
-
 - name: Ensure statsd_exporter is running and enabled
   ansible.builtin.service:
     name: statsd_exporter
