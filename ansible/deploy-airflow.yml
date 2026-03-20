@@ -6,6 +6,7 @@
   roles:
     - nginx
     - dehydrated
+    - prometheus_statsd_exporter
     - oonidata_airflow
   vars:
     airflow_public_fqdn: "airflow.prod.ooni.io"

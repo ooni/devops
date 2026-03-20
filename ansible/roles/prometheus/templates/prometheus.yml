@@ -429,4 +429,14 @@ scrape_configs:
         replacement: "/$2"
         target_label: "__metrics_path__"
         action: "replace"
+
+  - job_name: "airflow"
+    scheme: https
+    metrics_path: /metrics/statsd_exporter
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password }}'
+    static_configs:
+      - targets:
+        - airflow.prod.ooni.io
 ...
