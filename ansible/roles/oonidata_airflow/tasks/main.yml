@@ -71,6 +71,7 @@
     airflow_extra_packages:
       - postgres
       - virtualenv
+      - statsd
     airflow_services:
       airflow_webserver:
         service_name: airflow-webserver
