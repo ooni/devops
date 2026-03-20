@@ -28,7 +28,6 @@
     remote_src: true
     mode: "0755"
   when: exporter_installed.rc != 0 # return code (rc) is != 0 when not installed
-  register: exporter_downloaded
   become: true
 
 - name: Move statsd_exporter binary into place
