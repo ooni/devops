@@ -597,6 +597,7 @@ module "ooniapi_ooniprobe" {
     COLLECTOR_ID          = 3 # use a different one in prod
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
     TOR_TARGETS           = "tor_targets.json"
+    PSIPHON_CONFIG        = "psiphon_config.json"
     ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
     ANONC_MANIFEST_FILE   = "manifest.json"
   }
