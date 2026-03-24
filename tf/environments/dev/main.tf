@@ -1093,7 +1093,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "event-detector"
+  branch_name             = "master"
   environment             = local.environment
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
