@@ -1,0 +1,9 @@
+apiVersion: {{ yace_api_version }}
+sts-region: {{ yace_sts_region }}
+discovery:
+  jobs:
+{% if yace_discovery_jobs | length == 0 %}
+    []
+{% else %}
+{{ yace_discovery_jobs | to_nice_yaml(indent=2) | indent(4, true) }}
+{% endif %}

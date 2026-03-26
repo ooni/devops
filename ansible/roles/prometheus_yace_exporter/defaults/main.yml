@@ -1,0 +1,19 @@
+---
+yace_version: "0.63.0"
+yace_arch: "amd64"
+yace_filename: "yet-another-cloudwatch-exporter_{{ yace_version }}_linux_{{ yace_arch }}"
+yace_download_url: "https://github.com/prometheus-community/yet-another-cloudwatch-exporter/releases/download/v{{ yace_version }}/{{ yace_filename }}.tar.gz"
+
+yace_user: "yace"
+yace_group: "yace"
+yace_bin_path: "/usr/local/bin/yace"
+yace_config_dir: "/etc/yace"
+yace_config_path: "{{ yace_config_dir }}/config.yml"
+yace_listen_address: "127.0.0.1:5000"
+yace_log_format: "logfmt"
+yace_extra_flags: ""
+
+# YACE config values
+yace_api_version: "v1alpha1"
+yace_sts_region: "eu-central-1"
+yace_discovery_jobs: []
