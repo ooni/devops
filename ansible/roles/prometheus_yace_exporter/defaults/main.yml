@@ -4,8 +4,6 @@ yace_arch: "amd64"
 yace_filename: "yet-another-cloudwatch-exporter_{{ yace_version }}_linux_{{ yace_arch }}"
 yace_download_url: "https://github.com/prometheus-community/yet-another-cloudwatch-exporter/releases/download/v{{ yace_version }}/{{ yace_filename }}.tar.gz"
 
-yace_user: "yace"
-yace_group: "yace"
 yace_bin_path: "/usr/local/bin/yace"
 yace_config_dir: "/etc/yace"
 yace_config_path: "{{ yace_config_dir }}/config.yml"

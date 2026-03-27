@@ -3,14 +3,14 @@
 # prometheus
 - name: Create yace group
   ansible.builtin.group:
-    name: "{{ yace_group }}"
+    name: "yace"
     state: present
   become: true
 
 - name: Create yace user
   ansible.builtin.user:
-    name: "{{ yace_user }}"
-    group: "{{ yace_group }}"
+    name: "yace"
+    group: "yace"
     shell: /sbin/nologin
     system: true
     createhome: false
@@ -20,8 +20,8 @@
   ansible.builtin.file:
     path: "{{ yace_config_dir }}"
     state: directory
-    owner: "{{ yace_user }}"
-    group: "{{ yace_group }}"
+    owner: "yace"
+    group: "yace"
     mode: "0750"
   become: true
 
@@ -36,7 +36,7 @@
     src: "{{ yace_download_url }}"
     dest: /tmp/
     remote_src: true
-    mode: "0755"
+    mode: "0700"
   when: >
     yace_version_check.rc != 0 or
     ('v' ~ yace_version) not in ((yace_version_check.stdout | default('')) ~ ' ' ~ (yace_version_check.stderr | default('')))
@@ -46,6 +46,8 @@
   ansible.builtin.copy:
     src: "/tmp/{{ yace_filename }}/yace"
     dest: "{{ yace_bin_path }}"
+    owner: "yace"
+    group: "yace"
     mode: "0755"
     remote_src: true
   when: >
@@ -58,8 +60,8 @@
   ansible.builtin.template:
     src: config.yml
     dest: "{{ yace_config_path }}"
-    owner: "{{ yace_user }}"
-    group: "{{ yace_group }}"
+    owner: "yace"
+    group: "yace"
     mode: "0640"
   notify: restart yace
   become: true
