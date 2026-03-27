@@ -16,7 +16,6 @@
     - role: monitoring_proxy
       vars:
         monitoring_proxy_public_fqdn: "{{ inventory_hostname }}"
-    - role: yace
     - role: prometheus_yace_exporter
       vars:
         node_exporter_port: 9100
