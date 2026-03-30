@@ -98,6 +98,24 @@
         state: absent
       tags: codesign
 
+- name: Create aws directory
+  ansible.builtin.file:
+    path: "/home/ubuntu/.aws"
+    owner: ubuntu
+    group: adm
+    state: directory
+    mode: "0750"
+  tags: codesign
+
+- name: Write ~/.aws/credentials
+  ansible.builtin.template:
+    src: aws_credentials
+    dest: /home/ubuntu/.aws/credentials
+    owner: ubuntu
+    group: adm
+    mode: "u=rwx,g=r,o="
+  tags: codesign
+
 - name: Write customerCA.crt
   ansible.builtin.template:
     src: customerCA.crt

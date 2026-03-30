@@ -2,3 +2,5 @@
 cluster_id: cluster-qsvghm4oqok
 hsm_token_name: OONI_2024-04-26_1
 codesign_usernames: [ art, majakomel, mehul ]
+aws_secret_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/cloudhsm_secret_access_key', profile='oonidevops_user_prod') }}"
+aws_access_key_id: "AKIAW3MEBT7WLINUBPU2"
