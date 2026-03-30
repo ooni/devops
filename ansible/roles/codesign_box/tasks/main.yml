@@ -21,6 +21,67 @@
       - libengine-pkcs11-openssl
       - awscli
 
+- name: Check if osslsigncode is already installed
+  ansible.builtin.command: which osslsigncode
+  register: osslsigncode_check
+  failed_when: false
+  changed_when: false
+- name: Build and install osslsigncode from source
+  when: osslsigncode_check.rc != 0
+  block:
+    - name: Install osslsigncode build dependencies
+      ansible.builtin.apt:
+        name:
+          - cmake
+          - libssl-dev
+          - libcurl4-openssl-dev
+          - zlib1g-dev
+          - python3
+          - git
+        state: present
+        update_cache: true
+
+    - name: Download osslsigncode release tarball
+      ansible.builtin.get_url:
+        url: https://github.com/mtrojnar/osslsigncode/archive/refs/tags/2.13.tar.gz
+        dest: /tmp/osslsigncode.tar.gz
+        mode: "0644"
+
+    - name: Extract osslsigncode tarball
+      ansible.builtin.unarchive:
+        src: /tmp/osslsigncode.tar.gz
+        dest: /tmp/
+        remote_src: true
+
+    - name: Create build directory
+      ansible.builtin.file:
+        path: /tmp/osslsigncode/build
+        state: directory
+        mode: "0755"
+
+    - name: Configure osslsigncode with CMake
+      ansible.builtin.command:
+        cmd: cmake -S .. -DCMAKE_BUILD_TYPE=Release
+        chdir: /tmp/osslsigncode/build
+      changed_when: true
+
+    - name: Build osslsigncode
+      ansible.builtin.command:
+        cmd: cmake --build . --parallel
+        chdir: /tmp/osslsigncode/build
+      changed_when: true
+
+    - name: Install osslsigncode
+      ansible.builtin.command:
+        cmd: cmake --install .
+        chdir: /tmp/osslsigncode/build
+      changed_when: true
+
+    - name: Clean up build directory
+      ansible.builtin.file:
+        path: /tmp/osslsigncode
+        state: absent
+
 - name: Write customerCA.crt
   ansible.builtin.template:
     src: customerCA.crt
@@ -57,7 +118,7 @@
   ansible.builtin.copy:
     dest: /home/ubuntu/.hsmcredentials
     content: |
-      HSM_PASSWORD=
+      HSM_CREDENTIALS=
     owner: ubuntu
     group: adm
     mode: "u=rw,g=,o="

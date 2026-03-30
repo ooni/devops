@@ -16,7 +16,7 @@ osslsigncode sign \
     -pass $HSM_CREDENTIALS \
     -pkcs11engine /usr/lib/x86_64-linux-gnu/engines-3/pkcs11.so \
     -pkcs11module /opt/cloudhsm/lib/libcloudhsm_pkcs11.so \
-    -certs Cert_bundle.pem \
+    -certs /opt/cloudhsm/etc/Cert_bundle.pem \
     -key "pkcs11:token=hsm1;object={{ hsm_token_name }}" \
     -in $1 \
     -out $2

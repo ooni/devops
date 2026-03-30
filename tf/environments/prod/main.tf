@@ -1460,8 +1460,8 @@ module "ooni_codesign_box" {
     ipv6_cidr_blocks = ["::/0"],
   }]
 
-  sg_prefix = "cdsgn"
-  tg_prefix = "cdsgn"
+  sg_prefix = "sgn"
+  tg_prefix = "sgn"
 
   disk_size = 20
 
