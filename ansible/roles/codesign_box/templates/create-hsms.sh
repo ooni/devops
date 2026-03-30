@@ -1,9 +1,11 @@
 #!/bin/bash
 
 CLUSTER_ID="{{ cluster_id }}"
+AWS_DEFAULT_REGION="eu-central-1"
+export AWS_DEFAULT_REGION
 
 create_hsm_token() {
-    if [ -z $1 ]; then
+    if [ -z "$1" ]; then
        echo "AVAILABILITY ZONE PARAMETER UNSET!"
        exit 1
     fi
@@ -16,20 +18,26 @@ create_hsm_token() {
 
 
 wait_for_hsm_tokens() {
-
+    local attempts=0
+    local max_attempts=60  # 10 minutes
     while true; do
-        STATE=$(aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID --query "Clusters[0].Hsms[?State=='ACTIVE'] | length(@)")
+        STATE=$(aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID --query "Clusters[0].Hsms[?State=='ACTIVE'] | length(@)" --output text)
         if [ "$STATE" -ge 2 ]; then
             echo "HSM Tokens created and active."
             break
         fi
-        echo "Waiting for HSM Token $TOKEN_NAME to become active..."
+        attempts=$((attempts + 1))
+        if [ "$attempts" -ge "$max_attempts" ]; then
+            echo "ERROR: Timed out waiting for HSM tokens to become active."
+            exit 1
+        fi
+        echo "Waiting for HSM Token to become active..."
         sleep 10
     done
 
 }
 
-CURRENT_TOKEN_COUNT=$(aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID --query "Clusters[0].Hsms[?State=='ACTIVE'] | length(@)")
+CURRENT_TOKEN_COUNT=$(aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID --query "Clusters[0].Hsms[?State=='ACTIVE'] | length(@)" --output text)
 if [ "$CURRENT_TOKEN_COUNT" -ge 2 ]; then
     echo "Enough HSMs already exist, skipping creation"
 else
@@ -44,6 +52,11 @@ echo "IP Addresses of created HSM tokens: $IP_ADDRESSES"
 
 IP_ADDRESS_1=$(echo $IP_ADDRESSES | cut -d ' ' -f1)
 IP_ADDRESS_2=$(echo $IP_ADDRESSES | cut -d ' ' -f2)
+
+if [ -z "$IP_ADDRESS_1" ] || [ -z "$IP_ADDRESS_2" ]; then
+    echo "ERROR: Could not extract both IP addresses. Got: '$IP_ADDRESSES'"
+    exit 1
+fi
 
 echo "[+] writing cloudhsm-cli.cfg"
 cat <<EOF > /tmp/cloudhsm-cli.cfg
