@@ -1427,10 +1427,10 @@ module "ooni_codesign_box" {
 
   stage = local.environment
 
-  vpc_id             = module.network.vpc_id
-  subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
-  subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
-  dns_zone_ooni_io   = local.dns_zone_ooni_io
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_cloudhsm[0].id
+  private_subnet_cidr = module.network.vpc_subnet_cloudhsm[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
 
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3.micro"
@@ -1442,9 +1442,10 @@ module "ooni_codesign_box" {
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
-    from_port   = 2223
-    to_port     = 2225
-    cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
+    from_port   = 2223,
+    to_port     = 2225,
+    protocol    = "tcp",
+    cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block,
   }]
 
   egress_rules = [{
