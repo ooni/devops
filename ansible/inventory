@@ -52,3 +52,4 @@ jumphost.dev.ooni.io
 jumphost.prod.ooni.io
 testlist-ec2.dev.ooni.io
 testlist-ec2.prod.ooni.io
+codesign-box
