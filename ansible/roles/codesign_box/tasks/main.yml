@@ -74,7 +74,7 @@
     - name: Configure osslsigncode with CMake
       ansible.builtin.command:
         cmd: cmake -S .. -DCMAKE_BUILD_TYPE=Release
-        chdir: /tmp/osslsigncode/build
+        chdir: "/tmp/osslsigncode-{{ ossl_version }}/build"
       changed_when: true
       tags: codesign
 
