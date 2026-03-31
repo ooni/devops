@@ -13,9 +13,10 @@
   ansible.builtin.import_playbook: deploy-testlists.yml
 
 # commented out due to the fact it requires manual config of ~/.ssh/config
-#- name: Setup codesign box
-#  hosts: codesign-box
-#  become: true
-#  remote_user: ubuntu
-#  roles:
-#    - codesign_box
+- name: Setup codesign box
+  hosts: codesign-box
+  become: true
+  remote_user: ubuntu
+  roles:
+    - codesign_box
+  tags: codesign
