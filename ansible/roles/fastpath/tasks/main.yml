@@ -149,13 +149,14 @@
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
-    image: ooni/fastpath:20260401-e190dc9d
+    image: ooni/fastpath:20260401-dee281c2
     state: started
     restart_policy: always
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from fastpath to the statsd exporter without
     # creating a network with redirection rules to match the ports
     network_mode: host
+    command: ["python", "/home/fastpath/app/run_fastpath", "--write-to-disk", "--debug"]
     # published_ports: # unused on network_mode: host
     #   - "8472:8472"
     volumes:
