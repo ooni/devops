@@ -149,7 +149,7 @@
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
-    image: ooni/fastpath:20260401-1bc19e9e
+    image: ooni/fastpath:20260401-7be33e41
     state: started
     restart_policy: always
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
