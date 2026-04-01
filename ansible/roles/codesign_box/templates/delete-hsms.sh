@@ -1,9 +1,11 @@
 #!/bin/bash
 CLUSTER_ID="{{ cluster_id }}"
+AWS_DEFAULT_REGION="eu-central-1"
+export AWS_DEFAULT_REGION
 
 # List all HSM tokens
 echo "Listing all HSM tokens in the cluster..."
-aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID --query "Clusters[0].Hsms[*].HsmId"
+aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID --query "Clusters[0].Hsms[*].HsmId" --output text
 
 # Function to delete an HSM token and wait for its deletion
 delete_hsm_token() {
@@ -16,7 +18,7 @@ delete_hsm_token() {
 wait_for_them_to_die() {
 
     while true; do
-        STATE=$(aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID --query "Clusters[0].Hsms[*] | length(@)")
+        STATE=$(aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID --query "Clusters[0].Hsms[*] | length(@)" --output text)
         if [ "$STATE" -eq 0 ]; then
             echo "All HSM tokens are dead. RIP."
             break

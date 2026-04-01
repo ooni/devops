@@ -1422,19 +1422,60 @@ resource "aws_acm_certificate_validation" "ooniapi_frontend" {
 
 ## Code signing setup
 
-# this has been manually created on EC2
-#module "codesigning" {
-#  source = "../../modules/cloudhsm"
-#
-#  vpc_id             = module.network.vpc_id
-#  subnet_ids         = module.network.vpc_subnet_cloudhsm[*].id
-#  subnet_cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block
-#  key_name           = module.adm_iam_roles.oonidevops_key_name
-#  tags = {
-#    Environment = local.environment
-#  }
-#  monitoring_active = "false"
-#}
+module "ooni_codesign_box" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_cloudhsm[0].id
+  private_subnet_cidr = module.network.vpc_subnet_cloudhsm[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3.micro"
+
+  name = "codesign-box"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 2223,
+    to_port     = 2225,
+    protocol    = "tcp",
+    cidr_blocks = module.network.vpc_subnet_cloudhsm[*].cidr_block,
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "sgn"
+  tg_prefix = "sgn"
+
+  disk_size = 20
+
+  # This host will be turned off most of the times and
+  # the monitoring system will think it's down, so it's
+  # not worth monitoring
+  monitoring_active = "false"
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier3-codesign" }
+  )
+}
+
 
 ## Ansible controller setup
 
