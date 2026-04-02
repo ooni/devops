@@ -19,7 +19,7 @@ resource "aws_ecs_cluster" "main" {
 
 
 data "aws_ssm_parameter" "ecs_optimized_ami" {
-  name = "/aws/service/ecs/optimized-ami/amazon-linux-2/recommended"
+  name = "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended"
 }
 
 resource "aws_iam_role" "container_host" {
@@ -170,15 +170,6 @@ resource "aws_launch_template" "container_host" {
     security_groups = [
       aws_security_group.container_host.id,
     ]
-  }
-
-  block_device_mappings {
-    device_name = "/dev/sdf"
-
-    ebs {
-      volume_size           = var.instance_volume_size
-      delete_on_termination = true
-    }
   }
 
   tag_specifications {

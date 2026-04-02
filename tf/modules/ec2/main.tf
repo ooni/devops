@@ -92,7 +92,7 @@ resource "aws_instance" "ooni_ec2" {
 
   root_block_device {
     volume_size = var.disk_size # Size in GB
-    volume_type = "gp2"
+    volume_type = "gp3"
   }
 
   tags = merge(var.tags, { MonitoringActive = var.monitoring_active })
