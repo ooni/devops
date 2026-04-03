@@ -75,3 +75,9 @@ variable "disk_size" {
   default     = 8
   type        = number
 }
+
+variable "iam_instance_profile_name" {
+  description = "Optional IAM instance profile name for the instance (e.g. YACE via IMDS)"
+  default     = null
+  type        = string
+}
