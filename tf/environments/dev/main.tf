@@ -904,7 +904,7 @@ module "fastpath_builder" {
 
   service_name            = "fastpath"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "fix-fastpath"
   environment             = local.environment
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
