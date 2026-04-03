@@ -1,0 +1,17 @@
+# YACE: ECS service metrics (task counts) for ooniprobe on ooniapi-ecs-cluster.
+yace_discovery_jobs:
+  - type: AWS/ECS
+    regions:
+      - eu-central-1
+    period: 60
+    length: 300
+    searchTags:
+      - key: Name
+        value: ooni-tier0-ooniprobe
+    metrics:
+      - name: RunningTaskCount
+        statistics:
+          - Average
+      - name: DesiredTaskCount
+        statistics:
+          - Average
