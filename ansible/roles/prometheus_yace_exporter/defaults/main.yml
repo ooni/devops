@@ -5,7 +5,7 @@ yace_download_url: "https://github.com/prometheus-community/yet-another-cloudwat
 yace_bin_path: "/usr/local/bin/yace"
 yace_config_dir: "/etc/yace"
 yace_config_path: "{{ yace_config_dir }}/config.yml"
-yace_listen_address: "127.0.0.1:5000"
+yace_listen_address: "0.0.0.0:5000"
 yace_log_format: "logfmt"
 yace_extra_flags: ""
 
