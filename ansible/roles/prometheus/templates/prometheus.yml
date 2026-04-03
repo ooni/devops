@@ -440,7 +440,7 @@ scrape_configs:
       - targets:
         - airflow.prod.ooni.io
 
-  - job_name: "yace"
+  - job_name: "cloudwatch_exporter" # yace
     scheme: http
     metrics_path: /metrics
     static_configs:
