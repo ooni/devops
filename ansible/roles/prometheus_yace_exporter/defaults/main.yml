@@ -1,6 +1,6 @@
 ---
-yace_filename: "yet-another-cloudwatch-exporter_0.63.0_linux_amd64"
-yace_download_url: "https://github.com/prometheus-community/yet-another-cloudwatch-exporter/releases/download/v0.63.0/{{ yace_filename }}.tar.gz"
+yace_filename: "yet-another-cloudwatch-exporter-0.63.0.linux-arm64"
+yace_download_url: "https://github.com/prometheus-community/yet-another-cloudwatch-exporter/releases/download/v0.63.0/{{yace_filename}}.tar.gz"
 
 yace_bin_path: "/usr/local/bin/yace"
 yace_config_dir: "/etc/yace"
