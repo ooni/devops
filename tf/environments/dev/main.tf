@@ -153,7 +153,7 @@ module "oonipg" {
   # see https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Limits.html
   # With 1GiB of ram you get ~112 connections:
   # 1074000000 / 9531392 = 112.68
-  db_instance_class        = "db.t3.micro" # 2GiB => ~224 max_connections
+  db_instance_class        = "db.t4g.micro" # 2GiB => ~224 max_connections
   db_storage_type          = "standard"
   db_allocated_storage     = "5"
   db_max_allocated_storage = null
@@ -606,16 +606,16 @@ module "ooniapi_ooniprobe" {
     # module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling       = true
+  use_autoscaling       = false
   service_desired_count = 1
-  max_desired_count     = 4
-  autoscale_policies = [
-    {
-      resource_type     = "memory"
-      name              = "memory"
-      scaleout_treshold = 60
-    }
-  ]
+  #max_desired_count     = 4
+  #autoscale_policies = [
+  #  {
+  #    resource_type     = "memory"
+  #    name              = "memory"
+  #    scaleout_treshold = 60
+  #  }
+  #]
 
   tags = merge(
     local.tags,
@@ -1073,12 +1073,12 @@ module "ooniapi_ooniauth" {
     ADMIN_EMAILS = jsonencode([
       "maja@ooni.org",
       "arturo@ooni.org",
-      "jessie@ooni.org",
       "mehul@ooni.org",
       "norbel@ooni.org",
       "maria@ooni.org",
-      "elizaveta@ooni.org",
       "admin+dev@ooni.org",
+      "luis@openobservatory.org",
+      "contact@openobservatory.org"
     ])
   }
 

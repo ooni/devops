@@ -1105,12 +1105,12 @@ module "ooniapi_ooniauth" {
     ADMIN_EMAILS = jsonencode([
       "maja@ooni.org",
       "arturo@ooni.org",
-      "jessie@ooni.org",
       "mehul@ooni.org",
       "norbel@ooni.org",
       "maria@ooni.org",
-      "elizaveta@ooni.org",
       "admin+dev@ooni.org",
+      "luis@openobservatory.org",
+      "contact@openobservatory.org"
     ])
   }
 
