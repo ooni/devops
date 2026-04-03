@@ -29,7 +29,7 @@
   ansible.builtin.command: "{{ yace_bin_path }} --version"
   failed_when: false
   changed_when: false
-  register: yace_version_check
+  register: yace_installed # return code (rc) is != 0 when not installed
 
 - name: Download and unarchive yace
   ansible.builtin.unarchive:
@@ -37,9 +37,7 @@
     dest: /tmp/
     remote_src: true
     mode: "0700"
-  when: >
-    yace_version_check.rc != 0 or
-    ('v' ~ yace_version) not in ((yace_version_check.stdout | default('')) ~ ' ' ~ (yace_version_check.stderr | default('')))
+  when: yace_installed.rc != 0
   become: true
 
 - name: Install yace binary
@@ -50,9 +48,7 @@
     group: "yace"
     mode: "0755"
     remote_src: true
-  when: >
-    yace_version_check.rc != 0 or
-    ('v' ~ yace_version) not in ((yace_version_check.stdout | default('')) ~ ' ' ~ (yace_version_check.stderr | default('')))
+  when: yace_installed.rc != 0
   notify: restart yace
   become: true
 
