@@ -606,16 +606,16 @@ module "ooniapi_ooniprobe" {
     # module.ooniapi_cluster.web_security_group_id
   ]
 
-  use_autoscaling       = true
+  use_autoscaling       = false
   service_desired_count = 1
-  max_desired_count     = 4
-  autoscale_policies = [
-    {
-      resource_type     = "memory"
-      name              = "memory"
-      scaleout_treshold = 60
-    }
-  ]
+  #max_desired_count     = 4
+  #autoscale_policies = [
+  #  {
+  #    resource_type     = "memory"
+  #    name              = "memory"
+  #    scaleout_treshold = 60
+  #  }
+  #]
 
   tags = merge(
     local.tags,
