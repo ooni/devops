@@ -447,3 +447,8 @@ scrape_configs:
       - targets:
         - monitoringproxy.dev.ooni.io:5000
         # - monitoringproxy.prod.ooni.io:5000
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: 'monitoringproxy\.(dev|prod)\.ooni\.io:5000'
+        target_label: environment
+        replacement: '$1'
