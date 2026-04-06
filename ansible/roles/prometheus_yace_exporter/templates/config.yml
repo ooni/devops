@@ -1,0 +1,31 @@
+# Yet Another CloudWatch Exporter — edit this file directly (no Ansible templating).
+# ECS: task counts per service (services tagged Environment=dev in Resource Groups).
+# Prometheus examples: aws_ecs_running_task_count_average{dimension_ServiceName="..."}
+apiVersion: v1alpha1
+sts-region: eu-central-1
+discovery:
+  exportedTagsOnMetrics:
+    ecs-svc:
+      - Name
+  jobs:
+    - type: AWS/ECS
+      regions:
+        - eu-central-1
+      period: 60
+      length: 300
+      searchTags:
+        - key: Environment
+          value: dev
+      dimensionNameRequirements:
+        - ClusterName
+        - ServiceName
+      metrics:
+        - name: RunningTaskCount
+          statistics:
+            - Average
+        - name: DesiredTaskCount
+          statistics:
+            - Average
+        - name: PendingTaskCount
+          statistics:
+            - Average
