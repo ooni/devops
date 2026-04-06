@@ -115,6 +115,11 @@ ssh_users:
     comment: Dillon (Voidly)
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKQztdHIbaVzZww+5fJyIjIwCYY7FVT/zCrVnd8yYJWO info@voidly.ai"
+  duenkim:
+    login: duenkim
+    comment: duenkim
+    keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHR20OcFg34s4P5WoohBdgqOKBe8VljzlorjbI9ASHH4 duenkim@ethz.ch"
   aagbsn:
     login: aagbsn
     comment: Aaron Gibson
@@ -127,7 +132,7 @@ ssh_users:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
 
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis ]
-non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, dillon, lex, imap, sloncocs, aagbsn]
+non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, dillon, lex, imap, sloncocs, aagbsn, duenkim]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
