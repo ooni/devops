@@ -8,9 +8,3 @@ yace_config_path: "{{ yace_config_dir }}/config.yml"
 yace_listen_address: "0.0.0.0:5000"
 yace_log_format: "logfmt"
 yace_extra_flags: ""
-
-# YACE config values
-yace_api_version: "v1alpha1"
-yace_sts_region: "eu-central-1"
-# Override in host_vars (e.g. host_vars/monitoringproxy.dev.ooni.io/vars.yml). Empty = no CloudWatch jobs.
-yace_discovery_jobs: []
