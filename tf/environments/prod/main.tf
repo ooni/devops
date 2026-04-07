@@ -644,7 +644,7 @@ module "ooniapi_cluster" {
   asg_min = 2
   asg_max = 10
 
-  instance_type = "t3a.medium"
+  instance_type = "t3a.large"
 
   monitoring_sg_ids = [
     # The clickhouse proxy has an nginx configuration
@@ -672,7 +672,7 @@ module "oonitier1plus_cluster" {
   asg_min = 2
   asg_max = 5
 
-  instance_type = "t3a.medium"
+  instance_type = "t3a.large"
 
   monitoring_sg_ids = [
     # The clickhouse proxy has an nginx configuration
@@ -1147,7 +1147,8 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 256
+  task_memory       = 1024
+  memory_hard_limit = 3072
 
   first_run = true
   vpc_id    = module.network.vpc_id
