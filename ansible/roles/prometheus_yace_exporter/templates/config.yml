@@ -17,6 +17,12 @@ discovery:
         - name: MemoryUtilization
           statistics:
             - Average
+    - type: ECS/ContainerInsights
+      regions:
+        - eu-central-1
+      period: 60
+      length: 300
+      metrics:
         - name: RunningTaskCount
           statistics:
             - Average
