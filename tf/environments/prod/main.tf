@@ -1141,7 +1141,7 @@ module "ooniapi_oonimeasurements_deployer" {
 module "ooniapi_oonimeasurements" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 1024
+  task_memory       = 1024
   memory_hard_limit = 3072
 
   first_run = true
