@@ -43,6 +43,11 @@ variable "task_memory" {
   description = "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#task_size"
 }
 
+variable "memory_hard_limit" {
+  default     = 1024
+  description = "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#task_size"
+}
+
 variable "dns_zone_ooni_io" {
   description = "id of the DNS zone for ooni_io"
 }
