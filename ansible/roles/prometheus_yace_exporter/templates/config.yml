@@ -20,3 +20,12 @@ discovery:
         - name: MemoryUtilization
           statistics:
             - Average
+        - name: RunningTaskCount
+          statistics:
+            - Average
+        - name: DesiredTaskCount
+          statistics:
+            - Average
+        - name: PendingTaskCount
+          statistics:
+            - Average
