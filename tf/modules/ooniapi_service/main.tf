@@ -55,6 +55,7 @@ resource "aws_ecs_task_definition" "ooniapi_service" {
   container_definitions = jsonencode([
     {
       memoryReservation = var.task_memory,
+      memory            = var.task_memory * 2,
       essential         = true,
       image = try(
         data.aws_ecs_container_definition.ooniapi_service_current[0].image,
