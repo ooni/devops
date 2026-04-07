@@ -761,7 +761,7 @@ resource "aws_route53_record" "clickhouse_proxy_alias" {
 # IAM role for the cloudwatch exporter.
 # https://github.com/prometheus-community/yet-another-cloudwatch-exporter#authentication
 resource "aws_iam_role" "monitoring_proxy_yace" {
-  name = "${local.name}-monitoring-proxy-yace"
+  name = "monitoring-proxy-yace"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -774,7 +774,7 @@ resource "aws_iam_role" "monitoring_proxy_yace" {
     }]
   })
 
-  tags = merge(local.tags, { Name = "${local.name}-monitoring-proxy-yace" })
+  tags = merge(local.tags, { Name = "monitoring-proxy-yace" })
 }
 
 resource "aws_iam_role_policy" "monitoring_proxy_yace" {
