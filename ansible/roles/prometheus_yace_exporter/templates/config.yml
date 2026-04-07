@@ -10,9 +10,6 @@ discovery:
       searchTags:
         - key: Environment
           value: dev
-      dimensionNameRequirements:
-        - ClusterName
-        - ServiceName
       metrics:
         - name: CPUUtilization
           statistics:
