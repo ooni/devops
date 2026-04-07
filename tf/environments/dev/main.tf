@@ -413,7 +413,7 @@ module "ooniapi_cluster" {
   asg_min = 2
   asg_max = 4
 
-  instance_type = "t3a.micro"
+  instance_type = "t3a.small"
 
   monitoring_sg_ids = [
     # The clickhouse proxy has an nginx configuration
