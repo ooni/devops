@@ -163,7 +163,6 @@ scrape_configs:
     static_configs:
       - targets:
         - backend-fsn.ooni.org:19999
-        - backend-hel.ooni.org:19999
 
   - job_name: 'ooni-api'
     scrape_interval: 5s
