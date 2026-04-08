@@ -26,9 +26,15 @@ discovery:
         - name: RunningTaskCount
           statistics:
             - Average
+            - Minimum
+            - Maximum
         - name: DesiredTaskCount
           statistics:
             - Average
+            - Minimum
+            - Maximum
         - name: PendingTaskCount
           statistics:
             - Average
+            - Minimum
+            - Maximum
