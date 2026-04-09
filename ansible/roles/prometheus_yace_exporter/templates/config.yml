@@ -7,9 +7,6 @@ discovery:
         - eu-central-1
       period: 60
       length: 300
-      searchTags:
-        - key: Environment
-          value: dev
       metrics:
         - name: CPUUtilization
           statistics:
