@@ -649,7 +649,7 @@ module "ooni_monitoring_proxy" {
     to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
-
+    }, {
     // To query the cloudwatch exporter
     from_port   = 5000,
     to_port     = 5000,
