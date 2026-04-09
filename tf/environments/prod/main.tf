@@ -440,7 +440,7 @@ module "ooniapi_reverseproxy_deployer" {
 module "ooniapi_reverseproxy" {
   source = "../../modules/ooniapi_service"
 
-  task_memory = 64
+  task_memory = 128
 
   # First run should be set on first run to bootstrap the task definition
   # first_run = true
@@ -804,7 +804,7 @@ module "ooniapi_ooniprobe" {
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
-  task_memory              = 256
+  task_memory              = 1024
 
 
   task_secrets = {
@@ -969,6 +969,7 @@ module "ooniapi_oonirun" {
   source = "../../modules/ooniapi_service"
   #first_run = true
 
+  task_memory = 256
   vpc_id = module.network.vpc_id
 
   service_name             = "oonirun"
@@ -1019,6 +1020,7 @@ module "ooniapi_oonifindings_deployer" {
 module "ooniapi_oonifindings" {
   source = "../../modules/ooniapi_service"
 
+  task_memory = 512
   # first_run          = true
   vpc_id = module.network.vpc_id
 
@@ -1071,6 +1073,7 @@ module "ooniapi_ooniauth" {
   source = "../../modules/ooniapi_service"
   # first_run = true
 
+  task_memory = 256
   vpc_id = module.network.vpc_id
 
   service_name             = "ooniauth"
