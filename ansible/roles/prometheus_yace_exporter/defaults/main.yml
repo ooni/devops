@@ -8,3 +8,6 @@ yace_config_path: "{{ yace_config_dir }}/config.yml"
 yace_listen_address: "0.0.0.0:5000"
 yace_log_format: "logfmt"
 yace_extra_flags: ""
+
+# Defaults to deriving env from inventory hostname (e.g. monitoringproxy.prod.ooni.io -> prod).
+env: "{{ inventory_hostname.split('.')[1] }}"

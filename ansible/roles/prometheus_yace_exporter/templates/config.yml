@@ -7,6 +7,9 @@ discovery:
         - eu-central-1
       period: 60
       length: 300
+      searchTags:
+        - key: Environment
+          value: "{{ env }}"
       metrics:
         - name: CPUUtilization
           statistics:
@@ -19,6 +22,9 @@ discovery:
         - eu-central-1
       period: 60
       length: 300
+      searchTags:
+        - key: Environment
+          value: "{{ env }}"
       metrics:
         - name: RunningTaskCount
           statistics:
