@@ -446,7 +446,7 @@ scrape_configs:
     static_configs:
       - targets:
         - monitoringproxy.dev.ooni.io:5000
-        # - monitoringproxy.prod.ooni.io:5000
+        - monitoringproxy.prod.ooni.io:5000
     relabel_configs:
       - source_labels: [__address__]
         regex: 'monitoringproxy\.(dev|prod)\.ooni\.io:5000'
