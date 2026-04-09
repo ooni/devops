@@ -970,7 +970,7 @@ module "ooniapi_oonirun" {
   #first_run = true
 
   task_memory = 256
-  vpc_id = module.network.vpc_id
+  vpc_id      = module.network.vpc_id
 
   service_name             = "oonirun"
   default_docker_image_url = "ooni/api-oonirun:latest"
@@ -1074,7 +1074,7 @@ module "ooniapi_ooniauth" {
   # first_run = true
 
   task_memory = 256
-  vpc_id = module.network.vpc_id
+  vpc_id      = module.network.vpc_id
 
   service_name             = "ooniauth"
   default_docker_image_url = "ooni/api-ooniauth:latest"
