@@ -33,7 +33,7 @@ clickhouse_version: 24.8.6.70
 clickhouse_config:
   max_connections: 4096
   keep_alive_timeout: 3
-  max_concurrent_queries: 100
+  max_concurrent_queries: 300
   max_server_memory_usage: 0
   max_thread_pool_size: 10000
   max_server_memory_usage_to_ram_ratio: 0.9
@@ -173,7 +173,6 @@ clickhouse_default_profiles:
   write:
     readonly: 0
     max_memory_usage: 61001001000
-    max_concurrent_queries: 200
 
 clickhouse_listen_hosts:
   - "::"
