@@ -1,0 +1,13 @@
+[Unit]
+Description=Prometheus YACE Exporter
+After=network.target
+
+[Service]
+Type=simple
+User=yace
+Group=yace
+ExecStart={{ yace_bin_path }} --config.file={{ yace_config_path }} --listen-address={{ yace_listen_address }} --log.format={{ yace_log_format }} {{ yace_extra_flags }}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

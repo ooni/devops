@@ -1,0 +1,43 @@
+apiVersion: v1alpha1
+sts-region: eu-central-1
+discovery:
+  jobs:
+    - type: AWS/ECS
+      regions:
+        - eu-central-1
+      period: 60
+      length: 300
+      searchTags:
+        - key: Environment
+          value: "{{ env }}"
+      metrics:
+        - name: CPUUtilization
+          statistics:
+            - Average
+        - name: MemoryUtilization
+          statistics:
+            - Average
+    - type: ECS/ContainerInsights
+      regions:
+        - eu-central-1
+      period: 60
+      length: 300
+      searchTags:
+        - key: Environment
+          value: "{{ env }}"
+      metrics:
+        - name: RunningTaskCount
+          statistics:
+            - Average
+            - Minimum
+            - Maximum
+        - name: DesiredTaskCount
+          statistics:
+            - Average
+            - Minimum
+            - Maximum
+        - name: PendingTaskCount
+          statistics:
+            - Average
+            - Minimum
+            - Maximum

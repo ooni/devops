@@ -560,6 +560,65 @@ resource "aws_route53_record" "clickhouse_proxy_alias" {
 }
 
 #### Monitoring Proxy
+
+# IAM role for the cloudwatch exporter.
+# https://github.com/prometheus-community/yet-another-cloudwatch-exporter#authentication
+resource "aws_iam_role" "monitoring_proxy_yace" {
+  name = "monitoring-proxy-yace"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+
+  tags = merge(local.tags, { Name = "monitoring-proxy-yace" })
+}
+
+resource "aws_iam_role_policy" "monitoring_proxy_yace" {
+  name = "yace-cloudwatch-read"
+  role = aws_iam_role.monitoring_proxy_yace.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "tag:GetResources",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListMetrics",
+          "apigateway:GET",
+          "aps:ListWorkspaces",
+          "autoscaling:DescribeAutoScalingGroups",
+          "dms:DescribeReplicationInstances",
+          "dms:DescribeReplicationTasks",
+          "ec2:DescribeTransitGatewayAttachments",
+          "ec2:DescribeSpotFleetRequests",
+          "shield:ListProtections",
+          "storagegateway:ListGateways",
+          "storagegateway:ListTagsForResource",
+          "iam:ListAccountAliases",
+        ]
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_instance_profile" "monitoring_proxy_yace" {
+  name = "${local.name}-monitoring-proxy-yace"
+  role = aws_iam_role.monitoring_proxy_yace.name
+
+  tags = merge(local.tags, { Name = "${local.name}-monitoring-proxy-yace" })
+}
+
 module "ooni_monitoring_proxy" {
   source = "../../modules/ec2"
 
@@ -590,6 +649,12 @@ module "ooni_monitoring_proxy" {
     to_port     = 9200,
     protocol    = "tcp"
     cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
+    }, {
+    // To query the cloudwatch exporter
+    from_port   = 5000,
+    to_port     = 5000,
+    protocol    = "tcp"
+    cidr_blocks = [for ip in flatten(data.dns_a_record_set.monitoring_host.*.addrs) : "${tostring(ip)}/32"]
   }]
 
   egress_rules = [{
@@ -606,6 +671,8 @@ module "ooni_monitoring_proxy" {
 
   sg_prefix = "oomnprx"
   tg_prefix = "mnpr"
+
+  iam_instance_profile_name = aws_iam_instance_profile.monitoring_proxy_yace.name
 
   tags = merge(
     local.tags,
