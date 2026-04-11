@@ -17,6 +17,8 @@ nftables_clickhouse_allow:
     ip: "{{ lookup('dig', 'clickhouseproxy.dev.ooni.io/A') }}"
   - fqdn: clickhouseproxy.prod.ooni.io
     ip: "{{ lookup('dig', 'clickhouseproxy.prod.ooni.io/A') }}"
+  - fqdn: fastpath.prod.ooni.io
+    ip: "{{ lookup('dig', 'fastpath.prod.ooni.io/A') }}"
 
 nftables_zookeeper_allow:
   - fqdn: data1.htz-fsn.prod.ooni.nu
