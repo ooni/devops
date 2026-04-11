@@ -511,6 +511,8 @@ module "ooni_clickhouse_proxy" {
       module.network.vpc_subnet_private[*].cidr_block,
       ["${module.ooni_fastpath.aws_instance_private_ip}/32",
       "${module.ooni_fastpath.aws_instance_public_ip}/32"],
+      ["${module.ooni_fastpath2.aws_instance_private_ip}/32",
+      "${module.ooni_fastpath2.aws_instance_public_ip}/32"],
       ["${module.ooniapi_testlists.aws_instance_private_ip}/32",
       "${module.ooniapi_testlists.aws_instance_public_ip}/32"],
     ),
@@ -985,6 +987,75 @@ module "ooni_fastpath" {
   )
 }
 
+module "ooni_fastpath2" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "c6i.large"
+
+  name = "oonifastpath2"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 8472,
+    to_port     = 8472,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 8479,
+    to_port     = 8479,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 8475, # for serving jsonl files
+    to_port     = 8475,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    }, {
+    from_port   = 9102, # For fastpath metrics
+    to_port     = 9102,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32", "${module.ooni_monitoring_proxy.aws_instance_public_ip}/32"]
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "oonifstp2"
+  tg_prefix = "fp2"
+
+  disk_size = 150
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-fastpath2" }
+  )
+}
+
 resource "aws_route53_record" "fastpath_alias" {
   zone_id = local.dns_zone_ooni_io
   name    = "fastpath.${local.environment}.ooni.io"
@@ -993,6 +1064,17 @@ resource "aws_route53_record" "fastpath_alias" {
 
   records = [
     module.ooni_fastpath.aws_instance_public_dns
+  ]
+}
+
+resource "aws_route53_record" "fastpath2_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "fastpath2.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_fastpath2.aws_instance_public_dns
   ]
 }
 
@@ -1237,7 +1319,7 @@ module "ooniapi_oonimeasurements" {
   task_environment = {
     # it has to be a json-compliant array
     OTHER_COLLECTORS = jsonencode([
-      "http://fastpath.${local.environment}.ooni.io:8475",
+      "http://fastpath2.${local.environment}.ooni.io:8475",
       "https://backend-fsn.ooni.org"
     ])
     BASE_URL                        = "https://api.ooni.io"

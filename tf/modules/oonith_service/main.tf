@@ -149,7 +149,7 @@ resource "aws_alb_target_group" "oonith_service_direct" {
   tags = var.tags
 }
 
-# TODO(DecFox): Uncomment after we have evaluated how we want to direct 
+# TODO(DecFox): Uncomment after we have evaluated how we want to direct
 # traffic from th.{var.stage}.ooni.io to a specific target group
 
 # The mapped target group is used for mapping it in the main TH load balancer

@@ -158,6 +158,14 @@
     network_mode: host
     # published_ports: # unused on network_mode: host
     #   - "8472:8472"
+    # Image CMD: python /home/fastpath/app/run_fastpath --write-to-disk
+    command:
+      - python
+      - /home/fastpath/app/run_fastpath
+      - --write-to-disk
+      - --debug
+    env:
+      FASTPATH_QUEUE_PUT_TIMEOUT: "0"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
