@@ -183,6 +183,24 @@ clickhouse_default_profiles:
 clickhouse_listen_hosts:
   - "::"
 
+# Users examples
+clickhouse_admin_user: admin
+clickhouse_admin_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_admin_password', profile='oonidevops_user_prod') }}"
+
+clickhouse_admin_users:
+  - user:
+    name: "{{ clickhouse_admin_user }}"
+    password_sha256_hex: "{{ clickhouse_admin_password | hash('sha256') }}"
+    networks:
+      - "127.0.0.1"
+      - "::1"
+    profile: "default"
+    quota: "default"
+    access_management: 1
+    named_collection_control: 1
+    show_named_collections: 1
+    show_named_collections_secrets: 1
+
 clickhouse_default_users:
   - user:
     name: default
