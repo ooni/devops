@@ -231,7 +231,7 @@ clickhouse_custom_users:
   - user:
     name: oonimeasurements
     password_type: sha256_password
-    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') }}"
     networks:
       - "IP '0.0.0.0/0'"
     settings:
