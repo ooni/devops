@@ -507,6 +507,7 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_1" {
         "/api/v1/measurements/*",
         "/api/v1/raw_measurement",
         "/api/v1/measurement_meta",
+        "/api/v1/measurements",
         "/api/v1/torsf_stats"
       ]
     }
@@ -520,21 +521,10 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
   listener_arn = aws_alb_listener.ooniapi_listener_https.arn
   priority     = 142
 
-  #action {
-  #  type             = "forward"
-  #  target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
-  #}
-
   action {
-    type = "fixed-response"
-
-    fixed_response {
-      content_type = "text/plain"
-      message_body = "we are experiencing heavy load. afk for the weekend. brb."
-      status_code  = "566"
-    }
+    type             = "forward"
+    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
   }
-
 
   condition {
     path_pattern {
@@ -543,7 +533,6 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
         "/api/v1/aggregation/*",
         "/api/v1/observations",
         "/api/v1/analysis",
-        "/api/v1/measurements"
       ]
     }
   }
