@@ -244,6 +244,7 @@ clickhouse_custom_users:
     quota: "oonimeasurements"
     databases: [ooni]
 
+clickhouse_role_manage_grants: true
 clickhouse_custom_grants:
 - on:
   databases: [ooni]
