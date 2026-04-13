@@ -244,7 +244,8 @@ clickhouse_custom_users:
     quota: "oonimeasurements"
     databases: [ooni]
 
-clickhouse_role_manage_quotas: true
+# TODO: this quota was created by hand since it wasn't working in the idealista playbook
+clickhouse_role_manage_quotas: false
 clickhouse_custom_quotas:
   # quota over a 10 minute window
   - quota:
@@ -255,12 +256,21 @@ clickhouse_custom_quotas:
       - oonimeasurements
 
 clickhouse_role_manage_grants: true
+clickhouse_role_manage_roles: true
 clickhouse_custom_grants:
 - on:
   databases: [ooni]
   tables: ["*"]
   privileges: [SELECT]
   to: [oonimeasurements]
+
+clickhouse_custom_grant_roles:
+  - roles: [oonimeasurements]
+    to: [oonimeasurements]
+
+clickhouse_custom_roles:
+  - role:
+    name: oonimeasurements
 
 clickhouse_default_quotas:
   - quota:
