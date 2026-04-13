@@ -231,7 +231,7 @@ clickhouse_custom_users:
     password_type: sha256_password
     password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') | hash('sha256') }}"
     networks:
-      - "0.0.0.0/0"
+      - "IP '0.0.0.0/0'"
     settings:
       # 500 MB
       - "max_memory_usage = 501001000"
