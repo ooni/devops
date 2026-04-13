@@ -206,6 +206,7 @@ clickhouse_default_users:
     profile: write
     quota: default
 
+clickhouse_role_manage_users: true
 clickhouse_custom_users:
   - user:
     name: oonimeasurements
