@@ -142,6 +142,9 @@ clickhouse_release_type: stable
 clickhouse_listen_hosts:
   - "127.0.0.1"
 
+# this only applies to SQL managed users
+clickhouse_role_manage_users: false
+# these are handled via config files
 clickhouse_default_users:
   - user:
     name: default
