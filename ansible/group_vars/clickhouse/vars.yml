@@ -179,6 +179,8 @@ clickhouse_default_profiles:
   write:
     readonly: 0
     max_memory_usage: 61001001000
+  admin:
+    readonly: 0
 
 clickhouse_listen_hosts:
   - "::"
@@ -194,7 +196,7 @@ clickhouse_admin_users:
     networks:
       - "127.0.0.1"
       - "::1"
-    profile: "default"
+    profile: admin
     quota: "default"
     access_management: 1
     named_collection_control: 1
