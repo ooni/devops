@@ -238,7 +238,7 @@ clickhouse_custom_users:
       # 500 MB
       - "max_memory_usage = 501001000"
       # 60 seconds
-      - "max_execution_time = 60"
+      - "max_execution_time = 30"
     profile:
       - readonly
     quota: "oonimeasurements"
