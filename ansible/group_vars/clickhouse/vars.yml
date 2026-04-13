@@ -221,7 +221,7 @@ clickhouse_custom_users:
     profile:
       - readonly
     quota: "oonimeasurements"
-    databases: [ProjectD]
+    databases: [ooni]
 
 
 clickhouse_default_quotas:
