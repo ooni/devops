@@ -244,6 +244,12 @@ clickhouse_custom_users:
     quota: "oonimeasurements"
     databases: [ooni]
 
+clickhouse_custom_grants:
+- on:
+  databases: [ooni]
+  tables: ["*"]
+  privileges: [SELECT]
+  to: [oonimeasurements]
 
 clickhouse_default_quotas:
   - quota:
