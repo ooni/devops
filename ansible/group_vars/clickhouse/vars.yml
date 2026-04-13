@@ -250,9 +250,9 @@ clickhouse_custom_quotas:
   - quota:
     name: oonimeasurements
     settings:
-      - "INTERVAL 10 minute MAX queries 12000"
-      - "INTERVAL 1 minute MAX errors 10"
-      - "INTERVAL 10 minute MAX execution_time 1000"
+      - "INTERVAL 10 minute MAX queries = 12000"
+      - "INTERVAL 1 minute MAX errors = 10"
+      - "INTERVAL 10 minute MAX execution_time = 1000"
     to:
       - oonimeasurements
 
