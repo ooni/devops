@@ -174,6 +174,8 @@ clickhouse_default_profiles:
     max_partitions_per_insert_block: 100
   readonly:
     readonly: 1
+    # 1 GB
+    max_memory_usage: 1001001000
   write:
     readonly: 0
     max_memory_usage: 61001001000
@@ -204,6 +206,24 @@ clickhouse_default_users:
     profile: write
     quota: default
 
+clickhouse_custom_users:
+  - user:
+    name: oonimeasurements
+    password_type: sha256_password
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "0.0.0.0/0"
+    settings:
+      # 500 MB
+      - "max_memory_usage = 501001000"
+      # 60 seconds
+      - "max_execution_time = 60"
+    profile:
+      - readonly
+    quota: "oonimeasurements"
+    databases: [ProjectD]
+
+
 clickhouse_default_quotas:
   - quota:
     name: default
@@ -213,6 +233,16 @@ clickhouse_default_quotas:
     result_rows: 0
     read_rows: 0
     execution_time: 0
+  # quota over a 10 minute window
+  - quota:
+    name: oonimeasurements
+    duration: 600
+    # 20 queries per second
+    queries: 12000
+    errors: 10
+    result_rows: 0
+    read_rows: 0
+    execution_time: 1000
 
 clickhouse_prometheus:
   endpoint: "/metrics"
