@@ -234,8 +234,14 @@ ENGINE = ReplicatedReplacingMergeTree (
 ORDER BY (ts, type, probe_cc, probe_asn, uid);
 
 -- Anonymous Credentials fields
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `is_verified` Int8;
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `nym` Nullable(String);
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `zkp_request` Nullable(String);
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `age_range` Nullable(String);
-ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `msm_range` Nullable(String);
+ALTER TABLE ooni.fastpath ADD COLUMN IF NOT EXISTS `is_verified` Int8;
+ALTER TABLE ooni.fastpath ADD COLUMN IF NOT EXISTS `nym` Nullable(String);
+ALTER TABLE ooni.fastpath ADD COLUMN IF NOT EXISTS `zkp_request` Nullable(String);
+ALTER TABLE ooni.fastpath ADD COLUMN IF NOT EXISTS `age_range` Nullable(String);
+ALTER TABLE ooni.fastpath ADD COLUMN IF NOT EXISTS `msm_range` Nullable(String);
+
+ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `nym`;
+ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `zkp_request`;
+ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `age_range`;
+ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `msm_range`;
+ALTER TABLE ooni.fastpath MODIFY COLUMN `is_verified` LowCardinality(String) DEFAULT 'u';
