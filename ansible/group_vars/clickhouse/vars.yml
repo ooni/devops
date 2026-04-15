@@ -174,12 +174,34 @@ clickhouse_default_profiles:
     max_partitions_per_insert_block: 100
   readonly:
     readonly: 1
+    # 1 GB
+    max_memory_usage: 1001001000
   write:
     readonly: 0
     max_memory_usage: 61001001000
+  admin:
+    readonly: 0
 
 clickhouse_listen_hosts:
   - "::"
+
+# Users examples
+clickhouse_admin_user: admin
+clickhouse_admin_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_admin_password', profile='oonidevops_user_prod') }}"
+
+clickhouse_admin_users:
+  - user:
+    name: "{{ clickhouse_admin_user }}"
+    password_sha256_hex: "{{ clickhouse_admin_password | hash('sha256') }}"
+    networks:
+      - "127.0.0.1"
+      - "::1"
+    profile: admin
+    quota: "default"
+    access_management: 1
+    named_collection_control: 1
+    show_named_collections: 1
+    show_named_collections_secrets: 1
 
 clickhouse_default_users:
   - user:
@@ -203,6 +225,52 @@ clickhouse_default_users:
       - "0.0.0.0/0"
     profile: write
     quota: default
+
+clickhouse_role_manage_users: true
+clickhouse_custom_users:
+  - user:
+    name: oonimeasurements
+    password_type: sha256_password
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    settings:
+      # 500 MB
+      - "max_memory_usage = 501001000"
+      # 60 seconds
+      - "max_execution_time = 30"
+    profile:
+      - readonly
+    quota: "oonimeasurements"
+    databases: [ooni]
+
+# TODO: this quota was created by hand since it wasn't working in the idealista playbook
+clickhouse_role_manage_quotas: false
+clickhouse_custom_quotas:
+  # quota over a 10 minute window
+  - quota:
+    name: oonimeasurements
+    settings:
+      - "INTERVAL 10 minute MAX queries = 12000, MAX errors = 1000, MAX execution_time = 1000"
+    to:
+      - oonimeasurements
+
+clickhouse_role_manage_grants: true
+clickhouse_role_manage_roles: true
+clickhouse_custom_grants:
+- on:
+  databases: [ooni]
+  tables: ["*"]
+  privileges: [SELECT]
+  to: [oonimeasurements]
+
+clickhouse_custom_grant_roles:
+  - roles: [oonimeasurements]
+    to: [oonimeasurements]
+
+clickhouse_custom_roles:
+  - role:
+    name: oonimeasurements
 
 clickhouse_default_quotas:
   - quota:
