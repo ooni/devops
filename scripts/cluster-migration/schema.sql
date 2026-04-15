@@ -240,8 +240,8 @@ ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `zkp_request` Nullable(Str
 ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `age_range` Nullable(String);
 ALTER TABLE default.fastpath ADD COLUMN IF NOT EXISTS `msm_range` Nullable(String);
 
-ALTER TABLE default.fastpath DROP COLUMN IF EXISTS `nym`;
-ALTER TABLE default.fastpath DROP COLUMN IF EXISTS `zkp_request`;
-ALTER TABLE default.fastpath DROP COLUMN IF EXISTS `age_range`;
-ALTER TABLE default.fastpath DROP COLUMN IF EXISTS `msm_range`;
-ALTER TABLE default.fastpath MODIFY COLUMN `is_verified` LowCardinality(String) DEFAULT 'u';
+ALTER TABLE default.fastpath DROP COLUMN IF EXISTS `nym` ON CLUSTER oonidata_cluster;
+ALTER TABLE default.fastpath DROP COLUMN IF EXISTS `zkp_request` ON CLUSTER oonidata_cluster;
+ALTER TABLE default.fastpath DROP COLUMN IF EXISTS `age_range` ON CLUSTER oonidata_cluster;
+ALTER TABLE default.fastpath DROP COLUMN IF EXISTS `msm_range` ON CLUSTER oonidata_cluster;
+ALTER TABLE default.fastpath MODIFY COLUMN `is_verified` LowCardinality(String) DEFAULT 'u' ON CLUSTER oonidata_cluster;
