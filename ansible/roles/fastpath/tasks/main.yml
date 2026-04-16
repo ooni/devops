@@ -164,6 +164,8 @@
       - /home/fastpath/app/run_fastpath
       - --write-to-disk
       - --debug
+    env:
+      FASTPATH_QUEUE_PUT_TIMEOUT: "-1"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
