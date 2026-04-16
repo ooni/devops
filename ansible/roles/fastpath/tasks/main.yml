@@ -163,7 +163,6 @@
       - python
       - /home/fastpath/app/run_fastpath
       - --write-to-disk
-      - --debug
     env:
       FASTPATH_QUEUE_PUT_TIMEOUT: "-1"
     volumes:
