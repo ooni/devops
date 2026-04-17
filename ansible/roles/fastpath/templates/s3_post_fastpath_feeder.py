@@ -4,13 +4,14 @@ List objects in an S3 bucket using boto3.
 Configuration is read from environment variables (see defaults below).
 """
 
-import os
+import argparse
 import boto3
-import json
+import os
 import requests
+
+from pathlib import Path
 from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 
 # Configuration from environment (set these in your shell)
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")           # required if not using IAM role/profile
@@ -21,9 +22,12 @@ ROLE_DURATION_SECONDS = int(os.getenv("ROLE_DURATION_SECONDS", "3600"))  # optio
 AWS_REGION = os.getenv("AWS_REGION", "eu-central-1")
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME")                    # required
 PREFIX = os.getenv("S3_PREFIX", "")
-MAX_KEYS = int(os.getenv("S3_MAX_KEYS", "1000"))
-DEST_ROOT = os.getenv("DOWNLOAD_ROOT", "./s3-downloads")
 FASTPATH_API = os.getenv("FASTPATH_API", "")
+NUM_WORKERS = int(os.getenv("NUM_WORKERS", "4"))
+
+parser = argparse.ArgumentParser(description="List/process S3 objects")
+parser.add_argument("--dry-run", action="store_true", help="List objects and print POSTs without downloading or sending them")
+args = parser.parse_args()
 
 def assume_role_and_get_credentials(role_arn, session_name, duration_seconds=3600):
     """
@@ -71,7 +75,7 @@ def get_s3_client():
                 client_kwargs["aws_session_token"] = AWS_SESSION_TOKEN
     return boto3.client("s3", **client_kwargs)
 
-def walk(s3, bucket_name, start_prefix=''):
+def walk(s3, client, bucket_name, start_prefix=''):
     """
     Generator like os.walk:
     yields (prefix, subprefixes, objects)
@@ -92,42 +96,29 @@ def walk(s3, bucket_name, start_prefix=''):
             objects.append(key)
     yield start_prefix, subprefixes, objects
     for sub in subprefixes:
-        yield from walk(s3, bucket_name, sub)
+        yield from walk(s3, client, bucket_name, sub)
 
-def safe_local_path(prefix, key):
-    # turn S3 key into a local path under DEST_ROOT preserving prefix structure
-    rel = key[len(prefix):] if prefix and key.startswith(prefix) else key
-    return os.path.join(DEST_ROOT, prefix.replace('/', os.sep), rel.replace('/', os.sep))
-
-def ensure_parent(path):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-
-def process_postcan(s3, bucket, key, local_path):
+def process_postcan(s3, client, bucket, key):
     try:
-        print("Downloading", key)
-        s3.download_file(bucket, key, local_path)
-        p = Path(local_path)
+        p = Path(key)
         msmt_id = p.stem
-        with p.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-            assert data['format'] == 'json'
-            content = data.get('content')
-            endpoint = f"{FASTPATH_API}/{msmt_id}"
-            try:
-                resp = requests.post(endpoint, json=content, timeout=30)
-                resp.raise_for_status()
-            except requests.RequestException:
-                raise
-            assert resp.status_code == 200
-            assert resp.content == b""
+        print(f"msmt_id: {p.stem}")
+        endpoint = f"{FASTPATH_API}/{msmt_id}"
+
+        if args.dry_run:
+            print(f"DRY RUN: s3://{bucket}/{key} -> {endpoint}")
+            return key, None
+
+        print(f"SEND: s3://{bucket}/{key} -> {endpoint}")
+        resp_obj = s3.get_object(Bucket=bucket, Key=key)
+        body = resp_obj["Body"]
+        headers = {"Content-Type": "application/octet-stream"}
+        r = client.post(endpoint, data=body.iter_chunks(chunk_size=16 * 1024), headers=headers, timeout=60)
+        with r:
+            r.raise_for_status()
         # XXX: remove file from s3 if everything went OK
         return key, None
     except Exception as e:
-        try:
-            if os.path.exists(local_path):
-                os.remove(local_path)
-        except Exception as remove_err:
-            return key, f"remove-failed: {remove_err}; download-failed: {e}"
         return key, str(e)
 
 def main():
@@ -135,21 +126,19 @@ def main():
         print("S3_BUCKET_NAME environment variable is required.")
         return
     s3 = get_s3_client()
-    for prefix, subs, objs in walk(s3, BUCKET_NAME, ""):
-        print(f"PREFIX: {prefix}  subdirs={len(subs)} objects={len(objs)}")
-        with ThreadPoolExecutor(max_workers=50) as _exe:
-            futures = []
-            for key in objs:
-                local_path = safe_local_path(prefix, key)
-                ensure_parent(local_path)
-                futures.append(_exe.submit(process_postcan, s3, BUCKET_NAME, key, local_path))
-        
-            for fut in as_completed(futures):
-                key, err = fut.result()
-                if err:
-                    print(f"Failed to process {key}: {err}")
-                else:
-                    print(f"Submitted {key} to fastpath")
+    with requests.Session() as client:
+        for prefix, subs, objs in walk(s3, client, BUCKET_NAME, ""):
+            print(f"PREFIX: {prefix}  subdirs={len(subs)} objects={len(objs)}")
+            with ThreadPoolExecutor(max_workers=NUM_WORKERS) as _exe:
+                futures = []
+                for key in objs:
+                    futures.append(_exe.submit(process_postcan, s3, client, BUCKET_NAME, key))
+                for fut in as_completed(futures):
+                    key, err = fut.result()
+                    if err:
+                        print(f"Failed to process {key}: {err}")
+                    else:
+                        print(f"Submitted {key} to fastpath")
             
 if __name__ == "__main__":
     main()
