@@ -11,7 +11,6 @@ import requests
 
 from pathlib import Path
 from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configuration from environment (set these in your shell)
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")           # required if not using IAM role/profile
@@ -23,7 +22,6 @@ AWS_REGION = os.getenv("AWS_REGION", "eu-central-1")
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME")                    # required
 PREFIX = os.getenv("S3_PREFIX", "")
 FASTPATH_API = os.getenv("FASTPATH_API", "")
-NUM_WORKERS = int(os.getenv("NUM_WORKERS", "4"))
 
 parser = argparse.ArgumentParser(description="List/process S3 objects")
 parser.add_argument("--dry-run", action="store_true", help="List objects and print POSTs without downloading or sending them")
@@ -71,8 +69,6 @@ def get_s3_client():
                 "aws_access_key_id": AWS_ACCESS_KEY_ID,
                 "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
             })
-            if AWS_SESSION_TOKEN:
-                client_kwargs["aws_session_token"] = AWS_SESSION_TOKEN
     return boto3.client("s3", **client_kwargs)
 
 def walk(s3, client, bucket_name, start_prefix=''):
@@ -129,16 +125,12 @@ def main():
     with requests.Session() as client:
         for prefix, subs, objs in walk(s3, client, BUCKET_NAME, ""):
             print(f"PREFIX: {prefix}  subdirs={len(subs)} objects={len(objs)}")
-            with ThreadPoolExecutor(max_workers=NUM_WORKERS) as _exe:
-                futures = []
-                for key in objs:
-                    futures.append(_exe.submit(process_postcan, s3, client, BUCKET_NAME, key))
-                for fut in as_completed(futures):
-                    key, err = fut.result()
-                    if err:
-                        print(f"Failed to process {key}: {err}")
-                    else:
-                        print(f"Submitted {key} to fastpath")
+            for key in objs:
+                key, err = process_postcan(s3, client, BUCKET_NAME, key)
+                if err:
+                    print(f"Failed to process {key}: {err}")
+                else:
+                    print(f"Submitted {key} to fastpath")
             
 if __name__ == "__main__":
     main()
