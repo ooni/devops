@@ -245,8 +245,8 @@ clickhouse_custom_users:
       - "max_rows_to_read = 5001001000"
       # 5s
       - "timeout_before_checking_execution_speed = 5"
-      # 10 M
-      - "max_result_rows = 11001000"
+      # 50k
+      - "max_result_rows = 51000"
     profile:
       - readonly
     quota: "oonimeasurements"
