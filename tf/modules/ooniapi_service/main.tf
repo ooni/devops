@@ -140,6 +140,17 @@ resource "aws_alb_target_group" "ooniapi_service" {
   vpc_id      = var.vpc_id
   target_type = "instance"
 
+  health_check {
+    enabled             = true
+    path                = "/health"
+    matcher             = "200"
+    protocol            = "HTTP"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 30
+  }
+
   lifecycle {
     create_before_destroy = true
   }
