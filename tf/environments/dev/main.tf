@@ -630,7 +630,7 @@ module "ooniapi_reverseproxy_deployer" {
 
   service_name            = "reverseproxy"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "1183-fix-smoketest"
   environment             = local.environment
   trigger_path            = "ooniapi/services/reverseproxy/**"
   buildspec_path          = "ooniapi/services/reverseproxy/buildspec.yml"
@@ -972,7 +972,7 @@ module "fastpath_builder" {
 
   service_name            = "fastpath"
   repo                    = "ooni/backend"
-  branch_name             = "fix-fastpath"
+  branch_name             = "1183-fix-smoketest"
   environment             = local.environment
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
@@ -990,7 +990,7 @@ module "ooniapi_oonirun_deployer" {
 
   service_name            = "oonirun"
   repo                    = "ooni/backend"
-  branch_name             = "oonirun-v2-1"
+  branch_name             = "1183-fix-smoketest"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
   trigger_path            = "ooniapi/services/oonirun/**"
@@ -1041,7 +1041,7 @@ module "ooniapi_oonifindings_deployer" {
 
   service_name            = "oonifindings"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "1183-fix-smoketest"
   environment             = local.environment
   trigger_path            = "ooniapi/services/oonifindings/**"
   buildspec_path          = "ooniapi/services/oonifindings/buildspec.yml"
@@ -1092,7 +1092,7 @@ module "ooniapi_ooniauth_deployer" {
 
   service_name            = "ooniauth"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "1183-fix-smoketest"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/ooniauth/buildspec.yml"
   trigger_path            = "ooniapi/services/ooniauth/**"
@@ -1161,7 +1161,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "1183-fix-smoketest"
   environment             = local.environment
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
@@ -1306,7 +1306,7 @@ module "testlists_builder" {
 
   service_name            = "testlists"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "1183-fix-smoketest"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
   trigger_path            = "ooniapi/services/testlists/**"
