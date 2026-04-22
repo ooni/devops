@@ -1057,6 +1057,24 @@ mdadm --grow --raid-devices=4 /dev/md3
 /dev/md3        2.6T  1.2T  1.3T  48% /
 ```
 
+## Pitfalls to avoid when changing hardware configurations
+
+When a NVME (PCIe) drive is added it is possible for the PCI bus ID of the network interface to change, which affects the device name of the network interface. If this happens and the system isn't reachable, you can boot a rescue shell and obtain the new network interface name (# ip a) and edit the /etc/network/interfaces file to use the correct name.
+
+systemd can also set network names based on MAC address, which will avoid this pitfall.
+
+```
+Use interface names based on MAC address by writing a udev .link file:
+
+    Create /etc/systemd/network/10-nic.link with:
+
+    [Match]
+    MACAddress=<your-mac>
+
+    [Link]
+    Name=eth0
+```
+
 ## Replicating MergeTree tables
 
 Notes on how to go about converting a MergeTree family table to a replicated table, while minimizing downtime.
