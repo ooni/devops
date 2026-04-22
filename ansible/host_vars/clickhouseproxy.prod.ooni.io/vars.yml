@@ -1,2 +1,1 @@
-# clickhouse_url: "clickhouse1.prod.ooni.io"
-clickhouse_url: "clickhouse3.prod.ooni.io"
+clickhouse_url: "clickhouse1.prod.ooni.io"
