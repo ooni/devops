@@ -1,6 +1,7 @@
 variable "name" {
-  description = "Short name used for the instance and DNS record (e.g. 'fastpath' or 'fastpath2')"
+  description = "Short name used for the instance and DNS record"
   type        = string
+  default = "fastpath"
 }
 
 variable "env" {
