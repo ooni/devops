@@ -1095,8 +1095,6 @@ module "fastpath_builder" {
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
-
-  ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
 
@@ -1441,8 +1439,6 @@ module "testlists_builder" {
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
-
-  ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
 #### OONI Tier0 API Frontend
