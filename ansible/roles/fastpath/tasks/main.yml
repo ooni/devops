@@ -149,7 +149,7 @@
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
-    image: ooni/fastpath:v0.90
+    image: ooni/fastpath:20260416-37f9e89c
     state: started
     restart_policy: always
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
@@ -163,9 +163,9 @@
       - python
       - /home/fastpath/app/run_fastpath
       - --write-to-disk
-      - --debug
     env:
-      FASTPATH_QUEUE_PUT_TIMEOUT: "0"
+      FASTPATH_QUEUE_PUT_TIMEOUT: "-1"
+      FASTPATH_NUM_WORKERS: "2"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
