@@ -15,8 +15,10 @@ locals {
     Repository  = "https://github.com/ooni/devops"
   }
 
-  # Hostnames of the fastpath collectors used by the OONI backend services.
-  fastpath_hosts = ["fastpath.${local.environment}.ooni.io"]
+  # Private IPs of fastpath hosts currently active.
+  fastpath_hosts = [
+    module.ooni_fastpath.aws_instance_private_ip
+  ]
 }
 
 ## AWS Setup
