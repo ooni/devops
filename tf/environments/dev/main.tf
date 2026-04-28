@@ -14,6 +14,11 @@ locals {
     Environment = local.environment
     Repository  = "https://github.com/ooni/devops"
   }
+
+  # Private IPs of fastpath hosts currently active.
+  fastpath_hosts = [
+    module.ooni_fastpath.aws_instance_private_ip
+  ]
 }
 
 ## AWS Setup
@@ -593,6 +598,7 @@ module "ooniapi_ooniprobe" {
 
   task_environment = {
     FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
+    FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 3 # use a different one in prod
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
@@ -1145,7 +1151,7 @@ module "ooniapi_oonimeasurements" {
 
   task_environment = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS                = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
+    OTHER_COLLECTORS                = jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"])
     BASE_URL                        = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
     VALKEY_URL                      = local.ooniapi_valkey_url
