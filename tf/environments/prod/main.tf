@@ -22,8 +22,8 @@ locals {
 
   # Private IPs of fastpath hosts currently active.
   fastpath_hosts = [
+    module.ooni_fastpath.aws_instance_private_ip,
     module.ooni_fastpath2.aws_instance_private_ip,
-    # module.ooni_fastpath.aws_instance_private_ip,
   ]
 }
 
