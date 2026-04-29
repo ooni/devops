@@ -235,8 +235,8 @@ clickhouse_custom_users:
     networks:
       - "IP '0.0.0.0/0'"
     settings:
-      # 500 MB
-      - "max_memory_usage = 501001000"
+      # 1 GB
+      - "max_memory_usage = 1001001000"
       # 60 seconds
       - "max_execution_time = 30"
     profile:
