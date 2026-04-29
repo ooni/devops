@@ -1,5 +1,9 @@
 - ansible.builtin.include_role:
     name: idealista.clickhouse_role
+  vars:
+    clickhouse_custom_profiles:
+      admin:
+        readonly: 0
   tags:
     - oonidata
     - clickhouse
