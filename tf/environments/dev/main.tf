@@ -14,6 +14,11 @@ locals {
     Environment = local.environment
     Repository  = "https://github.com/ooni/devops"
   }
+
+  # Private IPs of fastpath hosts currently active.
+  fastpath_hosts = [
+    module.ooni_fastpath.aws_instance_private_ip
+  ]
 }
 
 ## AWS Setup
@@ -554,7 +559,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "remove-report-id"
   environment             = local.environment
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
@@ -593,6 +598,7 @@ module "ooniapi_ooniprobe" {
 
   task_environment = {
     FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
+    FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 3 # use a different one in prod
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
@@ -892,78 +898,27 @@ resource "aws_route53_record" "monitoring_proxy_alias" {
 
 ### Fastpath
 module "ooni_fastpath" {
-  source = "../../modules/ec2"
+  source = "../../modules/ooni_fastpath"
 
-  stage = local.environment
+  name = "fastpath"
+  env  = local.environment
 
   vpc_id              = module.network.vpc_id
   subnet_id           = module.network.vpc_subnet_public[0].id
   private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  public_subnet_cidr  = module.network.vpc_subnet_public[*].cidr_block
   dns_zone_ooni_io    = local.dns_zone_ooni_io
 
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3a.small"
 
-  name = "oonifastpath"
-  ingress_rules = [{
-    from_port   = 22,
-    to_port     = 22,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 8472,
-    to_port     = 8472,
-    protocol    = "tcp",
-    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
-    }, {
-    from_port   = 8475, # for serving jsonl files
-    to_port     = 8475,
-    protocol    = "tcp",
-    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
-    }, {
-    from_port   = 9100,
-    to_port     = 9100,
-    protocol    = "tcp"
-    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
-    }, {
-    from_port   = 9102, # For fastpath metrics
-    to_port     = 9102,
-    protocol    = "tcp"
-    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
-  }]
-
-  egress_rules = [{
-    from_port   = 0,
-    to_port     = 0,
-    protocol    = "-1",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port        = 0,
-    to_port          = 0,
-    protocol         = "-1",
-    ipv6_cidr_blocks = ["::/0"],
-  }]
-
   sg_prefix = "oonifastpath"
   tg_prefix = "fstp"
 
-  disk_size = 150
+  monitoring_proxy_private_ip = module.ooni_monitoring_proxy.aws_instance_private_ip
+  monitoring_proxy_public_ip  = module.ooni_monitoring_proxy.aws_instance_public_ip
 
-  tags = merge(
-    local.tags,
-    { Name = "ooni-tier0-fastpath" }
-  )
-}
-
-resource "aws_route53_record" "fastpath_alias" {
-  zone_id = local.dns_zone_ooni_io
-  name    = "fastpath.${local.environment}.ooni.io"
-  type    = "CNAME"
-  ttl     = 300
-
-  records = [
-    module.ooni_fastpath.aws_instance_public_dns
-  ]
+  tags = local.tags
 }
 
 module "fastpath_builder" {
@@ -979,8 +934,6 @@ module "fastpath_builder" {
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
-
-  ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
 #### OONI Run service
@@ -1198,7 +1151,7 @@ module "ooniapi_oonimeasurements" {
 
   task_environment = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS                = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475", "https://backend-hel.ooni.org"])
+    OTHER_COLLECTORS                = jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"])
     BASE_URL                        = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
     VALKEY_URL                      = local.ooniapi_valkey_url
@@ -1313,8 +1266,6 @@ module "testlists_builder" {
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
-
-  ecs_cluster_name = module.ooniapi_cluster.cluster_name
 }
 
 #### OONI Tier0 API Frontend
