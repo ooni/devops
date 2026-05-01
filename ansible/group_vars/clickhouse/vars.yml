@@ -241,17 +241,6 @@ clickhouse_custom_users:
     databases: [ooni]
 
   - user:
-    name: oonifindings
-    password_type: sha256_hash
-    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonifindings_password', profile='oonidevops_user_prod') | hash('sha256') }}"
-    networks:
-      - "IP '0.0.0.0/0'"
-    profile:
-      - readonly
-    quota: "oonifindings"
-    databases: [ooni]
-
-  - user:
     name: oonimeasurements
     password_type: sha256_hash
     password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') | hash('sha256') }}"
@@ -310,16 +299,6 @@ clickhouse_custom_users:
 
 clickhouse_role_manage_quotas: True
 clickhouse_custom_quotas:
-  # quota over a 10 minute window
-  - quota:
-    name: oonifindings
-    duration: 600
-    queries: 12000
-    errors: 1000
-    result_rows: 0
-    read_rows: 0
-    execution_time: 1000
-
   - quota:
     name: oonimeasurements
     duration: 600
@@ -364,7 +343,7 @@ clickhouse_custom_grants:
   databases: [ooni]
   tables: ["*"]
   privileges: [SELECT]
-  to: [oonifindings, ooniprobe, oonimeasurements, oonirun, fastpath]
+  to: [ooniprobe, oonimeasurements, oonirun, fastpath]
 
 - on:
   databases: [ooni]
