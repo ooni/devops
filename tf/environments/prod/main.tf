@@ -239,16 +239,24 @@ data "aws_ssm_parameter" "oonipg_url" {
   name = "/oonidevops/secrets/ooni-tier0-postgres/postgresql_write_url"
 }
 
-data "aws_ssm_parameter" "clickhouse_readonly_url" {
-  name = "/oonidevops/secrets/clickhouse_readonly_url"
+data "aws_ssm_parameter" "clickhouse_oonifindings_url" {
+  name = "/oonidevops/secrets/clickhouse_oonifindings_url"
 }
 
 data "aws_ssm_parameter" "clickhouse_oonimeasurements_url" {
   name = "/oonidevops/secrets/clickhouse_oonimeasurements_url"
 }
 
-data "aws_ssm_parameter" "clickhouse_write_url" {
-  name = "/oonidevops/secrets/clickhouse_write_url"
+data "aws_ssm_parameter" "clickhouse_oonimeasurements_test_url" {
+  name = "/oonidevops/secrets/clickhouse_oonimeasurements_test_url"
+}
+
+data "aws_ssm_parameter" "clickhouse_ooniprobe_url" {
+  name = "/oonidevops/secrets/clickhouse_ooniprobe_url"
+}
+
+data "aws_ssm_parameter" "clickhouse_oonirun_url" {
+  name = "/oonidevops/secrets/clickhouse_oonirun_url"
 }
 
 data "aws_ssm_parameter" "account_id_hashing_key" {
@@ -890,7 +898,7 @@ module "ooniapi_ooniprobe" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_write_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_ooniprobe_url.arn
     ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
   }
 
@@ -1088,7 +1096,7 @@ module "ooniapi_oonirun" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonirun_url.arn
   }
 
   ooniapi_service_security_groups = [
@@ -1140,6 +1148,7 @@ module "ooniapi_oonifindings" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonifindings_url.arn
   }
 
   ooniapi_service_security_groups = [
