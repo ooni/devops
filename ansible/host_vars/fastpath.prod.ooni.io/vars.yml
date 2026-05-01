@@ -1,5 +1,5 @@
 s3_ooni_open_data_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/s3_ooni_open_data_access_key', profile='oonidevops_user_prod') }}"
-clickhouse_url: "clickhouse://write:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_write_password', profile='oonidevops_user_prod') }}@clickhouseproxy.prod.ooni.io/ooni"
+clickhouse_url: "clickhouse://fastpath:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_fastpath_password', profile='oonidevops_user_prod') }}@clickhouseproxy.prod.ooni.io/ooni"
 bucket_name: "ooni-data-eu-fra"
 # COLLECTOR ID SHOULD BE DIFFERENT BETWEEN EACH FASTPATH INSTANCE
 collector_id: "1"

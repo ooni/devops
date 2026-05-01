@@ -165,6 +165,7 @@ clickhouse_distributed_ddl:
   cleanup_delay_period: 60
   max_tasks_in_queue: 1000
 
+clickhouse_role_manage_settings_profiles: True
 clickhouse_default_profiles:
   default:
     readonly: 2
@@ -226,48 +227,147 @@ clickhouse_default_users:
     profile: write
     quota: default
 
-clickhouse_role_manage_users: true
+clickhouse_role_manage_users: True
 clickhouse_custom_users:
   - user:
+    name: fastpath
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_fastpath_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: "fastpath"
+    databases: [ooni]
+
+  - user:
     name: oonimeasurements
-    password_type: sha256_password
-    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') }}"
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') | hash('sha256') }}"
     networks:
       - "IP '0.0.0.0/0'"
     settings:
-      # 500 MB
-      - "max_memory_usage = 501001000"
+      # 1 GB
+      - "max_memory_usage = 1001001000"
       # 60 seconds
       - "max_execution_time = 30"
+      # 500 GB
+      - "max_bytes_to_read = 501001001000"
+      # 5 B
+      - "max_rows_to_read = 5001001000"
+      # 5s
+      - "timeout_before_checking_execution_speed = 5"
+      # 50k
+      - "max_result_rows = 51000"
     profile:
       - readonly
-    quota: "oonimeasurements"
+    quota: oonimeasurements
+    databases: [ooni, oonitest]
+
+  - user:
+    name: ooniprobe
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_ooniprobe_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: ooniprobe
     databases: [ooni]
 
-# TODO: this quota was created by hand since it wasn't working in the idealista playbook
-clickhouse_role_manage_quotas: false
+  - user:
+    name: oonirun
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonirun_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: oonirun
+    databases: [ooni]
+
+  - user:
+    name: oonitestlists
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonitestlists_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: oonitestlists
+    databases: [ooni]
+
+clickhouse_role_manage_quotas: True
 clickhouse_custom_quotas:
-  # quota over a 10 minute window
   - quota:
     name: oonimeasurements
-    settings:
-      - "INTERVAL 10 minute MAX queries = 12000, MAX errors = 1000, MAX execution_time = 1000"
-    to:
-      - oonimeasurements
+    duration: 600
+    queries: 12000
+    errors: 1000
+    result_rows: 0
+    read_rows: 0
+    execution_time: 1000
 
-clickhouse_role_manage_grants: true
-clickhouse_role_manage_roles: true
+    # no limits set
+  - quota:
+    name: ooniprobe
+    duration: 0
+    queries: 0
+    errors: 0
+    result_rows: 0
+    read_rows: 0
+    execution_time: 0
+
+    # no limits set
+  - quota:
+    name: oonirun
+    duration: 0
+    queries: 0
+    errors: 0
+    result_rows: 0
+    read_rows: 0
+    execution_time: 0
+
+  - quota:
+    name: oonitestlists
+    duration: 600
+    queries: 12000
+    errors: 1000
+    result_rows: 0
+    read_rows: 0
+    execution_time: 1000
+
+clickhouse_role_manage_grants: True
 clickhouse_custom_grants:
 - on:
   databases: [ooni]
   tables: ["*"]
   privileges: [SELECT]
-  to: [oonimeasurements]
+  to: [ooniprobe, oonimeasurements, oonirun, fastpath]
+
+- on:
+  databases: [ooni]
+  tables: [url_priorities]
+  privileges: [INSERT]
+  to: [oonitestlists]
+
+- on:
+  databases: [ooni]
+  tables: [faulty_measurements]
+  privileges: [INSERT]
+  to: [ooniprobe]
+
+- on:
+  databases: [ooni]
+  tables: [fastpath, obs_web, obs_openvpn, jsonl, new_jsonl]
+  privileges: [INSERT]
+  to: [fastpath]
 
 clickhouse_custom_grant_roles:
   - roles: [oonimeasurements]
     to: [oonimeasurements]
 
+clickhouse_role_manage_roles: True
 clickhouse_custom_roles:
   - role:
     name: oonimeasurements
