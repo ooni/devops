@@ -36,3 +36,5 @@
         rules: "{{ zk_nft_rule }}"
       - name: 9234
         rules: "{{ raft_nft_rule }}"
+  tags:
+     - nftables
