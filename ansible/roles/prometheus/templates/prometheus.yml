@@ -388,8 +388,8 @@ scrape_configs:
   - job_name: "testlists"
     static_configs:
     - targets:
-      - testlists.dev.ooni.io:9102
-      # - testlists.prod.ooni.io:9102
+      - testlist-ec2.dev.ooni.io:9102
+      - testlist-ec2.prod.ooni.io:9102
     scrape_interval: 5s
     scheme: https
     relabel_configs: # Change the host to the proxy host with relabeling
