@@ -91,6 +91,7 @@
 - name: Ensure testlists is running
   community.docker.docker_container:
     env:
+      PROMETHEUS_METRICS_PASSWORD: "{{ prometheus_metrics_password }}"
       CLICKHOUSE_URL: "{{ clickhouse_url }}"
       JWT_ENCRYPTION_KEY: "{{ jwt_encryption_key }}"
       WORKING_DIR: "/var/lib/ooniapi/testlists"
