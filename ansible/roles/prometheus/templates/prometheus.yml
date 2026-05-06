@@ -388,10 +388,10 @@ scrape_configs:
   - job_name: "testlists"
     static_configs:
     - targets:
-      - testlist-ec2.dev.ooni.io:443
-      - testlist-ec2.prod.ooni.io:443
+      - testlist-ec2.dev.ooni.io:80
+      - testlist-ec2.prod.ooni.io:80
     scrape_interval: 5s
-    scheme: https
+    scheme: http
     relabel_configs: # Change the host to the proxy host with relabeling
       # Store ip in ecs_host
       - source_labels: [__address__]
