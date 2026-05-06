@@ -394,7 +394,7 @@ scrape_configs:
     basic_auth:
       username: 'prom'
       password: '{{ prometheus_metrics_password }}'
-    scheme: https
+    scheme: http
 
   - job_name: "airflow"
     scheme: https
