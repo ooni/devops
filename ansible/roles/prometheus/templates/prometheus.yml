@@ -391,7 +391,7 @@ scrape_configs:
       - testlist-ec2.prod.ooni.io
       - testlist-ec2.dev.ooni.io
     scrape_interval: 5s
-    scheme: https
+    scheme: http
     basic_auth:
       username: 'prom'
       password: '{{ prometheus_metrics_password }}'
