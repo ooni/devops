@@ -388,13 +388,10 @@ scrape_configs:
   - job_name: "testlists"
     static_configs:
     - targets:
-      - testlist-ec2.dev.ooni.io
-      - testlist-ec2.prod.ooni.io
+      - testlists.prod.ooni.io
+      - testlists.dev.ooni.io
     scrape_interval: 5s
-    basic_auth:
-      username: 'prom'
-      password: '{{ prometheus_metrics_password }}'
-    scheme: http
+    scheme: https
 
   - job_name: "airflow"
     scheme: https
