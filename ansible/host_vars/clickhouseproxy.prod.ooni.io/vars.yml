@@ -1,1 +1,7 @@
-clickhouse_url: "clickhouse1.prod.ooni.io"
+clickhouse_nodes:
+  - host: clickhouse1.prod.ooni.io
+  #- host: clickhouse2.prod.ooni.io
+  - host: clickhouse3.prod.ooni.io
+    backup: true
+
+clickhouse_port: 9000
