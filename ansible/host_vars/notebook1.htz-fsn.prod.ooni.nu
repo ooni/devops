@@ -136,6 +136,8 @@ clickhouse_default_profiles:
     readonly: 2
   write:
     readonly: 0
+  admin:
+    readonly: 0
 
 clickhouse_version: "24.10.2.80"
 clickhouse_release_type: stable
