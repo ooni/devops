@@ -161,3 +161,8 @@ clickhouse_default_users:
       - "127.0.0.1"
     profile: write
     quota: default
+
+# configure extra domains for dehydrated
+ssl_domains:
+  - notebook1.htz-fns.prod.ooni.nu
+  - notebook.ooni.org
