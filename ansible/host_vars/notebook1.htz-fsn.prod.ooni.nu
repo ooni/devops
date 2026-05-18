@@ -139,7 +139,6 @@ clickhouse_default_profiles:
   admin:
     readonly: 0
 
-clickhouse_version: "24.10.2.80"
 clickhouse_release_type: stable
 clickhouse_listen_hosts:
   - "127.0.0.1"
