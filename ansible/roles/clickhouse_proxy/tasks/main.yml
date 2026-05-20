@@ -10,15 +10,19 @@
 - name: Flush all handlers now
   meta: flush_handlers
 
-- name: Allow traffic on port 9000
+- name: Allow traffic on ClickHouse proxy ports
   tags: clickhouse-proxy
   blockinfile:
-    path: /etc/ooni/nftables/tcp/9000.nft
+    path: "/etc/ooni/nftables/tcp/{{ item }}.nft"
     create: yes
     block: |
-      add rule inet filter input tcp dport 9000 counter accept comment "clickhouse"
+      add rule inet filter input tcp dport {{ item }} counter accept comment "clickhouse proxy"
+  loop:
+    - 9000
+    - 9001
+    - 9002
   notify:
-    - reload nftables  
+    - reload nftables
 
 - name: Allow traffic on port 9100
   tags: prometheus-proxy
