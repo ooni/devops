@@ -126,7 +126,7 @@ ssh_users:
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
 
-admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis ]
+admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, aagbsn]
 non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, dillon, lex, imap, sloncocs, aagbsn]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin

@@ -514,7 +514,7 @@ module "ooni_clickhouse_proxy" {
     cidr_blocks = ["0.0.0.0/0"],
     }, {
     from_port = 9000,
-    to_port   = 9000,
+    to_port   = 9002, // for several clickhouse instances
     protocol  = "tcp",
     cidr_blocks = concat(
       module.network.vpc_subnet_public[*].cidr_block,
