@@ -2,7 +2,7 @@ nftables_clickhouse_allow:
   - fqdn: data1.htz-fsn.prod.ooni.nu
     ip: 142.132.254.225
   - fqdn: data2.htz-fsn.prod.ooni.nu
-    ip: 88.198.54.12
+    ip: 23.88.74.249
   - fqdn: data3.htz-fsn.prod.ooni.nu
     ip: 168.119.7.188
   - fqdn: notebook1.htz-fsn.prod.ooni.nu
@@ -26,7 +26,7 @@ nftables_zookeeper_allow:
   - fqdn: data1.htz-fsn.prod.ooni.nu
     ip: 142.132.254.225
   - fqdn: data2.htz-fsn.prod.ooni.nu
-    ip: 88.198.54.12
+    ip: 23.88.74.249
   - fqdn: data3.htz-fsn.prod.ooni.nu
     ip: 168.119.7.188
   - fqdn: notebook1.htz-fsn.prod.ooni.nu
@@ -41,6 +41,9 @@ clickhouse_config:
   max_server_memory_usage: 0
   max_thread_pool_size: 10000
   max_server_memory_usage_to_ram_ratio: 0.9
+  # for 1GB/s 50% utilization cap
+  max_replicated_sends_network_bandwidth_for_server: 62500000
+  max_replicated_fetches_network_bandwidth_for_server: 62500000
   total_memory_profiler_step: 4194304
   total_memory_tracker_sample_probability: 0
   uncompressed_cache_size: 8589934592
@@ -113,6 +116,9 @@ clickhouse_zookeeper:
   - node:
     host: clickhouse1.prod.ooni.io
     port: 9181
+#  - node:
+#    host: clickhouse2.prod.ooni.io
+#    port: 9181
   - node:
     host: clickhouse3.prod.ooni.io
     port: 9181
@@ -131,9 +137,9 @@ clickhouse_remote_servers:
           - replica:
             host: clickhouse1.prod.ooni.io
             port: 9000
-          #- replica:
-          #  host: clickhouse2.prod.ooni.io
-          #  port: 9000
+          - replica:
+            host: clickhouse2.prod.ooni.io
+            port: 9000
           - replica:
             host: clickhouse3.prod.ooni.io
             port: 9000

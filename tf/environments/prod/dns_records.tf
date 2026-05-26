@@ -792,7 +792,7 @@ resource "aws_route53_record" "clickhouse1-prod-ooni-io-_a_" {
 
 resource "aws_route53_record" "clickhouse2-prod-ooni-io-_A_" {
   name    = "clickhouse2.prod.ooni.io"
-  records = ["88.198.54.12"]
+  records = ["23.88.74.249"]
   ttl     = "60"
   type    = "A"
   zone_id = local.dns_zone_ooni_io

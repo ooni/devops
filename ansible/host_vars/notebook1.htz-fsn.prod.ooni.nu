@@ -126,7 +126,7 @@ ssh_users:
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
 
-admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis ]
+admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, aagbsn]
 non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, dillon, lex, imap, sloncocs, aagbsn]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
@@ -136,8 +136,9 @@ clickhouse_default_profiles:
     readonly: 2
   write:
     readonly: 0
+  admin:
+    readonly: 0
 
-clickhouse_version: "24.10.2.80"
 clickhouse_release_type: stable
 clickhouse_listen_hosts:
   - "127.0.0.1"
@@ -160,3 +161,8 @@ clickhouse_default_users:
       - "127.0.0.1"
     profile: write
     quota: default
+
+# configure extra domains for dehydrated
+ssl_domains:
+  - notebook1.htz-fns.prod.ooni.nu
+  - notebook.ooni.org

@@ -563,7 +563,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "remove-report-id"
+  branch_name             = "master"
   environment             = local.environment
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
@@ -717,7 +717,7 @@ module "ooni_clickhouse_proxy" {
     cidr_blocks = ["0.0.0.0/0"],
     }, {
     from_port = 9000,
-    to_port   = 9000,
+    to_port   = 9002, // for several clickhouse instances
     protocol  = "tcp",
     cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, ["${module.ooni_fastpath.aws_instance_private_ip}/32", "${module.ooni_fastpath.aws_instance_public_ip}/32"],
     ["${module.ooniapi_testlists.aws_instance_private_ip}/32", "${module.ooniapi_testlists.aws_instance_public_ip}/32"]),

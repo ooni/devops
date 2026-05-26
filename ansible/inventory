@@ -7,6 +7,7 @@ ghs_ams
 [clickhouse]
 notebook1.htz-fsn.prod.ooni.nu
 data1.htz-fsn.prod.ooni.nu
+data2.htz-fsn.prod.ooni.nu
 data3.htz-fsn.prod.ooni.nu
 
 [airflow]
@@ -18,6 +19,7 @@ data1.htz-fsn.prod.ooni.nu
 monitoring.ooni.org
 notebook1.htz-fsn.prod.ooni.nu
 data1.htz-fsn.prod.ooni.nu
+data2.htz-fsn.prod.ooni.nu
 data3.htz-fsn.prod.ooni.nu
 openvpn1.htz-fsn.prod.ooni.nu
 openvpn2.htz-fsn.prod.ooni.nu

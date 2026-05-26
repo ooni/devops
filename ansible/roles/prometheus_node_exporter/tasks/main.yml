@@ -5,6 +5,16 @@
     - node_exporter
   when: use_nginx
 
+- ansible.builtin.include_role:
+    name: dehydrated
+  tags:
+    - oonidata
+    - dehydrated
+  vars:
+    ssl_domains:
+      - "{{ inventory_hostname }}"
+  when: use_https
+
 - name: create ooni configuration directory
   ansible.builtin.file:
     path: "/etc/ooni/"
