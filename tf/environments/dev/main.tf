@@ -1092,6 +1092,7 @@ module "ooniapi_ooniauth" {
       "norbel@ooni.org",
       "maria@ooni.org",
       "admin+dev@ooni.org",
+      "aaron@openobservatory.org",
       "luis@openobservatory.org",
       "contact@openobservatory.org"
     ])
