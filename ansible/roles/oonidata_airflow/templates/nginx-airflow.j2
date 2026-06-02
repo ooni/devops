@@ -10,9 +10,9 @@ server {
 
     include /etc/nginx/ssl_intermediate.conf;
 
-    ssl_certificate {{ tls_cert_dir }}/{{ inventory_hostname }}/fullchain.pem;
-    ssl_certificate_key {{ tls_cert_dir }}/{{ inventory_hostname }}/privkey.pem;
-    ssl_trusted_certificate {{ tls_cert_dir }}/{{ inventory_hostname }}/chain.pem;
+    ssl_certificate {{ tls_cert_dir }}/{{ airflow_public_fqdn }}/fullchain.pem;
+    ssl_certificate_key {{ tls_cert_dir }}/{{ airflow_public_fqdn }}/privkey.pem;
+    ssl_trusted_certificate {{ tls_cert_dir }}/{{ airflow_public_fqdn }}/chain.pem;
 
     server_name {{ airflow_public_fqdn }};
     access_log  /var/log/nginx/{{ airflow_public_fqdn }}.access.log;

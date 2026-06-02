@@ -392,7 +392,7 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3" {
       values = [
         "/api/v1/manifest*",
         "/api/v1/sign_credential*",
-        "/api/v1/submit_measurement/*"
+        "/api/v1/submit_measurement*"
       ]
     }
   }

@@ -30,10 +30,6 @@ variable "repo" {
   default = "ooni/backend"
 }
 
-variable "ecs_cluster_name" {
-  description = "id of the cluster to deploy into"
-}
-
 variable "trigger_path" {
   description = "path filter for push changes which trigger the codepipeline eg. ooniapi/services/oonirun/**"
 }
