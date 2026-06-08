@@ -98,3 +98,25 @@ variable "autoscale_policies" {
 
   default = []
 }
+
+variable "run_on_schedule" {
+  type    = bool
+  default = false
+
+  validation {
+    condition = !(var.run_on_schedule == true && var.scheduled_task_cluster == null)
+    error_message = "scheduled_task_cluster must be set when run_on_schedule = true."
+  }
+}
+
+variable "schedule_expression" {
+  type    = string
+  default = "cron(0 6 ? * MON-FRI *)" # example default; callers override
+}
+
+variable "scheduled_task_cluster" {
+  type    = string
+  description = "Name of the ECS cluster to run the scheduled task on (required when run_on_schedule = True)."
+  nullable = true
+  default = null
+}
