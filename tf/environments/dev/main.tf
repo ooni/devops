@@ -945,7 +945,7 @@ module "reuploader_builder" {
   branch_name             = "add_fastpath_reuploader"
   environment             = local.environment
   buildspec_path          = "reuploader/buildspec.yml"
-  trigger_path            = "fastpath/**"
+  trigger_path            = "reuploader/**"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
