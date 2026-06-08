@@ -936,6 +936,21 @@ module "fastpath_builder" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 }
 
+module "reuploader_builder" {
+  source      = "../../modules/ooni_docker_build"
+  trigger_tag = ""
+
+  service_name            = "reuploader"
+  repo                    = "ooni/backend"
+  branch_name             = "add_fastpath_reuploader"
+  environment             = local.environment
+  buildspec_path          = "reuploader/buildspec.yml"
+  trigger_path            = "fastpath/**"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+}
+
 #### OONI Run service
 
 module "ooniapi_oonirun_deployer" {
