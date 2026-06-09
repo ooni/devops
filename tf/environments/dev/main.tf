@@ -951,6 +951,44 @@ module "reuploader_builder" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 }
 
+module "reuploader" {
+  source = "../../modules/scheduled_service"
+
+  task_memory = 256
+
+  vpc_id = module.network.vpc_id
+
+  service_name             = "reuploader"
+  default_docker_image_url = "ooni/reuploader:latest"
+  schedule_expression      = "cron(0 * * * ? 2000-2199)"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+
+  task_secrets = {
+    AWS_ACCESS_KEY_ID           = data.aws_ssm_parameter.s3_user_access_id
+    AWS_SECRET_ACCESS_KEY       = data.aws_ssm_parameter.s3_user_secret_key
+    #ROLE_ARN                    =
+    #ROLE_DURATION_SECONDS       = "3600"
+    AWS_REGION                  = var.aws_region
+    # required
+    BUCKET_NAME                 = "ooniprobe-failed-reports-eu-central-1-1d24426a"
+    # PREFIX # s3 path prefix
+    # fastpath API endpoint; use the last (fallback) fastpath instance in set
+    FASTPATH_API                = "http://${local.fastpath_hosts[length(local.fastpath_hosts) - 1]}:8472"
+  }
+
+  ooniapi_service_security_groups = [
+    module.ooniapi_cluster.web_security_group_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-reuploader" }
+  )
+}
+
 #### OONI Run service
 
 module "ooniapi_oonirun_deployer" {
