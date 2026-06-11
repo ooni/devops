@@ -55,7 +55,7 @@ EOF
 
 resource "aws_iam_role_policy" "events_run_task_policy" {
   name  = "${local.name}-events-run-task-policy"
-  role  = aws_iam_role.events_run_task[0].id
+  role  = aws_iam_role.events_run_task.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -82,10 +82,10 @@ resource "aws_cloudwatch_event_rule" "scheduled_run" {
 }
 
 resource "aws_cloudwatch_event_target" "run_ecs_task" {
-  rule  = aws_cloudwatch_event_rule.scheduled_run[0].name
-  arn   = data.aws_ecs_cluster.target[0].arn
+  rule  = aws_cloudwatch_event_rule.scheduled_run.name
+  arn   = data.aws_ecs_cluster.target.arn
 
-  role_arn = aws_iam_role.events_run_task[0].arn
+  role_arn = aws_iam_role.events_run_task.arn
 
   ecs_target {
     task_definition_arn = aws_ecs_task_definition.scheduled_service.arn
@@ -119,7 +119,7 @@ resource "aws_ecs_task_definition" "scheduled_service" {
       memory            = var.memory_hard_limit
       essential         = true,
       image = try(
-        data.aws_ecs_container_definition.scheduled_service_current[0].image,
+        data.aws_ecs_container_definition.scheduled_service_current.image,
         var.default_docker_image_url
       ),
       name = local.name,
