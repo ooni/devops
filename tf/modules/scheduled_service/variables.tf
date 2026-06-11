@@ -29,15 +29,6 @@ variable "tags" {
   type        = map(string)
 }
 
-variable "service_desired_count" {
-  description = <<-EOF
-                Desired numbers of instances in the ecs service.
-                When `use_autoscaling == true` this will be the minimum amount of
-                spawned services
-                EOF
-  default     = 1
-}
-
 variable "task_memory" {
   default     = 64
   description = "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#task_size"
@@ -75,40 +66,6 @@ variable "ooniapi_service_security_groups" {
   type        = list(string)
 }
 
-// Autoscaling
-variable "use_autoscaling" {
-  description = "Whether this service should use autoscaling to modify task count at runtime"
-  type        = bool
-  default     = false
-}
-
-variable "max_desired_count" {
-  description = "Desired numbers of instances in the ecs service"
-  default     = 1
-}
-
-variable "autoscale_policies" {
-  description = "Policies used for autoscaling resources, only valid if `use_autoscaling` == true"
-
-  type = list(object({
-    resource_type     = string // memory | cpu
-    scaleout_treshold = number // from 0 to 100, number used to trigger a scale in. Should be higher than scalein_treshold
-    name              = string
-  }))
-
-  default = []
-}
-
-variable "run_on_schedule" {
-  type    = bool
-  default = false
-
-  validation {
-    condition = !(var.run_on_schedule == true && var.scheduled_task_cluster == null)
-    error_message = "scheduled_task_cluster must be set when run_on_schedule = true."
-  }
-}
-
 variable "schedule_expression" {
   type    = string
   default = "cron(0 6 ? * MON-FRI *)" # example default; callers override
@@ -116,7 +73,7 @@ variable "schedule_expression" {
 
 variable "scheduled_task_cluster" {
   type    = string
-  description = "Name of the ECS cluster to run the scheduled task on (required when run_on_schedule = True)."
+  description = "Name of the ECS cluster to run the scheduled task on."
   nullable = true
   default = null
 }
