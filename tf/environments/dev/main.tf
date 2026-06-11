@@ -968,20 +968,19 @@ module "reuploader" {
   scheduled_task_cluster   = module.ooniapi_cluster.cluster_name
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
-  task_secrets = {
-    AWS_SECRET_ACCESS_KEY       = module.ooniapi_user.aws_secret_access_key_arn
-    AWS_ACCESS_KEY_ID           = module.ooniapi_user.aws_access_key_id_arn
-
-    #ROLE_ARN                    =
-    #ROLE_DURATION_SECONDS       = "3600"
-    AWS_REGION                  = var.aws_region
+  task_environment = {
     BATCH_SIZE                  = 10
-    # required
     BUCKET_NAME                 = aws_s3_bucket.ooniprobe_failed_reports.bucket
     DRY_RUN                     = true
     # PREFIX # s3 path prefix
     # fastpath API endpoint; use the last (fallback) fastpath instance in set
     FASTPATH_API                = "http://${local.fastpath_hosts[length(local.fastpath_hosts) - 1]}:8472"
+  }
+
+  task_secrets = {
+    AWS_SECRET_ACCESS_KEY       = module.ooniapi_user.aws_secret_access_key_arn
+    AWS_ACCESS_KEY_ID           = module.ooniapi_user.aws_access_key_id_arn
+    AWS_REGION                  = var.aws_region
   }
 
   ooniapi_service_security_groups = [
