@@ -67,7 +67,10 @@ resource "aws_iam_role_policy" "events_run_task_policy" {
           "iam:PassRole",
           "ecs:StartTask",
           "ecs:DescribeClusters",
-          "ecs:DescribeTasks"
+          "ecs:DescribeTasks",
+          "events:TagResource",
+          "events:PutRule",
+          "events:PutTargets",
         ]
         Resource = "*"
       }
@@ -119,7 +122,7 @@ resource "aws_ecs_task_definition" "scheduled_service" {
       memory            = var.memory_hard_limit
       essential         = true,
       image = try(
-        data.aws_ecs_container_definition.scheduled_service_current.image,
+        data.aws_ecs_container_definition.scheduled_service_current[0].image,
         var.default_docker_image_url
       ),
       name = local.name,

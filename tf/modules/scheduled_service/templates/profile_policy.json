@@ -56,6 +56,16 @@
         "elasticloadbalancing:RegisterTargets"
       ],
       "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "events:TagResource",
+        "events:PutRule",
+        "events:PutTargets"
+      ],
+      "Resource": "*"
     }
+
   ]
 }
