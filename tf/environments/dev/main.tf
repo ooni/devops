@@ -958,6 +958,7 @@ module "reuploader" {
 
   vpc_id = module.network.vpc_id
 
+  first_run                = true
   service_name             = "reuploader"
   default_docker_image_url = "ooni/reuploader:latest"
   schedule_expression      = "cron(0 * * * ? 2000-2199)"
