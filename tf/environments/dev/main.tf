@@ -961,7 +961,7 @@ module "reuploader" {
   first_run                = true
   service_name             = "reuploader"
   default_docker_image_url = "ooni/reuploader:20260611-f9cf0ff7"
-  schedule_expression      = "cron(0 * * * ? 2000-2199)"
+  schedule_expression      = "cron(42 * * * ? 2000-2199)"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
@@ -970,10 +970,8 @@ module "reuploader" {
 
   task_environment = {
     BATCH_SIZE                  = 10
-    BUCKET_NAME                 = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    BUCKET_NAME                 = "ooniprobe-failed-reports-eu-central-1-1d24426a"
     DRY_RUN                     = true
-    # PREFIX # s3 path prefix
-    # fastpath API endpoint; use the last (fallback) fastpath instance in set
     FASTPATH_API                = "http://${local.fastpath_hosts[length(local.fastpath_hosts) - 1]}:8472"
   }
 
