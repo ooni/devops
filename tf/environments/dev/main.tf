@@ -967,8 +967,9 @@ module "reuploader" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_secrets = {
-    AWS_ACCESS_KEY_ID           = data.aws_ssm_parameter.s3_user_access_id
-    AWS_SECRET_ACCESS_KEY       = data.aws_ssm_parameter.s3_user_secret_key
+    AWS_SECRET_ACCESS_KEY       = module.ooniapi_user.aws_secret_access_key_arn
+    AWS_ACCESS_KEY_ID           = module.ooniapi_user.aws_access_key_id_arn
+
     #ROLE_ARN                    =
     #ROLE_DURATION_SECONDS       = "3600"
     AWS_REGION                  = var.aws_region
