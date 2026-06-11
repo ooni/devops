@@ -974,6 +974,7 @@ module "reuploader" {
     AWS_REGION                  = var.aws_region
     # required
     BUCKET_NAME                 = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    DRY_RUN                     = true
     # PREFIX # s3 path prefix
     # fastpath API endpoint; use the last (fallback) fastpath instance in set
     FASTPATH_API                = "http://${local.fastpath_hosts[length(local.fastpath_hosts) - 1]}:8472"
