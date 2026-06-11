@@ -37,7 +37,6 @@ resource "aws_iam_role_policy" "scheduled_service_task" {
 }
 
 resource "aws_iam_role" "events_run_task" {
-  count = 1
   name  = "${local.name}-events-run-task-role"
 
   assume_role_policy = <<EOF
@@ -55,7 +54,6 @@ EOF
 }
 
 resource "aws_iam_role_policy" "events_run_task_policy" {
-  count = 1
   name  = "${local.name}-events-run-task-policy"
   role  = aws_iam_role.events_run_task[0].id
 
@@ -78,14 +76,12 @@ resource "aws_iam_role_policy" "events_run_task_policy" {
 }
 
 resource "aws_cloudwatch_event_rule" "scheduled_run" {
-  count               = 1
   name                = "${local.name}-schedule"
   schedule_expression = var.schedule_expression
   tags                = var.tags
 }
 
 resource "aws_cloudwatch_event_target" "run_ecs_task" {
-  count = 1
   rule  = aws_cloudwatch_event_rule.scheduled_run[0].name
   arn   = data.aws_ecs_cluster.target[0].arn
 
@@ -98,7 +94,6 @@ resource "aws_cloudwatch_event_target" "run_ecs_task" {
 }
 
 data "aws_ecs_cluster" "target" {
-  count = 1
   cluster_name = var.scheduled_task_cluster
 }
 
