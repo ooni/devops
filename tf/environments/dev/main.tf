@@ -961,7 +961,7 @@ module "reuploader" {
   first_run                = true
   service_name             = "reuploader"
   default_docker_image_url = "ooni/reuploader:20260611-840e1b63"
-  schedule_expression      = "cron(0 * * * ? 2000-2199)"
+  schedule_expression      = "cron(0/5 * * * ? 2000-2199)"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
@@ -969,6 +969,7 @@ module "reuploader" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_environment = {
+    AWS_REGION                  = var.aws_region
     BATCH_SIZE                  = 10
     BUCKET_NAME                 = "ooniprobe-failed-reports-eu-central-1-1d24426a"
     DRY_RUN                     = true
@@ -978,7 +979,6 @@ module "reuploader" {
   task_secrets = {
     AWS_SECRET_ACCESS_KEY       = module.ooniapi_user.aws_secret_access_key_arn
     AWS_ACCESS_KEY_ID           = module.ooniapi_user.aws_access_key_id_arn
-    AWS_REGION                  = var.aws_region
   }
 
   ooniapi_service_security_groups = [
