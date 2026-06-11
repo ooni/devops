@@ -40,7 +40,7 @@ variable "db_allocated_storage" {
 }
 
 variable "db_storage_type" {
-  default = "standard"
+  default = "gp3"
 }
 
 variable "db_max_allocated_storage" {
@@ -48,7 +48,7 @@ variable "db_max_allocated_storage" {
 }
 
 variable "db_engine_version" {
-  default = "16.8"
+  default = "16.13"
 }
 
 variable "db_parameter_group" {
