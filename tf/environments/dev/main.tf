@@ -972,6 +972,7 @@ module "reuploader" {
     #ROLE_ARN                    =
     #ROLE_DURATION_SECONDS       = "3600"
     AWS_REGION                  = var.aws_region
+    BATCH_SIZE                  = 10
     # required
     BUCKET_NAME                 = aws_s3_bucket.ooniprobe_failed_reports.bucket
     DRY_RUN                     = true
