@@ -977,8 +977,6 @@ module "reuploader" {
   }
 
   task_secrets = {
-    AWS_SECRET_ACCESS_KEY       = module.ooniapi_user.aws_secret_access_key_arn
-    AWS_ACCESS_KEY_ID           = module.ooniapi_user.aws_access_key_id_arn
   }
 
   ooniapi_service_security_groups = [
