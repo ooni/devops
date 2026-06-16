@@ -991,6 +991,31 @@ module "reuploader" {
   )
 }
 
+# For reuploader accessing the failed reports s3 bucket
+resource "aws_iam_role_policy" "reuploader_role" {
+  name = "${local.name}-task-role"
+  role = module.reuploader.task_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = ""
+        Effect = "Allow"
+        Action = ["s3:GetObject"]
+        Resource = "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
+     },
+     {
+       Sid    = ""
+       Effect = "Allow"
+       Action = ["s3:ListBucket"]
+       Resource = aws_s3_bucket.ooniprobe_failed_reports.arn
+     }
+   ]
+  })
+}
+
+
 #### OONI Run service
 
 module "ooniapi_oonirun_deployer" {
