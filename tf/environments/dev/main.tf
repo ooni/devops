@@ -971,7 +971,7 @@ module "reuploader" {
   task_environment = {
     AWS_REGION                  = var.aws_region
     BATCH_SIZE                  = 10
-    S3_BUCKET_NAME              = "ooniprobe-failed-reports-eu-central-1-1d24426a"
+    S3_BUCKET_NAME              = aws_s3_bucket.ooniprobe_failed_reports.bucket
     DRY_RUN                     = true
     FASTPATH_API                = "http://${local.fastpath_hosts[length(local.fastpath_hosts) - 1]}:8472"
   }
