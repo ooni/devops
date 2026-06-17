@@ -1033,6 +1033,83 @@ resource "aws_route53_record" "fastpath2_alias" {
   ]
 }
 
+# fastpath instance for reuploading reports to from the failed-measurements bucket
+module "ooni_reuploader_fastpath" {
+  source = "../../modules/ec2"
+
+  stage = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.small"
+
+  name = "oonireuploaderfastpath"
+  ingress_rules = [{
+    from_port   = 22,
+    to_port     = 22,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 8472,
+    to_port     = 8472,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 8479,
+    to_port     = 8479,
+    protocol    = "tcp",
+    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
+    }, {
+    from_port   = 9100,
+    to_port     = 9100,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
+    }, {
+    from_port   = 9102, # For fastpath metrics
+    to_port     = 9102,
+    protocol    = "tcp"
+    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32", "${module.ooni_monitoring_proxy.aws_instance_public_ip}/32"]
+  }]
+
+  egress_rules = [{
+    from_port   = 0,
+    to_port     = 0,
+    protocol    = "-1",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port        = 0,
+    to_port          = 0,
+    protocol         = "-1",
+    ipv6_cidr_blocks = ["::/0"],
+  }]
+
+  sg_prefix = "oonirefp"
+  tg_prefix = "refp"
+
+  disk_size = 150
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-reuploader-fastpath" }
+  )
+}
+
+resource "aws_route53_record" "reuploader_fastpath" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "reuploaderfastpath.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    module.ooni_reuploader_fastpath.aws_instance_public_dns
+  ]
+}
+
+
 module "fastpath_builder" {
   source      = "../../modules/ooni_docker_build"
   trigger_tag = ""
