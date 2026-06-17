@@ -1037,7 +1037,7 @@ resource "aws_route53_record" "fastpath2_alias" {
 
 # fastpath instance for reuploading reports to from the failed-measurements bucket
 module "ooni_reuploader_fastpath" {
-  source = "../../modules/ec2"
+  source = "../../modules/ooni_fastpath"
 
   stage = local.environment
 
@@ -1049,55 +1049,17 @@ module "ooni_reuploader_fastpath" {
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3a.small"
 
-  name = "oonireuploaderfastpath"
-  ingress_rules = [{
-    from_port   = 22,
-    to_port     = 22,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 8472,
-    to_port     = 8472,
-    protocol    = "tcp",
-    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
-    }, {
-    from_port   = 8479,
-    to_port     = 8479,
-    protocol    = "tcp",
-    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, module.network.vpc_subnet_public[*].cidr_block),
-    }, {
-    from_port   = 9100,
-    to_port     = 9100,
-    protocol    = "tcp"
-    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
-    }, {
-    from_port   = 9102, # For fastpath metrics
-    to_port     = 9102,
-    protocol    = "tcp"
-    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32", "${module.ooni_monitoring_proxy.aws_instance_public_ip}/32"]
-  }]
-
-  egress_rules = [{
-    from_port   = 0,
-    to_port     = 0,
-    protocol    = "-1",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port        = 0,
-    to_port          = 0,
-    protocol         = "-1",
-    ipv6_cidr_blocks = ["::/0"],
-  }]
+  name = "reuploaderfastpath"
 
   sg_prefix = "oonirefp"
   tg_prefix = "refp"
 
-  disk_size = 150
+  disk_size = 20
 
-  tags = merge(
-    local.tags,
-    { Name = "ooni-tier0-reuploader-fastpath" }
-  )
+  monitoring_proxy_private_ip = module.ooni_monitoring_proxy.aws_instance_private_ip
+  monitoring_proxy_public_ip  = module.ooni_monitoring_proxy.aws_instance_public_ip
+
+  tags = local.tags
 }
 
 resource "aws_route53_record" "reuploader_fastpath" {
