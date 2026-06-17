@@ -354,6 +354,10 @@ resource "aws_s3_bucket" "ooniprobe_failed_reports" {
   bucket = "ooniprobe-failed-reports-${var.aws_region}"
 }
 
+data "aws_s3_bucket" "ooniprobe_failed_reports_2026_04_10" {
+  bucket = "ooniprobe-failed-reports-eu-central-1-1d24426a"
+}
+
 resource "aws_s3_bucket" "ooniapi_codepipeline_bucket" {
   bucket = "codepipeline-ooniapi-${var.aws_region}-${random_id.artifact_id.hex}"
 }
@@ -971,7 +975,7 @@ module "reuploader" {
   task_environment = {
     AWS_REGION                  = var.aws_region
     BATCH_SIZE                  = 10
-    S3_BUCKET_NAME              = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    S3_BUCKET_NAME              = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.bucket
     DRY_RUN                     = true
     FASTPATH_API                = "http://${local.fastpath_hosts[length(local.fastpath_hosts) - 1]}:8472"
   }
@@ -1001,13 +1005,13 @@ resource "aws_iam_role_policy" "reuploader_role" {
         Sid    = ""
         Effect = "Allow"
         Action = ["s3:GetObject"]
-        Resource = "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
+        Resource = "${data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn}/*"
      },
      {
        Sid    = ""
        Effect = "Allow"
        Action = ["s3:ListBucket"]
-       Resource = aws_s3_bucket.ooniprobe_failed_reports.arn
+       Resource = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn
      }
    ]
   })
