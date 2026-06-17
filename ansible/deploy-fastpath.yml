@@ -4,6 +4,7 @@
     - fastpath.dev.ooni.io
     - fastpath.prod.ooni.io
     - fastpath2.prod.ooni.io
+    - reuploaderfastpath.prod.ooni.io
   become: true
   roles:
     - role: bootstrap
