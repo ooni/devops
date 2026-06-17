@@ -523,6 +523,8 @@ module "ooni_clickhouse_proxy" {
       "${module.ooni_fastpath.aws_instance_public_ip}/32"],
       ["${module.ooni_fastpath2.aws_instance_private_ip}/32",
       "${module.ooni_fastpath2.aws_instance_public_ip}/32"],
+      ["${module.ooni_reuploader_fastpath.aws_instance_private_ip}/32",
+      "${module.ooni_reuploader_fastpath.aws_instance_public_ip}/32"],
       ["${module.ooniapi_testlists.aws_instance_private_ip}/32",
       "${module.ooniapi_testlists.aws_instance_public_ip}/32"],
     ),
