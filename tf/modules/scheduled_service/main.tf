@@ -148,6 +148,7 @@ resource "aws_ecs_task_definition" "scheduled_service" {
       }
     }
   ])
+  task_role_arn      = aws_iam_role.scheduled_service_task.arn
   execution_role_arn = aws_iam_role.scheduled_service_task.arn
   tags               = var.tags
   track_latest       = true
