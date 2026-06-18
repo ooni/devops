@@ -977,17 +977,6 @@ module "ooni_fastpath2" {
   tags = local.tags
 }
 
-resource "aws_route53_record" "fastpath2_alias" {
-  zone_id = local.dns_zone_ooni_io
-  name    = "fastpath2.${local.environment}.ooni.io"
-  type    = "CNAME"
-  ttl     = 300
-
-  records = [
-    module.ooni_fastpath2.aws_instance_public_dns
-  ]
-}
-
 module "fastpath_builder" {
   source      = "../../modules/ooni_docker_build"
   trigger_tag = ""
