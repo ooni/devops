@@ -1006,18 +1006,6 @@ module "ooni_reuploader_fastpath" {
   tags = local.tags
 }
 
-resource "aws_route53_record" "reuploader_fastpath" {
-  zone_id = local.dns_zone_ooni_io
-  name    = "reuploaderfastpath.${local.environment}.ooni.io"
-  type    = "CNAME"
-  ttl     = 300
-
-  records = [
-    module.ooni_reuploader_fastpath.aws_instance_public_dns
-  ]
-}
-
-
 module "fastpath_builder" {
   source      = "../../modules/ooni_docker_build"
   trigger_tag = ""
