@@ -36,72 +36,6 @@ resource "aws_iam_role_policy" "ooniapi_service_task" {
   policy = templatefile("${path.module}/templates/profile_policy.json", {})
 }
 
-resource "aws_iam_role" "events_run_task" {
-  count = var.run_on_schedule ? 1 : 0
-  name  = "${local.name}-events-run-task-role"
-
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "events.amazonaws.com"},
-    "Action": "sts:AssumeRole"
-  }]
-}
-EOF
-
-  tags = var.tags
-}
-
-resource "aws_iam_role_policy" "events_run_task_policy" {
-  count = var.run_on_schedule ? 1 : 0
-  name  = "${local.name}-events-run-task-policy"
-  role  = aws_iam_role.events_run_task[0].id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "ecs:RunTask",
-          "iam:PassRole",
-          "ecs:StartTask",
-          "ecs:DescribeClusters",
-          "ecs:DescribeTasks"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-resource "aws_cloudwatch_event_rule" "scheduled_run" {
-  count               = var.run_on_schedule ? 1 : 0
-  name                = "${local.name}-schedule"
-  schedule_expression = var.schedule_expression
-  tags                = var.tags
-}
-
-resource "aws_cloudwatch_event_target" "run_ecs_task" {
-  count = var.run_on_schedule ? 1 : 0
-  rule  = aws_cloudwatch_event_rule.scheduled_run[0].name
-  arn   = data.aws_ecs_cluster.target[0].arn
-
-  role_arn = aws_iam_role.events_run_task[0].arn
-
-  ecs_target {
-    task_definition_arn = aws_ecs_task_definition.ooniapi_service.arn
-    task_count          = 1
-  }
-}
-
-data "aws_ecs_cluster" "target" {
-  count = var.run_on_schedule ? 1 : 0
-  cluster_name = var.scheduled_task_cluster
-}
-
 resource "aws_cloudwatch_log_group" "ooniapi_service" {
   name = "ooni-ecs-group/${local.name}"
 }
@@ -165,7 +99,7 @@ resource "aws_ecs_service" "ooniapi_service" {
   name            = local.name
   cluster         = var.ecs_cluster_id
   task_definition = aws_ecs_task_definition.ooniapi_service.arn
-  desired_count   = var.run_on_schedule ? 0 : var.service_desired_count
+  desired_count   = var.service_desired_count
 
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
