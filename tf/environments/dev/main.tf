@@ -354,10 +354,6 @@ resource "aws_s3_bucket" "ooniprobe_failed_reports" {
   bucket = "ooniprobe-failed-reports-${var.aws_region}"
 }
 
-data "aws_s3_bucket" "ooniprobe_failed_reports_2026_04_10" {
-  bucket = "ooniprobe-failed-reports-eu-central-1-1d24426a"
-}
-
 resource "aws_s3_bucket" "ooniapi_codepipeline_bucket" {
   bucket = "codepipeline-ooniapi-${var.aws_region}-${random_id.artifact_id.hex}"
 }
