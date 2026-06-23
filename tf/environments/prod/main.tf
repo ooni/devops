@@ -1063,6 +1063,7 @@ module "reuploader" {
     S3_BUCKET_NAME              = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.bucket
     DRY_RUN                     = true
     FASTPATH_API                = "http://${module.ooni_reuploader_fastpath.aws_instance_private_ip}:8472"
+    LOG_LEVEL                   = "DEBUG"
   }
 
   task_secrets = {
