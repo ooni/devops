@@ -983,17 +983,17 @@ module "ooni_fastpath2" {
 module "ooni_reuploader_fastpath" {
   source = "../../modules/ooni_fastpath"
 
-  stage = local.environment
+  name = "reuploaderfastpath"
+  env  = local.environment
 
   vpc_id              = module.network.vpc_id
   subnet_id           = module.network.vpc_subnet_public[0].id
   private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  public_subnet_cidr  = module.network.vpc_subnet_public[*].cidr_block
   dns_zone_ooni_io    = local.dns_zone_ooni_io
 
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3a.small"
-
-  name = "reuploaderfastpath"
 
   sg_prefix = "oonirefp"
   tg_prefix = "refp"
