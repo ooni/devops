@@ -245,3 +245,16 @@ ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `zkp_request`;
 ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `age_range`;
 ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `msm_range`;
 ALTER TABLE ooni.fastpath MODIFY COLUMN `is_verified` LowCardinality(String) DEFAULT 'u';
+
+-- measurement feedback
+CREATE TABLE ooni.msmt_feedback ON CLUSTER oonidata_cluster
+(
+    `measurement_uid` String,
+    `account_id` String,
+    `status` String,
+    `update_time` DateTime64(3) DEFAULT now64(),
+    `comment` String
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/msmt_feedback/{shard}', '{replica}')
+ORDER BY (measurement_uid, account_id, update_time)
+SETTINGS index_granularity = 4;
