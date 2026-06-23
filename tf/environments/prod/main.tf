@@ -523,6 +523,8 @@ module "ooni_clickhouse_proxy" {
       "${module.ooni_fastpath.aws_instance_public_ip}/32"],
       ["${module.ooni_fastpath2.aws_instance_private_ip}/32",
       "${module.ooni_fastpath2.aws_instance_public_ip}/32"],
+      ["${module.ooni_reuploader_fastpath.aws_instance_private_ip}/32",
+      "${module.ooni_reuploader_fastpath.aws_instance_public_ip}/32"],
       ["${module.ooniapi_testlists.aws_instance_private_ip}/32",
       "${module.ooniapi_testlists.aws_instance_public_ip}/32"],
     ),
@@ -970,6 +972,33 @@ module "ooni_fastpath2" {
 
   sg_prefix = "oonifstp2"
   tg_prefix = "fp2"
+
+  monitoring_proxy_private_ip = module.ooni_monitoring_proxy.aws_instance_private_ip
+  monitoring_proxy_public_ip  = module.ooni_monitoring_proxy.aws_instance_public_ip
+
+  tags = local.tags
+}
+
+# fastpath instance for reuploading reports to from the failed-measurements bucket
+module "ooni_reuploader_fastpath" {
+  source = "../../modules/ooni_fastpath"
+
+  name = "reuploaderfastpath"
+  env  = local.environment
+
+  vpc_id              = module.network.vpc_id
+  subnet_id           = module.network.vpc_subnet_public[0].id
+  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
+  public_subnet_cidr  = module.network.vpc_subnet_public[*].cidr_block
+  dns_zone_ooni_io    = local.dns_zone_ooni_io
+
+  key_name      = module.adm_iam_roles.oonidevops_key_name
+  instance_type = "t3a.small"
+
+  sg_prefix = "oonirefp"
+  tg_prefix = "refp"
+
+  disk_size = 20
 
   monitoring_proxy_private_ip = module.ooni_monitoring_proxy.aws_instance_private_ip
   monitoring_proxy_public_ip  = module.ooni_monitoring_proxy.aws_instance_public_ip
