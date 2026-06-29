@@ -1059,9 +1059,8 @@ module "reuploader" {
 
   task_environment = {
     AWS_REGION                  = var.aws_region
-    BATCH_SIZE                  = 10
+    BATCH_SIZE                  = 150000
     S3_BUCKET_NAME              = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.bucket
-    DRY_RUN                     = true
     FASTPATH_API                = "http://${module.ooni_reuploader_fastpath.aws_instance_private_ip}:8472"
     LOG_LEVEL                   = "DEBUG"
   }
@@ -1098,6 +1097,12 @@ resource "aws_iam_role_policy" "reuploader_role" {
        Effect = "Allow"
        Action = ["s3:ListBucket"]
        Resource = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn
+     },
+     {
+       Sid    = ""
+       Effect = "Allow"
+       Action = ["s3:DeleteObject"]
+       Resource = "${data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn}/*"
      }
    ]
   })
