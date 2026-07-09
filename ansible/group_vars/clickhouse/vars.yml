@@ -249,6 +249,21 @@ clickhouse_custom_users:
       - readonly
     quota: "oonimeasurements"
     databases: [ooni]
+  - user:
+    name: notebook
+    password_type: sha256_password
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_notebook_password', profile='oonidevops_user_prod') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    settings:
+      # 16 GB
+      - "max_memory_usage = 17179869184"
+      # 10 minutes
+      - "max_execution_time = 600"
+    profile:
+      - notebook
+    quota: "notebook"
+    databases: [ooni]
 
 # TODO: this quota was created by hand since it wasn't working in the idealista playbook
 clickhouse_role_manage_quotas: false
@@ -268,15 +283,19 @@ clickhouse_custom_grants:
   databases: [ooni]
   tables: ["*"]
   privileges: [SELECT]
-  to: [oonimeasurements]
+  to: [oonimeasurements, notebook]
 
 clickhouse_custom_grant_roles:
   - roles: [oonimeasurements]
     to: [oonimeasurements]
+  - roles: [notebook]
+    to: [notebook]
 
 clickhouse_custom_roles:
   - role:
     name: oonimeasurements
+  - role:
+    name: notebook
 
 clickhouse_default_quotas:
   - quota:
