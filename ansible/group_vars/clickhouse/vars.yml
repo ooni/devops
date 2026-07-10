@@ -303,6 +303,17 @@ clickhouse_custom_users:
     quota: oonitestlists
     databases: [ooni]
 
+  - user:
+    name: notebook
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_notebook_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: notebook
+    databases: [ooni]
+
 clickhouse_role_manage_quotas: True
 clickhouse_custom_quotas:
   - quota:
@@ -343,13 +354,23 @@ clickhouse_custom_quotas:
     read_rows: 0
     execution_time: 1000
 
+    # no limits set
+  - quota:
+    name: notebook
+    duration: 0
+    queries: 0
+    errors: 0
+    result_rows: 0
+    read_rows: 0
+    execution_time: 0
+
 clickhouse_role_manage_grants: True
 clickhouse_custom_grants:
 - on:
   databases: [ooni]
   tables: ["*"]
   privileges: [SELECT]
-  to: [ooniprobe, oonimeasurements, oonirun, fastpath]
+  to: [ooniprobe, oonimeasurements, oonirun, fastpath, notebook]
 
 - on:
   databases: [ooni]
