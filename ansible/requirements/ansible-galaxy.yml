@@ -1,6 +1,4 @@
 roles: 
-  - src: willshersystems.sshd
-    version: v0.25.0
   - src: nginxinc.nginx
     version: 0.24.3
   - src: geerlingguy.certbot

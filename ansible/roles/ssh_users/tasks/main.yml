@@ -52,16 +52,16 @@
     mode: 0400
   with_items: "{{ admin_usernames | union(non_admin_usernames) }}"
 
-- name: configure sshd
+- name: configure sshd_config
   tags: ssh_users
-  include_role:
-    name: willshersystems.sshd
-  vars:
-    sshd_skip_defaults: false
-    sshd:
-      AllowUsers: "{{ admin_usernames | union(non_admin_usernames) | sort | join(' ') }}"
+  template:
+    src: sshd_config
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: 0440
 
-- name: Enesure sudoers dir exists
+- name: Ensure sudoers dir exists
   tags: ssh_users
   ansible.builtin.file:
     path: /etc/sudoers.d
