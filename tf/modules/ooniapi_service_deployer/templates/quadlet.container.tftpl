@@ -1,0 +1,23 @@
+[Unit]
+Description=${service_name} (slot ${slot})
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=${service_name}-${slot}
+Image=docker.io/ooni/api-${service_name}:__IMAGE_TAG__
+Network=${network_name}
+PublishPort=127.0.0.1:${host_port}:${container_port}
+%{ for key, value in env_vars ~}
+Environment="${key}=${value}"
+%{ endfor ~}
+%{ for secret_name in secrets ~}
+Secret=${secret_name}
+%{ endfor ~}
+
+[Service]
+Restart=always
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target
