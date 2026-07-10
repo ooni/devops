@@ -1,0 +1,23 @@
+# Managed by ansible - roles/ooniapi_gateway/templates/sudoers-ooniapi-deploy.j2
+#
+# Scoped to exactly the remote commands issued by
+# tf/modules/ooniapi_service_deployer/templates/buildspec_deploy.yml over
+# SSH as {{ ooniapi_gateway_deploy_user }}. Intentionally narrower than the
+# blanket "NOPASSWD:ALL" pattern used for the deploy user in other roles
+# (e.g. roles/anonc) -- this user is driven by an automated CI job over the
+# network, not a human operator.
+#
+# Caveat: sudoers glob matching (fnmatch without FNM_PATHNAME) lets "*"
+# match "/". The mv sources below are always files this same job just
+# scp'd into /tmp itself, so this is a theoretical rather than practical
+# widening of scope, but worth knowing if you're auditing this file.
+
+Cmnd_Alias OONIAPI_DEPLOY_MV_UNIT = /usr/bin/mv /tmp/*.container /etc/containers/systemd/*.container
+Cmnd_Alias OONIAPI_DEPLOY_MV_UPSTREAM = /usr/bin/mv /tmp/*-upstream.conf /etc/nginx/conf.d/*-upstream.conf
+Cmnd_Alias OONIAPI_DEPLOY_SYSTEMCTL = /usr/bin/systemctl daemon-reload, /usr/bin/systemctl restart *-a.service, /usr/bin/systemctl restart *-b.service, /usr/bin/systemctl reload nginx
+Cmnd_Alias OONIAPI_DEPLOY_NGINX_TEST = /usr/sbin/nginx -t
+Cmnd_Alias OONIAPI_DEPLOY_MARKER = /usr/bin/tee /etc/ooniapi/*/active_slot
+Cmnd_Alias OONIAPI_DEPLOY_PODMAN_SECRET = /usr/bin/podman secret create --replace * -
+
+{{ ooniapi_gateway_deploy_user }} ALL=(root) NOPASSWD: OONIAPI_DEPLOY_MV_UNIT, OONIAPI_DEPLOY_MV_UPSTREAM, OONIAPI_DEPLOY_SYSTEMCTL, OONIAPI_DEPLOY_NGINX_TEST, OONIAPI_DEPLOY_MARKER
+{{ ooniapi_gateway_deploy_user }} ALL=(root) NOPASSWD: OONIAPI_DEPLOY_PODMAN_SECRET

@@ -49,7 +49,7 @@ phases:
           #    stdin, never interpolated into the remote command string)
           for KEY in $(jq -r 'keys[]' /tmp/service_secrets.json); do
             VALUE=$(jq -r --arg k "$KEY" '.[$k]' /tmp/service_secrets.json)
-            printf '%s' "$VALUE" | ssh $SSH_OPTS "${DEPLOY_SSH_USER}@${HOST}" "podman secret create --replace ${KEY} -"
+            printf '%s' "$VALUE" | ssh $SSH_OPTS "${DEPLOY_SSH_USER}@${HOST}" "sudo podman secret create --replace ${KEY} -"
           done
 
           # d. reload systemd and (re)start only the target slot

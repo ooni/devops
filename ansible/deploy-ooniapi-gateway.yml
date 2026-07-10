@@ -1,0 +1,7 @@
+---
+- name: Bootstrap the tier0 blue/green gateway on dedicated backend hosts
+  hosts: backend-fsn.ooni.org:backend-hel.ooni.org
+  become: true
+  roles:
+    - role: ooniapi_gateway
+      tags: ooniapi_gateway

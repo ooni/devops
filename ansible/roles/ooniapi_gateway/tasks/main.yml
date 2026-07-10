@@ -1,0 +1,119 @@
+---
+# One-time (and idempotent-on-rerun) bootstrap for a host that will run
+# tier0 services via Podman Quadlet blue/green deploys, plus the nginx
+# gateway vhost that fronts them. See the Terraform side of this in
+# tf/modules/ooniapi_service_deployer (deploy_mode = "blue_green") and its
+# templates/buildspec_deploy.yml, which is what actually performs each
+# deploy -- this role only prepares the host for that job to run against.
+#
+# Runs as root (become: true at the play level). Podman state (networks,
+# secrets) is created in root's namespace to match the root-owned systemd
+# Quadlet units under /etc/containers/systemd/.
+
+- name: Ensure per-service state directories exist
+  ansible.builtin.file:
+    path: "/etc/ooniapi/{{ item.name }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ ooniapi_gateway_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Check whether each service already has an active_slot marker
+  ansible.builtin.stat:
+    path: "/etc/ooniapi/{{ item.name }}/active_slot"
+  loop: "{{ ooniapi_gateway_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ooniapi_gateway_active_slot_stat
+
+- name: Seed active_slot with "a" for services deploying for the first time
+  ansible.builtin.copy:
+    dest: "/etc/ooniapi/{{ item.item.name }}/active_slot"
+    content: "a"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ ooniapi_gateway_active_slot_stat.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not item.stat.exists
+
+- name: Check whether each service already has an nginx upstream conf
+  ansible.builtin.stat:
+    path: "/etc/nginx/conf.d/{{ item.name }}-upstream.conf"
+  loop: "{{ ooniapi_gateway_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ooniapi_gateway_upstream_stat
+
+# Seeded with slot "a" up / "b" down, matching active_slot's "a" default
+# above, so the very first `nginx -t` (run when installing the gateway
+# vhost below) succeeds before that service's first real deploy has run.
+- name: Seed a placeholder upstream conf for services deploying for the first time
+  ansible.builtin.copy:
+    dest: "/etc/nginx/conf.d/{{ item.item.name }}-upstream.conf"
+    content: |
+      upstream {{ item.item.name }} {
+          server 127.0.0.1:{{ item.item.host_port_a }};
+          server 127.0.0.1:{{ item.item.host_port_b }} down;
+      }
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ ooniapi_gateway_upstream_stat.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not item.stat.exists
+  notify: reload ooniapi gateway nginx
+
+- name: Check whether the podman network already exists
+  ansible.builtin.command: podman network exists {{ ooniapi_gateway_network_name }}
+  register: ooniapi_gateway_network_check
+  changed_when: false
+  failed_when: false
+
+- name: Create the shared podman network
+  ansible.builtin.command: podman network create {{ ooniapi_gateway_network_name }}
+  when: ooniapi_gateway_network_check.rc != 0
+
+- name: Ensure sudoers.d directory exists
+  ansible.builtin.file:
+    path: /etc/sudoers.d
+    state: directory
+    owner: root
+    group: root
+
+- name: Install scoped sudoers rule for the deploy user
+  ansible.builtin.template:
+    src: sudoers-ooniapi-deploy.j2
+    dest: /etc/sudoers.d/90-ooniapi-deploy
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: Render the gateway vhost
+  ansible.builtin.template:
+    src: gateway.conf.j2
+    dest: /etc/nginx/conf.d/ooniapi-gateway.conf.pending
+    owner: root
+    group: root
+    mode: "0644"
+
+# Split into "render" + "install" so a bad template is visible
+# (.conf.pending) without ever being loaded by nginx, and so the vhost is
+# never installed at all until ooniapi_gateway_cert_ready is true -- see
+# defaults/main.yml for why that's a separate, deliberate step.
+- name: Install the gateway vhost now that its cert is ready
+  ansible.builtin.copy:
+    remote_src: true
+    src: /etc/nginx/conf.d/ooniapi-gateway.conf.pending
+    dest: /etc/nginx/conf.d/ooniapi-gateway.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: ooniapi_gateway_cert_ready
+  notify: reload ooniapi gateway nginx
