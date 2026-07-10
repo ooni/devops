@@ -279,6 +279,95 @@ resource "aws_secretsmanager_secret_version" "oonipg_url" {
   )
 }
 
+### Blue/green deploy secrets (Podman Quadlet on dedicated Hetzner hosts)
+#
+# These mirror the values already passed as `task_secrets` to the ECS task
+# definitions above, but consolidated into one JSON blob per service so the
+# "blue_green" deploy_mode CodeBuild job can fetch them in a single
+# secretsmanager:GetSecretValue call and push each key as a Podman secret.
+# Values are pulled from the same underlying data sources used by the ECS
+# `task_secrets` maps, so both deploy paths stay in sync automatically.
+
+data "aws_secretsmanager_secret_version" "ooniapi_user_access_key_id" {
+  secret_id = module.ooniapi_user.aws_access_key_id_arn
+}
+
+data "aws_secretsmanager_secret_version" "ooniapi_user_secret_access_key" {
+  secret_id = module.ooniapi_user.aws_secret_access_key_arn
+}
+
+locals {
+  ooniapi_deploy_service_secrets = {
+    reverseproxy = {
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+    }
+    ooniprobe = {
+      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_write_url.value
+      ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.value
+    }
+    oonirun = {
+      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.value
+    }
+    oonifindings = {
+      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+    }
+    ooniauth = {
+      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+      ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.value
+      AWS_SECRET_ACCESS_KEY       = data.aws_secretsmanager_secret_version.ooniapi_user_secret_access_key.secret_string
+      AWS_ACCESS_KEY_ID           = data.aws_secretsmanager_secret_version.ooniapi_user_access_key_id.secret_string
+    }
+    oonimeasurements = {
+      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_url.value
+      ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.value
+    }
+  }
+}
+
+resource "aws_secretsmanager_secret" "ooniapi_deploy_service_secrets" {
+  for_each = local.ooniapi_deploy_service_secrets
+
+  name = "oonidevops/ooniapi/${each.key}/service_secrets"
+  tags = local.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ooniapi_deploy_service_secrets" {
+  for_each = local.ooniapi_deploy_service_secrets
+
+  secret_id     = aws_secretsmanager_secret.ooniapi_deploy_service_secrets[each.key].id
+  secret_string = jsonencode(each.value)
+}
+
+# Shared by every service's blue/green deploy job. The private key itself is
+# generated and rotated out-of-band (see the deploy README); Terraform only
+# owns the secret container, not its value.
+resource "aws_secretsmanager_secret" "ooniapi_deploy_ssh_key" {
+  name = "oonidevops/ooniapi/deploy_ssh_key"
+  tags = local.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ooniapi_deploy_ssh_key" {
+  secret_id     = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.id
+  secret_string = "REPLACE_ME: populate out-of-band with the \"deploy\" user's SSH private key"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
 module "geoip_bucket" {
   source = "../../modules/s3_bucket"
 
@@ -433,6 +522,10 @@ module "ooni_th_droplet" {
 module "ooniapi_reverseproxy_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # blue/green deploy on the dedicated Hetzner hosts.
+  deploy_mode = "ecs"
+
   service_name            = "reverseproxy"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -445,6 +538,14 @@ module "ooniapi_reverseproxy_deployer" {
 
   ecs_service_name = module.ooniapi_reverseproxy.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars = {
+    TARGET_URL = "https://backend-fsn.ooni.org/"
+  }
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.reverseproxy)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["reverseproxy"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_reverseproxy" {
@@ -857,6 +958,10 @@ EOF
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # blue/green deploy on the dedicated Hetzner hosts.
+  deploy_mode = "ecs"
+
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -869,6 +974,23 @@ module "ooniapi_ooniprobe_deployer" {
 
   ecs_service_name = module.ooniapi_ooniprobe.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars = {
+    # hardcoded IP for fastpath2.prod.prod.ooni.io
+    FASTPATH_URL          = "http://10.0.0.32:8472"
+    FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
+    FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    COLLECTOR_ID          = 4 # be sure this is different from dev
+    CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
+    TOR_TARGETS           = "tor_targets.json"
+    PSIPHON_CONFIG        = "psiphon_config.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
+  }
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.ooniprobe)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["ooniprobe"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_ooniprobe" {
@@ -1027,6 +1149,10 @@ module "fastpath_builder" {
 module "ooniapi_oonirun_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # blue/green deploy on the dedicated Hetzner hosts.
+  deploy_mode = "ecs"
+
   service_name            = "oonirun"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -1039,6 +1165,12 @@ module "ooniapi_oonirun_deployer" {
 
   ecs_service_name = module.ooniapi_oonirun.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars                   = {}
+  secrets                    = keys(local.ooniapi_deploy_service_secrets.oonirun)
+  service_secrets_arn        = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonirun"].arn
+  deploy_ssh_key_secret_arn  = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_oonirun" {
@@ -1079,6 +1211,10 @@ module "ooniapi_oonirun" {
 module "ooniapi_oonifindings_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # blue/green deploy on the dedicated Hetzner hosts.
+  deploy_mode = "ecs"
+
   service_name            = "oonifindings"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -1091,6 +1227,12 @@ module "ooniapi_oonifindings_deployer" {
 
   ecs_service_name = module.ooniapi_oonifindings.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars                  = {}
+  secrets                    = keys(local.ooniapi_deploy_service_secrets.oonifindings)
+  service_secrets_arn        = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonifindings"].arn
+  deploy_ssh_key_secret_arn  = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_oonifindings" {
@@ -1131,6 +1273,10 @@ module "ooniapi_oonifindings" {
 module "ooniapi_ooniauth_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # blue/green deploy on the dedicated Hetzner hosts.
+  deploy_mode = "ecs"
+
   service_name            = "ooniauth"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -1143,6 +1289,27 @@ module "ooniapi_ooniauth_deployer" {
 
   ecs_service_name = module.ooniapi_ooniauth.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars = {
+    AWS_REGION           = var.aws_region
+    EMAIL_SOURCE_ADDRESS = module.ooniapi_user.email_address
+    SESSION_EXPIRY_DAYS  = 2
+    LOGIN_EXPIRY_DAYS    = 7
+    ADMIN_EMAILS = jsonencode([
+      "maja@ooni.org",
+      "arturo@ooni.org",
+      "mehul@ooni.org",
+      "norbel@ooni.org",
+      "maria@ooni.org",
+      "admin+dev@ooni.org",
+      "luis@openobservatory.org",
+      "contact@openobservatory.org"
+    ])
+  }
+  secrets                    = keys(local.ooniapi_deploy_service_secrets.ooniauth)
+  service_secrets_arn        = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["ooniauth"].arn
+  deploy_ssh_key_secret_arn  = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_ooniauth" {
@@ -1202,6 +1369,10 @@ module "ooniapi_ooniauth" {
 module "ooniapi_oonimeasurements_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # blue/green deploy on the dedicated Hetzner hosts.
+  deploy_mode = "ecs"
+
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -1215,6 +1386,21 @@ module "ooniapi_oonimeasurements_deployer" {
   ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
   ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
   # ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars = {
+    # it has to be a json-compliant array
+    OTHER_COLLECTORS                = jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"])
+    BASE_URL                        = "https://api.ooni.io"
+    S3_BUCKET_NAME                  = "ooni-data-eu-fra"
+    VALKEY_URL                      = local.ooniapi_valkey_url
+    RATE_LIMITS                     = "4000/hour;400000/day;200000/7day"
+    RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
+    RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])
+  }
+  secrets                    = keys(local.ooniapi_deploy_service_secrets.oonimeasurements)
+  service_secrets_arn        = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonimeasurements"].arn
+  deploy_ssh_key_secret_arn  = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_oonimeasurements" {
