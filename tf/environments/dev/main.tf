@@ -159,8 +159,8 @@ module "oonipg" {
   # With 1GiB of ram you get ~112 connections:
   # 1074000000 / 9531392 = 112.68
   db_instance_class        = "db.t4g.micro" # 2GiB => ~224 max_connections
-  db_storage_type          = "standard"
-  db_allocated_storage     = "5"
+  db_storage_type          = "gp3"
+  db_allocated_storage     = "20"
   db_max_allocated_storage = null
 
   allow_cidr_blocks = [
