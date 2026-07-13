@@ -297,6 +297,10 @@ resource "random_id" "artifact_id" {
   byte_length = 4
 }
 
+data "aws_s3_bucket" "ooniprobe_failed_reports_2026_04_10" {
+  bucket = "ooniprobe-failed-reports-eu-central-1-1d24426a"
+}
+
 resource "aws_s3_bucket" "ooniprobe_failed_reports" {
   bucket = "ooniprobe-failed-reports-${var.aws_region}-${random_id.artifact_id.hex}"
 }
@@ -1024,6 +1028,91 @@ module "fastpath_builder" {
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 }
+
+module "reuploader_builder" {
+  source      = "../../modules/ooni_docker_build"
+  trigger_tag = ""
+
+  service_name            = "reuploader"
+  repo                    = "ooni/backend"
+  branch_name             = "add_fastpath_reuploader"
+  environment             = local.environment
+  buildspec_path          = "reuploader/buildspec.yml"
+  trigger_path            = "reuploader/**"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+}
+
+module "reuploader" {
+  source = "../../modules/scheduled_service"
+
+  task_memory = 256
+
+  vpc_id = module.network.vpc_id
+
+  first_run                = true
+  service_name             = "reuploader"
+  default_docker_image_url = "ooni/reuploader:20260617-8b35a38f"
+  schedule_expression      = "cron(30 0 * * ? 2000-2199)"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  scheduled_task_cluster   = module.ooniapi_cluster.cluster_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+
+  task_environment = {
+    AWS_REGION                  = var.aws_region
+    BATCH_SIZE                  = 50000
+    S3_BUCKET_NAME              = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.bucket
+    FASTPATH_API                = "http://${module.ooni_reuploader_fastpath.aws_instance_private_ip}:8472"
+    LOG_LEVEL                   = "DEBUG"
+  }
+
+  task_secrets = {
+  }
+
+  ooniapi_service_security_groups = [
+    module.ooniapi_cluster.web_security_group_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-reuploader" }
+  )
+}
+
+# For reuploader accessing the failed reports s3 bucket
+resource "aws_iam_role_policy" "reuploader_role" {
+  name = "${local.name}-task-role"
+  role = module.reuploader.task_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = ""
+        Effect = "Allow"
+        Action = ["s3:GetObject"]
+        Resource = "${data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn}/*"
+     },
+     {
+       Sid    = ""
+       Effect = "Allow"
+       Action = ["s3:ListBucket"]
+       Resource = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn
+     },
+     {
+       Sid    = ""
+       Effect = "Allow"
+       Action = ["s3:DeleteObject"]
+       Resource = "${data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn}/*"
+     }
+   ]
+  })
+}
+
+
 
 
 #### OONI Run service
