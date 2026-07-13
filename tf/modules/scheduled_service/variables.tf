@@ -72,8 +72,8 @@ variable "schedule_expression" {
 }
 
 variable "scheduled_task_cluster" {
-  type    = string
+  type        = string
   description = "Name of the ECS cluster to run the scheduled task on."
-  nullable = true
-  default = null
+  nullable    = true
+  default     = null
 }

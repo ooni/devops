@@ -1062,11 +1062,11 @@ module "reuploader" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_environment = {
-    AWS_REGION                  = var.aws_region
-    BATCH_SIZE                  = 50000
-    S3_BUCKET_NAME              = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.bucket
-    FASTPATH_API                = "http://${module.ooni_reuploader_fastpath.aws_instance_private_ip}:8472"
-    LOG_LEVEL                   = "DEBUG"
+    AWS_REGION     = var.aws_region
+    BATCH_SIZE     = 50000
+    S3_BUCKET_NAME = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.bucket
+    FASTPATH_API   = "http://${module.ooni_reuploader_fastpath.aws_instance_private_ip}:8472"
+    LOG_LEVEL      = "DEBUG"
   }
 
   task_secrets = {
@@ -1091,24 +1091,24 @@ resource "aws_iam_role_policy" "reuploader_role" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = ""
-        Effect = "Allow"
-        Action = ["s3:GetObject"]
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
         Resource = "${data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn}/*"
-     },
-     {
-       Sid    = ""
-       Effect = "Allow"
-       Action = ["s3:ListBucket"]
-       Resource = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn
-     },
-     {
-       Sid    = ""
-       Effect = "Allow"
-       Action = ["s3:DeleteObject"]
-       Resource = "${data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn}/*"
-     }
-   ]
+      },
+      {
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn
+      },
+      {
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = ["s3:DeleteObject"]
+        Resource = "${data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn}/*"
+      }
+    ]
   })
 }
 

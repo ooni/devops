@@ -37,7 +37,7 @@ resource "aws_iam_role_policy" "scheduled_service_task" {
 }
 
 resource "aws_iam_role" "events_run_task" {
-  name  = "${local.name}-events-run-task-role"
+  name = "${local.name}-events-run-task-role"
 
   assume_role_policy = <<EOF
 {
@@ -54,8 +54,8 @@ EOF
 }
 
 resource "aws_iam_role_policy" "events_run_task_policy" {
-  name  = "${local.name}-events-run-task-policy"
-  role  = aws_iam_role.events_run_task.id
+  name = "${local.name}-events-run-task-policy"
+  role = aws_iam_role.events_run_task.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -85,8 +85,8 @@ resource "aws_cloudwatch_event_rule" "scheduled_run" {
 }
 
 resource "aws_cloudwatch_event_target" "run_ecs_task" {
-  rule  = aws_cloudwatch_event_rule.scheduled_run.name
-  arn   = data.aws_ecs_cluster.target.arn
+  rule = aws_cloudwatch_event_rule.scheduled_run.name
+  arn  = data.aws_ecs_cluster.target.arn
 
   role_arn = aws_iam_role.events_run_task.arn
 
