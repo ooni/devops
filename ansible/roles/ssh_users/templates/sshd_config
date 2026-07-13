@@ -1,0 +1,12 @@
+Include /etc/ssh/sshd_config.d/*.conf
+AllowUsers {{ admin_usernames | union(non_admin_usernames) | sort | join(' ') }}
+PasswordAuthentication No
+KbdInteractiveAuthentication no
+UsePAM yes
+X11Forwarding yes
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem	sftp	/usr/lib/openssh/sftp-server
+Ciphers chacha20-poly1305@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+KexAlgorithms mlkem768x25519-sha256,curve25519-sha256
+MACs hmac-sha2-512,hmac-sha2-256
