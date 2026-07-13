@@ -1035,7 +1035,7 @@ module "reuploader_builder" {
 
   service_name            = "reuploader"
   repo                    = "ooni/backend"
-  branch_name             = "add_fastpath_reuploader"
+  branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "reuploader/buildspec.yml"
   trigger_path            = "reuploader/**"
