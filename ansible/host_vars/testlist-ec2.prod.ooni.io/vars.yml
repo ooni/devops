@@ -1,4 +1,4 @@
 jwt_encryption_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/ooni_services/jwt_secret', profile='oonidevops_user_prod') }}"
 github_token: "{{ lookup('amazon.aws.aws_secret', 'oonidevops/ooni_services/testlists_github_token', profile='oonidevops_user_prod') }}"
 log_level: "info"
-clickhouse_url: "clickhouse://write:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_write_password', profile='oonidevops_user_prod') }}@clickhouseproxy.prod.ooni.io/ooni"
+clickhouse_url: "clickhouse://oonitestlists:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonitestlists_password', profile='oonidevops_user_prod') }}@clickhouseproxy.prod.ooni.io/ooni"
