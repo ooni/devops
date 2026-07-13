@@ -1050,7 +1050,7 @@ module "reuploader" {
   first_run                = true
   service_name             = "reuploader"
   default_docker_image_url = "ooni/reuploader:20260617-8b35a38f"
-  schedule_expression      = "cron(30 * * * ? 2000-2199)"
+  schedule_expression      = "cron(30 0 * * ? 2000-2199)"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
@@ -1059,7 +1059,7 @@ module "reuploader" {
 
   task_environment = {
     AWS_REGION                  = var.aws_region
-    BATCH_SIZE                  = 150000
+    BATCH_SIZE                  = 50000
     S3_BUCKET_NAME              = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.bucket
     FASTPATH_API                = "http://${module.ooni_reuploader_fastpath.aws_instance_private_ip}:8472"
     LOG_LEVEL                   = "DEBUG"
