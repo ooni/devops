@@ -98,7 +98,7 @@ clickhouse_keeper:
 
   - keeper_server:
     server: data2.htz-fsn.prod.ooni.nu
-    id: 2
+    id: 5
     hostname: clickhouse2.prod.ooni.io
     port: 9234
 
