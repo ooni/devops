@@ -8,6 +8,5 @@
     notebook_domain: "notebook.ooni.org"
     ssl_domains:
       - "{{ inventory_hostname }}"
-      - "notebook.ooni.org"
   roles:
     - notebook
