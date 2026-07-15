@@ -8,5 +8,5 @@ PrintMotd no
 AcceptEnv LANG LC_*
 Subsystem	sftp	/usr/lib/openssh/sftp-server
 Ciphers chacha20-poly1305@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
-KexAlgorithms mlkem768x25519-sha256,curve25519-sha256
+KexAlgorithms curve25519-sha256
 MACs hmac-sha2-512,hmac-sha2-256
