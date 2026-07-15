@@ -1191,12 +1191,12 @@ In order to add new users to the jupyterlab notebook server hosted
 `notebook.ooni.org` the steps are:
 
 1. Open a PR adding an entry to this list:
-   https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook1.htz-fsn.prod.ooni.nu (we need ssh key, email and username)
+   https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook.ooni.org (we need ssh key, email and username)
 2. An OONI core team member will run:
 ```
-./play deploy-bootstrap.yml -l notebook1.htz-fsn.prod.ooni.nu --diff -i inventory
+./play deploy-bootstrap.yml -l notebook.ooni.org --diff -i inventory
 ```
-3. An OONI core team member logs into `notebook1.htz-fsn.prod.ooni.nu` and runs:
+3. An OONI core team member logs into `notebook.ooni.org` and runs:
 ```
 sudo passwd NEWUSERNAME
 ```
@@ -1243,11 +1243,11 @@ The notebooks server uses the system’s actual user accounts to authenticate ac
 ### Procedure
 
 0. Ask the person requesting a new account for the following details: **name**, **username** (used to log in to the server), and **SSH key**.
-1. Create a new user entry in the [notebook server’s host vars](https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook1.htz-fsn.prod.ooni.nu). Remember to also add the username to the `non_admin_usernames` variable
+1. Create a new user entry in the [notebook server’s host vars](https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook.ooni.org). Remember to also add the username to the `non_admin_usernames` variable
 2. In the `ansible` directory, run:
 
    ```
-   ./play -i inventory deploy-bootstrap.yml -l notebook1.htz-fsn.prod.ooni.nu --diff
+   ./play -i inventory deploy-bootstrap.yml -l notebook.ooni.org --diff
    ```
 3. Log in to `notebook.ooni.org` via SSH.
 4. Set the default password for the new user using:

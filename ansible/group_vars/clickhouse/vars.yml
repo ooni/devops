@@ -5,7 +5,7 @@ nftables_clickhouse_allow:
     ip: 23.88.74.249
   - fqdn: data3.htz-fsn.prod.ooni.nu
     ip: 168.119.7.188
-  - fqdn: notebook1.htz-fsn.prod.ooni.nu
+  - fqdn: notebook.ooni.org
     ip: 138.201.19.39
   - fqdn: backend-hel.ooni.org
     ip: 65.108.192.151
@@ -31,7 +31,7 @@ nftables_zookeeper_allow:
     ip: 23.88.74.249
   - fqdn: data3.htz-fsn.prod.ooni.nu
     ip: 168.119.7.188
-  - fqdn: notebook1.htz-fsn.prod.ooni.nu
+  - fqdn: notebook.ooni.org
     ip: 138.201.19.39
 
 clickhouse_version: 24.8.6.70
@@ -109,9 +109,9 @@ clickhouse_keeper:
     port: 9234
 
   - keeper_server:
-    server: notebook1.htz-fsn.prod.ooni.nu
+    server: notebook.ooni.org
     id: 4
-    hostname: notebook1.htz-fsn.prod.ooni.nu
+    hostname: notebook.ooni.org
     port: 9234
 
 clickhouse_zookeeper:
@@ -125,7 +125,7 @@ clickhouse_zookeeper:
     host: clickhouse3.prod.ooni.io
     port: 9181
   - node:
-    host: notebook1.htz-fsn.prod.ooni.nu
+    host: notebook.ooni.org
     port: 9181
 
 clickhouse_remote_servers:
