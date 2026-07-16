@@ -40,6 +40,37 @@
     state: present
     update_cache: yes
 
+- name: Create Nomad configuration directory
+  ansible.builtin.file:
+    path: /etc/nomad.d
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Setup Nomad in dev mod
+  ansible.builtin.copy:
+    dest: /etc/nomad.d/nomad.hcl # Main config file
+    content: |
+      data_dir = "/opt/nomad"
+
+      server {
+        enabled          = true
+        bootstrap_expect = 1
+      }
+
+      client {
+        enabled = true
+      }
+
+      acl {
+        enabled = true
+      }
+    mode: '0644'
+    owner: root
+    group: root
+  notify: restart nomad
+
 - name: Ensure Nomad service is enabled and started
   ansible.builtin.service:
     name: nomad

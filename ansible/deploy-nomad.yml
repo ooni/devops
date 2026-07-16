@@ -7,4 +7,5 @@
     ssl_domains:
       - "{{ inventory_hostname }}"
   roles:
+    - nginx
     - nomad

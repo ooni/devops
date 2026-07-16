@@ -25,3 +25,8 @@
   ansible.builtin.systemd_service:
     name: docker
     state: restarted
+
+- name: restart nomad
+  ansible.builtin.systemd_service:
+    name: nomad
+    state: restarted
