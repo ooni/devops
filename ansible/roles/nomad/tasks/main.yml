@@ -4,6 +4,7 @@
   meta: flush_handlers
 
 - name: Install Docker prerequisites
+  tags: docker
   ansible.builtin.apt:
     name:
       - ca-certificates
@@ -13,30 +14,35 @@
     state: present
 
 - name: Create keyring directory
+  tags: [docker, nomad]
   ansible.builtin.file:
     path: /usr/share/keyrings
     state: directory
     mode: '0755'
 
 - name: Download Docker GPG key
+  tags: docker
   ansible.builtin.get_url:
     url: https://download.docker.com/linux/debian/gpg
     dest: /tmp/docker.asc
     mode: '0644'
 
 - name: Dearmor Docker GPG key
+  tags: docker
   ansible.builtin.command:
     cmd: gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg /tmp/docker.asc
   args:
     creates: /usr/share/keyrings/docker-archive-keyring.gpg
 
 - name: Add Docker apt repository
+  tags: docker
   ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+    repo: "deb [signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
     filename: docker
     state: present
 
 - name: Install Docker
+  tags: docker
   ansible.builtin.apt:
     name:
       - docker-ce
@@ -46,36 +52,42 @@
     update_cache: yes
 
 - name: Ensure Docker service is enabled and started
+  tags: docker
   ansible.builtin.service:
     name: docker
     state: started
     enabled: yes
 
 - name: Download HashiCorp GPG key
+  tags: nomad
   ansible.builtin.get_url:
     url: https://apt.releases.hashicorp.com/gpg
     dest: /tmp/hashicorp.asc
     mode: '0644'
 
 - name: Dearmor HashiCorp GPG key
+  tags: nomad
   ansible.builtin.command:
     cmd: gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.asc
   args:
     creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
 - name: Add HashiCorp apt repository
+  tags: nomad
   ansible.builtin.apt_repository:
     repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
     filename: hashicorp
     state: present
 
 - name: Install Nomad
+  tags: nomad
   ansible.builtin.apt:
     name: nomad
     state: present
     update_cache: yes
 
 - name: Create Nomad configuration directory
+  tags: nomad
   ansible.builtin.file:
     path: /etc/nomad.d
     state: directory
@@ -84,6 +96,7 @@
     group: root
 
 - name: Setup Nomad in dev mod
+  tags: nomad
   ansible.builtin.copy:
     dest: /etc/nomad.d/nomad.hcl # Main config file
     content: |
@@ -109,6 +122,7 @@
   notify: restart nomad
 
 - name: Ensure Nomad service is enabled and started
+  tags: nomad
   ansible.builtin.service:
     name: nomad
     state: started
