@@ -1,0 +1,47 @@
+---
+# For prometheus scrape requests
+- name: Flush all handlers
+  meta: flush_handlers
+
+- name: Install prerequisite packages
+  ansible.builtin.apt:
+    name:
+      - gpg
+      - coreutils
+    state: present
+
+- name: Create keyring directory
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download HashiCorp GPG key
+  ansible.builtin.get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /tmp/hashicorp.asc
+    mode: '0644'
+
+- name: Dearmor HashiCorp GPG key
+  ansible.builtin.command:
+    cmd: gpg --dearmor -y -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.asc
+  args:
+    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+- name: Add HashiCorp apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+    filename: hashicorp
+    state: present
+
+- name: Install Nomad
+  ansible.builtin.apt:
+    name: nomad
+    state: present
+    update_cache: yes
+
+- name: Ensure Nomad service is enabled and started
+  ansible.builtin.service:
+    name: nomad
+    state: started
+    enabled: yes

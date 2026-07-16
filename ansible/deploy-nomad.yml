@@ -1,0 +1,10 @@
+---
+# This will be in dev mode for the moment, just as a POC
+- name: Deploy Nomad agent
+  hosts: anonc.dev.ooni.io # Use this host in the meanwhile
+  become: true
+  vars:
+    ssl_domains:
+      - "{{ inventory_hostname }}"
+  roles:
+    - nomad
