@@ -1422,6 +1422,11 @@ module "ooni_anonc" {
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {
+    from_port   = 4646, # for the nomad webui
+    to_port     = 4646,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
     from_port   = 9100, # for node exporter metrics
     to_port     = 9100,
     protocol    = "tcp"
