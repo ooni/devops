@@ -7,5 +7,7 @@
     ssl_domains:
       - "{{ inventory_hostname }}"
   roles:
-    - bootstrap
+    # - bootstrap
+    - nginx
+    - dehydrated
     - nomad
