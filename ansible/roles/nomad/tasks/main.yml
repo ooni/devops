@@ -3,29 +3,14 @@
 - name: Flush all handlers
   meta: flush_handlers
 
-- name: Allow Nomad HTTP traffic
+- name: Allow Nginx HTTPS traffic for Nomad (Port 4645)
   become: true
-  tags:
-    - nomad-ports
-    - nftables
+  tags: nomad
   blockinfile:
-    path: /etc/ooni/nftables/tcp/4646.nft
+    path: /etc/ooni/nftables/tcp/4645.nft
     create: true
     block: |
-      add rule inet filter input tcp dport 4646 counter accept comment "nomad http api and web ui"
-  notify:
-   - Reload nftables
-
-- name: Allow Nomad RPC traffic
-  become: true
-  tags:
-    - nomad-ports
-    - nftables
-  blockinfile:
-    path: /etc/ooni/nftables/tcp/4647.nft
-    create: true
-    block: |
-      add rule inet filter input tcp dport 4647 counter accept comment "nomad rpc"
+      add rule inet filter input tcp dport 4645 counter accept comment "nomad web ui reverse proxy"
   notify:
    - Reload nftables
 
@@ -126,7 +111,7 @@
   ansible.builtin.copy:
     dest: /etc/nomad.d/nomad.hcl # Main config file
     content: |
-      bind_addr = "0.0.0.0"
+      bind_addr = "127.0.0.1"
       data_dir = "/opt/nomad/data"
 
       server {
@@ -144,7 +129,7 @@
       }
 
       tls {
-        http = true
+        http = false
         rpc  = true
 
         ca_file   = "/var/lib/dehydrated/certs/{{ inventory_hostname }}/chain.pem"
@@ -155,6 +140,26 @@
     owner: root
     group: root
   notify: restart nomad
+
+- name: Create basic auth credentials file for Nomad WebUI
+  tags: nomad
+  community.general.htpasswd:
+    path: "{{ nomad_htpasswd_path }}"
+    name: "{{ nomad_webui_username }}"
+    password: "{{ nomad_webui_password }}"
+    owner: root
+    group: www-data
+    mode: '0640'
+
+- name: Configure Nginx reverse proxy for Nomad
+  tags: nomad
+  ansible.builtin.template:
+    src: nginx-nomad.j2
+    dest: /etc/nginx/sites-enabled/nomad.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
 
 - name: Ensure Nomad service is enabled and started
   tags: nomad
