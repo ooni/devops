@@ -1,0 +1,92 @@
+version: 0.2
+
+env:
+  variables:
+    SSH_OPTS: "-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -i /tmp/deploy_key"
+
+phases:
+  install:
+    commands:
+      - command -v jq >/dev/null || (apt-get update -y && apt-get install -y jq)
+
+  pre_build:
+    commands:
+      - aws secretsmanager get-secret-value --secret-id "$DEPLOY_SSH_KEY_SECRET_ARN" --query SecretString --output text > /tmp/deploy_key
+      - chmod 600 /tmp/deploy_key
+      - aws secretsmanager get-secret-value --secret-id "$SERVICE_SECRETS_ARN" --query SecretString --output text > /tmp/service_secrets.json
+      - IMAGE_URI=$(jq -r '.[0].imageUri' imagedefinitions.json)
+      - export IMAGE_TAG="${IMAGE_URI##*:}"
+      - echo "Deploying $SERVICE_NAME image tag $IMAGE_TAG to $DEPLOY_HOST_PRIMARY then $DEPLOY_HOST_SECONDARY"
+
+  build:
+    commands:
+      - |
+        set -euo pipefail
+
+        deploy_host() {
+          HOST="$1"
+          echo "=== $SERVICE_NAME: deploying to $HOST ==="
+
+          ACTIVE_SLOT=$(ssh $SSH_OPTS "${DEPLOY_SSH_USER}@${HOST}" "cat /etc/ooniapi/${SERVICE_NAME}/active_slot 2>/dev/null || echo a")
+          if [ "$ACTIVE_SLOT" = "a" ]; then
+            TARGET_SLOT=b
+            TARGET_PORT="$HOST_PORT_B"
+          else
+            TARGET_SLOT=a
+            TARGET_PORT="$HOST_PORT_A"
+          fi
+          echo "$SERVICE_NAME on $HOST: active slot is $ACTIVE_SLOT, deploying to slot $TARGET_SLOT (port $TARGET_PORT)"
+
+          # a. + b. render/fetch the target slot's quadlet unit and install it
+          UNIT_FILE="${SERVICE_NAME}-${TARGET_SLOT}.container"
+          aws s3 cp "s3://${QUADLET_BUCKET}/${SERVICE_NAME}/${UNIT_FILE}" "/tmp/${UNIT_FILE}"
+          sed -i "s|__IMAGE_TAG__|${IMAGE_TAG}|g" "/tmp/${UNIT_FILE}"
+
+          scp $SSH_OPTS "/tmp/${UNIT_FILE}" "${DEPLOY_SSH_USER}@${HOST}:/tmp/${UNIT_FILE}"
+          ssh $SSH_OPTS "${DEPLOY_SSH_USER}@${HOST}" "sudo mv /tmp/${UNIT_FILE} /etc/containers/systemd/${UNIT_FILE}"
+
+          # c. push service secrets as podman secrets (values travel over
+          #    stdin, never interpolated into the remote command string)
+          for KEY in $(jq -r 'keys[]' /tmp/service_secrets.json); do
+            VALUE=$(jq -r --arg k "$KEY" '.[$k]' /tmp/service_secrets.json)
+            printf '%s' "$VALUE" | ssh $SSH_OPTS "${DEPLOY_SSH_USER}@${HOST}" "sudo podman secret create --replace ${KEY} -"
+          done
+
+          # d. reload systemd and (re)start only the target slot
+          ssh $SSH_OPTS "${DEPLOY_SSH_USER}@${HOST}" "sudo systemctl daemon-reload && sudo systemctl restart ${SERVICE_NAME}-${TARGET_SLOT}.service"
+
+          # e. health-check the target slot directly, bypassing nginx
+          HEALTHY=""
+          for i in $(seq 1 10); do
+            if ssh $SSH_OPTS "${DEPLOY_SSH_USER}@${HOST}" "curl -sf -o /dev/null http://127.0.0.1:${TARGET_PORT}/health"; then
+              HEALTHY=1
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$HEALTHY" ]; then
+            echo "$SERVICE_NAME on $HOST: slot $TARGET_SLOT failed health check, aborting deploy"
+            exit 1
+          fi
+
+          # f. flip nginx to the target slot and record the new active slot
+          if [ "$TARGET_SLOT" = "a" ]; then
+            STATE_A=""
+            STATE_B="down"
+          else
+            STATE_A="down"
+            STATE_B=""
+          fi
+          UPSTREAM_FILE="${SERVICE_NAME}-upstream.conf"
+          aws s3 cp "s3://${QUADLET_BUCKET}/${SERVICE_NAME}/${UPSTREAM_FILE}" "/tmp/${UPSTREAM_FILE}"
+          sed -i "s|__STATE_A__|${STATE_A}|g; s|__STATE_B__|${STATE_B}|g" "/tmp/${UPSTREAM_FILE}"
+
+          scp $SSH_OPTS "/tmp/${UPSTREAM_FILE}" "${DEPLOY_SSH_USER}@${HOST}:/tmp/${UPSTREAM_FILE}"
+          ssh $SSH_OPTS "${DEPLOY_SSH_USER}@${HOST}" "sudo mv /tmp/${UPSTREAM_FILE} /etc/nginx/conf.d/${UPSTREAM_FILE} && sudo nginx -t && sudo systemctl reload nginx"
+          ssh $SSH_OPTS "${DEPLOY_SSH_USER}@${HOST}" "echo ${TARGET_SLOT} | sudo tee /etc/ooniapi/${SERVICE_NAME}/active_slot > /dev/null"
+
+          echo "=== $SERVICE_NAME on $HOST: now serving from slot $TARGET_SLOT ==="
+        }
+
+        deploy_host "$DEPLOY_HOST_PRIMARY"
+        deploy_host "$DEPLOY_HOST_SECONDARY"
