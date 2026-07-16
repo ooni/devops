@@ -109,7 +109,7 @@ clickhouse_keeper:
     port: 9234
 
   - keeper_server:
-    server: notebook.ooni.org
+    server: notebook1.htz-fsn.prod.ooni.nu
     id: 4
     hostname: notebook.ooni.org
     port: 9234
