@@ -3,9 +3,11 @@
 - name: Flush all handlers
   meta: flush_handlers
 
-- name: Install prerequisite packages
+- name: Install Docker prerequisites
   ansible.builtin.apt:
     name:
+      - ca-certificates
+      - curl
       - gpg
       - coreutils
     state: present
@@ -16,6 +18,39 @@
     state: directory
     mode: '0755'
 
+- name: Download Docker GPG key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /tmp/docker.asc
+    mode: '0644'
+
+- name: Dearmor Docker GPG key
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg /tmp/docker.asc
+  args:
+    creates: /usr/share/keyrings/docker-archive-keyring.gpg
+
+- name: Add Docker apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+    filename: docker
+    state: present
+
+- name: Install Docker
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: yes
+
+- name: Ensure Docker service is enabled and started
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: yes
+
 - name: Download HashiCorp GPG key
   ansible.builtin.get_url:
     url: https://apt.releases.hashicorp.com/gpg
@@ -24,7 +59,7 @@
 
 - name: Dearmor HashiCorp GPG key
   ansible.builtin.command:
-    cmd: gpg --dearmor -y -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.asc
+    cmd: gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.asc
   args:
     creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
@@ -52,7 +87,8 @@
   ansible.builtin.copy:
     dest: /etc/nomad.d/nomad.hcl # Main config file
     content: |
-      data_dir = "/opt/nomad"
+      bind_addr = "0.0.0.0"
+      data_dir = "/opt/nomad/data"
 
       server {
         enabled          = true
@@ -61,6 +97,7 @@
 
       client {
         enabled = true
+        servers = ["127.0.0.1"]
       }
 
       acl {
