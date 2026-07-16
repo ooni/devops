@@ -142,6 +142,15 @@
       acl {
         enabled = true
       }
+
+      tls {
+        http = true
+        rpc  = true
+
+        ca_file   = "/var/lib/dehydrated/certs/{{ inventory_hostname }}/chain.pem"
+        cert_file = "/var/lib/dehydrated/certs/{{ inventory_hostname }}/cert.pem"
+        key_file  = "/var/lib/dehydrated/certs/{{ inventory_hostname }}/privkey.pem"
+      }
     mode: '0644'
     owner: root
     group: root
