@@ -38,6 +38,6 @@ server {
         # The default Origin header will be the proxy address, which
         # will be rejected by Nomad. It must be rewritten to be the
         # host address instead.
-        proxy_set_header Origin "http://127.0.0.1:4646";
+        proxy_set_header Origin "${scheme}://$host";
     }
 }
