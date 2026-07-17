@@ -171,7 +171,17 @@
   tags: nomad
   ansible.builtin.template:
     src: nginx-nomad.j2
-    dest: /etc/nginx/sites-enabled/nomad.conf
+    dest: /etc/nginx/sites-enabled/02-nomad.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+
+- name: Configure Nginx reverse proxy for the API
+  tags: nomad
+  ansible.builtin.template:
+    src: nginx-api.j2
+    dest: /etc/nginx/sites-enabled/03-api.conf
     owner: root
     group: root
     mode: '0644'

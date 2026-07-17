@@ -1,0 +1,41 @@
+# ansible-managed in ooni/devops.git
+upstream oonimeasurements {
+    server 10.0.0.123:8000;
+}
+
+server {
+    listen 80;
+    listen 443 ssl http2;
+    # this is the correct name, change it in the actual deployment
+    # server_name api.{{ environment }}.ooni.io;
+    server_name anonc.dev.ooni.io;
+
+    include /etc/nginx/ssl_intermediate.conf;
+    ssl_certificate /var/lib/dehydrated/certs/{{ inventory_hostname }}/fullchain.pem;
+    ssl_certificate_key /var/lib/dehydrated/certs/{{ inventory_hostname }}/privkey.pem;
+    ssl_trusted_certificate /var/lib/dehydrated/certs/{{ inventory_hostname }}/chain.pem;
+
+    # Redirect plain HTTP to HTTPS
+    if ($scheme = http) {
+        return 301 https://$host$request_uri;
+    }
+
+    # All paths currently route to oonimeasurements.
+    # Add more location blocks below as you bring up additional services.
+    location / {
+        proxy_pass http://oonimeasurements;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Example of how you'll extend this:
+    # location /something {
+    #     proxy_pass http://otherservice;
+    #     proxy_set_header Host $host;
+    #     proxy_set_header X-Real-IP $remote_addr;
+    #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    #     proxy_set_header X-Forwarded-Proto $scheme;
+    # }
+}

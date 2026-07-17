@@ -5,6 +5,7 @@ job "oonimeasurements" {
     network {
       port "oonimeasurements" {
         static = ${port}
+        to = 80
       }
     }
     service {
@@ -17,9 +18,6 @@ job "oonimeasurements" {
       config {
         image = "${docker_image}"
         ports = ["oonimeasurements"]
-        port_map = {
-          oonimeasurements = 80
-        }
       }
       // Secrets go here
       template {
