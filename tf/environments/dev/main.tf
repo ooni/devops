@@ -37,6 +37,11 @@ data "aws_ssm_parameter" "nomad_token" {
   with_decryption = true
 }
 
+data "aws_ssm_parameter" "clickhouse_readonly_url_test" {
+  name            = "/oonidevops/secrets/clickhouse_readonly_test_url"
+  with_decryption = true
+}
+
 ## AWS Setup
 
 provider "aws" {
@@ -1577,7 +1582,7 @@ resource "nomad_variable" "oonimeasurements_secrets" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_test_url.value
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url_test.value
     ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.value
   }
 }
