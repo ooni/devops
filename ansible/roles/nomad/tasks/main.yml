@@ -187,6 +187,12 @@
     mode: '0644'
   notify: reload nginx
 
+- name: Remove a file
+  tags: nomad
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/01-prometheus
+    state: absent
+
 - name: Ensure Nomad service is enabled and started
   tags: nomad
   ansible.builtin.service:
