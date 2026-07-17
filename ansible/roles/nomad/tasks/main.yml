@@ -114,6 +114,12 @@
       bind_addr = "127.0.0.1"
       data_dir = "/opt/nomad/data"
 
+      advertise {
+        http = "127.0.0.1"
+        rpc  = "127.0.0.1"
+        serf = "127.0.0.1"
+      }
+
       server {
         enabled          = true
         bootstrap_expect = 1
@@ -130,11 +136,7 @@
 
       tls {
         http = false
-        rpc  = true
-
-        ca_file   = "/var/lib/dehydrated/certs/{{ inventory_hostname }}/chain.pem"
-        cert_file = "/var/lib/dehydrated/certs/{{ inventory_hostname }}/cert.pem"
-        key_file  = "/var/lib/dehydrated/certs/{{ inventory_hostname }}/privkey.pem"
+        rpc  = false
       }
     mode: '0644'
     owner: root
@@ -148,7 +150,7 @@
     name: "{{ nomad_webui_username }}"
     password: "{{ nomad_webui_password }}"
     owner: root
-    group: www-data
+    group: nginx
     mode: '0640'
 
 - name: Configure Nginx reverse proxy for Nomad

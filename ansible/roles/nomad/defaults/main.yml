@@ -1,4 +1,4 @@
 ---
 nomad_webui_username: "admin"
-nomad_webui_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/nomad_webui_password', profile='oonidevops_user') }}"
+nomad_webui_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/nomad_webui_password', profile='oonidevops_user_dev') }}"
 nomad_htpasswd_path: "/etc/nginx/nomad.htpasswd"
