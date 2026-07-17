@@ -12,6 +12,14 @@ job "oonimeasurements" {
       name     = "oonimeasurements"
       port     = "oonimeasurements"
       provider = "nomad"
+
+      // Health checks
+      check {
+        type     = "http"
+        path     = "/health"
+        interval = "15s"
+        timeout  = "5s"
+      }
     }
     task "oonimeasurements-task" {
       driver = "docker"
