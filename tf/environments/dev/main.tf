@@ -1553,3 +1553,37 @@ resource "aws_route53_record" "jumphost_alias" {
     module.ooni_jumphost.aws_instance_public_dns
   ]
 }
+
+## Nomad services
+
+# These are the secrets for oonimeasurements
+resource "nomad_variable" "oonimeasurements_secrets" {
+  path = "nomad/jobs/oonimeasurements"
+
+  items = {
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
+    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_test_url.value
+    ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.value
+  }
+}
+
+resource "nomad_job" "oonimeasurements" {
+  jobspec = templatefile("${path.module}/jobs/oonimeasurements.tpl", {
+    docker_image             = "ooni/api-oonimeasurements"
+    task_memory              = 256 # in MB
+    desired_count            = 1
+    base_url                 = "https://api.${local.environment}.ooni.io"
+    s3_bucket_name            = "ooni-data-eu-fra-test"
+    valkey_url                = local.ooniapi_valkey_url
+    rate_limits               = "10/minute;400000/day;200000/7day"
+    # replace required due to template interpolation getting bugged
+    other_collectors          = replace(jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"]), "\"", "\\\"")
+    rate_limits_whitelisted   = replace(jsonencode(["5.9.112.244"]), "\"", "\\\"")
+    rate_limits_unmetered     = replace(jsonencode(["/metrics", "/health"]), "\"", "\\\"")
+    port = 8000
+  })
+
+  depends_on = [nomad_variable.oonimeasurements_secrets]
+}
