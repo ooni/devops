@@ -922,7 +922,7 @@ module "ooniapi_ooniprobe" {
   ]
 
   use_autoscaling       = false
-  service_desired_count = 2
+  service_desired_count = 4
   # max_desired_count     = 8
   # autoscale_policies = [
   #   {
