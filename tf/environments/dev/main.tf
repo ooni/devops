@@ -735,8 +735,21 @@ module "ooni_clickhouse_proxy" {
     from_port = 9000,
     to_port   = 9002, // for several clickhouse instances
     protocol  = "tcp",
-    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, ["${module.ooni_fastpath.aws_instance_private_ip}/32", "${module.ooni_fastpath.aws_instance_public_ip}/32"],
-    ["${module.ooniapi_testlists.aws_instance_private_ip}/32", "${module.ooniapi_testlists.aws_instance_public_ip}/32"]),
+    cidr_blocks = concat(
+      module.network.vpc_subnet_private[*].cidr_block,
+      [
+        "${module.ooni_fastpath.aws_instance_private_ip}/32",
+        "${module.ooni_fastpath.aws_instance_public_ip}/32"
+      ],
+      [
+        "${module.ooniapi_testlists.aws_instance_private_ip}/32",
+        "${module.ooniapi_testlists.aws_instance_public_ip}/32"
+      ],
+      [
+        "${module.ooni_anonc.aws_instance_private_ip}/32",
+        "${module.ooni_anonc.aws_instance_public_ip}/32",
+      ]
+    ),
     }, {
     // For the prometheus proxy:
     from_port   = 9200,
