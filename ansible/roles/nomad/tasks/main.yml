@@ -97,6 +97,20 @@
     state: present
     update_cache: yes
 
+- name: Install podman
+  tags: nomad
+  ansible.builtin.apt:
+    name: podman
+    state: present
+    update_cache: yes
+
+- name: Install podman-driver
+  tags: nomad
+  ansible.builtin.apt:
+    name: nomad-driver-podman
+    state: present
+    update_cache: yes
+
 - name: Create Nomad configuration directory
   tags: nomad
   ansible.builtin.file:
