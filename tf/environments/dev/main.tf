@@ -21,6 +21,22 @@ locals {
   ]
 }
 
+# nomad setup
+provider "nomad" {
+  address = data.aws_ssm_parameter.nomad_address.value
+  secret_id = data.aws_ssm_parameter.nomad_token.value
+}
+
+data "aws_ssm_parameter" "nomad_address" {
+  name            = "/oonidevops/secrets/nomad_address"
+  with_decryption = true
+}
+
+data "aws_ssm_parameter" "nomad_token" {
+  name            = "/oonidevops/secrets/nomad_token"
+  with_decryption = true
+}
+
 ## AWS Setup
 
 provider "aws" {

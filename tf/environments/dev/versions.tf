@@ -9,5 +9,9 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 4.66.1"
     }
+    nomad = {
+      source  = "hashicorp/nomad"
+      version = "~> 2.0"
+    }
   }
 }
