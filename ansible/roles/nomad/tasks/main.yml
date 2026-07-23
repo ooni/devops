@@ -97,6 +97,14 @@
     state: present
     update_cache: yes
 
+- name: Create Nomad plugins directory
+  ansible.builtin.file:
+    path: /opt/nomad/plugins
+    state: directory
+    owner: nomad
+    group: nomad
+    mode: "0755"
+
 - name: Install podman
   tags: nomad
   ansible.builtin.apt:
@@ -104,12 +112,25 @@
     state: present
     update_cache: yes
 
-- name: Install podman-driver
+- name: Install podman-driver for Nomad
   tags: nomad
   ansible.builtin.apt:
     name: nomad-driver-podman
     state: present
     update_cache: yes
+
+- name: Find nomad-driver-podman binary path
+  ansible.builtin.command: which nomad-driver-podman
+  register: podman_driver_path
+  changed_when: false
+
+- name: Symlink podman driver into Nomad plugins directory
+  ansible.builtin.file:
+    src: "{{ podman_driver_path.stdout }}"
+    dest: /opt/nomad/plugins/nomad-driver-podman
+    state: link
+    owner: nomad
+    group: nomad
 
 - name: Create Nomad configuration directory
   tags: nomad
@@ -127,6 +148,7 @@
     content: |
       bind_addr = "127.0.0.1"
       data_dir = "/opt/nomad/data"
+      plugin_dir = "/opt/nomad/plugins"
 
       advertise {
         http = "127.0.0.1"
