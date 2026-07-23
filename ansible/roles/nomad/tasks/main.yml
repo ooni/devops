@@ -98,6 +98,7 @@
     update_cache: yes
 
 - name: Create Nomad plugins directory
+  tags: nomad
   ansible.builtin.file:
     path: /opt/nomad/plugins
     state: directory
@@ -120,11 +121,13 @@
     update_cache: yes
 
 - name: Find nomad-driver-podman binary path
+  tags: nomad
   ansible.builtin.command: which nomad-driver-podman
   register: podman_driver_path
   changed_when: false
 
 - name: Symlink podman driver into Nomad plugins directory
+  tags: nomad
   ansible.builtin.file:
     src: "{{ podman_driver_path.stdout }}"
     dest: /opt/nomad/plugins/nomad-driver-podman
