@@ -1588,19 +1588,23 @@ resource "nomad_variable" "oonimeasurements_secrets" {
 }
 
 resource "nomad_job" "oonimeasurements" {
-  jobspec = templatefile("${path.module}/jobs/oonimeasurements.tpl", {
+  jobspec = templatefile("${path.module}/jobs/base_job.tpl", {
+    service_name             = "oonimeasurements"
     docker_image             = "docker.io/ooni/api-oonimeasurements"
     task_memory              = 256 # in MB
     desired_count            = 1
-    base_url                 = "https://api.${local.environment}.ooni.io"
-    s3_bucket_name            = "ooni-data-eu-fra-test"
-    valkey_url                = local.ooniapi_valkey_url
-    rate_limits               = "10/minute;400000/day;200000/7day"
-    # replace required due to template interpolation getting bugged
-    other_collectors          = replace(jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"]), "\"", "\\\"")
-    rate_limits_whitelisted   = replace(jsonencode(["5.9.112.244"]), "\"", "\\\"")
-    rate_limits_unmetered     = replace(jsonencode(["/metrics", "/health"]), "\"", "\\\"")
-    port = 8000
+    port                     = 8000
+    secret_keys              = keys(nomad_variable.oonimeasurements_secrets.items)
+    env_vars = {
+        BASE_URL                        = "https://api.${local.environment}.ooni.io"
+        S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
+        VALKEY_URL                      = local.ooniapi_valkey_url
+        RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
+        # replace required due to template interpolation getting bugged
+        RATE_LIMITS_WHITELISTED_IPADDRS = replace(jsonencode(["5.9.112.244"]), "\"", "\\\"")
+        RATE_LIMITS_UNMETERED_PAGES     = replace(jsonencode(["/metrics", "/health"]), "\"", "\\\"")
+        OTHER_COLLECTORS                = replace(jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"]), "\"", "\\\"")
+      }
   })
 
   depends_on = [nomad_variable.oonimeasurements_secrets]
