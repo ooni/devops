@@ -140,6 +140,7 @@
 # The following two actions fix a uid remapping bug
 # Error processing tar file(exit status 1): potentially insufficient UIDs or GIDs available in user namespace (requested 0:42 for /etc/gshadow): Check /etc/subuid and /etc/subgid: lchown /etc/gshadow: invalid argument
 - name: Set subuid range for podman-svc
+  tags: nomad
   ansible.builtin.lineinfile:
     path: /etc/subuid
     line: "podman-svc:100000:65536"
@@ -147,6 +148,7 @@
     regexp: "^podman-svc:"
 
 - name: Set subgid range for podman-svc
+  tags: nomad
   ansible.builtin.lineinfile:
     path: /etc/subgid
     line: "podman-svc:100000:65536"
