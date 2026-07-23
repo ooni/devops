@@ -113,6 +113,15 @@
     state: present
     update_cache: yes
 
+# Required for podman support in nomad
+# https://developer.hashicorp.com/nomad/plugins/drivers/podman
+- name: Enable and start Podman socket
+  tags: nomad
+  ansible.builtin.systemd:
+    name: podman.socket
+    enabled: true
+    state: started
+
 - name: Install podman-driver for Nomad
   tags: nomad
   ansible.builtin.apt:
@@ -152,7 +161,6 @@
       bind_addr = "127.0.0.1"
       data_dir = "/opt/nomad/data"
       plugin_dir = "/opt/nomad/plugins"
-
       advertise {
         http = "127.0.0.1"
         rpc  = "127.0.0.1"
@@ -176,6 +184,13 @@
       tls {
         http = false
         rpc  = false
+      }
+
+      # TODO change this to use rootless containers instead
+      plugin "nomad-driver-podman" {
+        config {
+          socket_path = "unix:///run/podman/podman.sock"
+        }
       }
     mode: '0644'
     owner: root
