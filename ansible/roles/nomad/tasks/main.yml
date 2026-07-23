@@ -3,6 +3,13 @@
 - name: Flush all handlers
   meta: flush_handlers
 
+- name: Install acl package (required for Ansible become to unprivileged users)
+  tags: nomad
+  ansible.builtin.apt:
+    name: acl
+    state: present
+    update_cache: true
+
 - name: Allow Nginx HTTPS traffic for Nomad (Port 4645)
   become: true
   tags: nomad
