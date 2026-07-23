@@ -1589,7 +1589,7 @@ resource "nomad_variable" "oonimeasurements_secrets" {
 
 resource "nomad_job" "oonimeasurements" {
   jobspec = templatefile("${path.module}/jobs/oonimeasurements.tpl", {
-    docker_image             = "ooni/api-oonimeasurements"
+    docker_image             = "docker.io/ooni/api-oonimeasurements"
     task_memory              = 256 # in MB
     desired_count            = 1
     base_url                 = "https://api.${local.environment}.ooni.io"
