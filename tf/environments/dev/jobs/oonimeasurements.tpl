@@ -23,7 +23,6 @@ job "oonimeasurements" {
     }
     task "oonimeasurements-task" {
       driver = "podman"
-      user = "podman-svc"
       config {
         image = "${docker_image}"
         ports = ["oonimeasurements"]
