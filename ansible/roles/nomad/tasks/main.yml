@@ -113,14 +113,42 @@
     state: present
     update_cache: yes
 
+- name: Create podman-svc group with fixed GID
+  tags: nomad
+  ansible.builtin.group:
+    name: podman-svc
+    gid: "{{ podman_uid }}"
+    system: yes
+
+- name: Create podman-svc user with fixed UID
+  tags: nomad
+  ansible.builtin.user:
+    name: podman-svc
+    uid: "{{ podman_uid }}"
+    group: podman-svc
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: yes
+
+- name: Enable linger for podman-svc
+  tags: nomad
+  ansible.builtin.command: loginctl enable-linger podman-svc
+  changed_when: false
+
+
 # Required for podman support in nomad
 # https://developer.hashicorp.com/nomad/plugins/drivers/podman
-- name: Enable and start Podman socket
+- name: Enable rootless podman socket
   tags: nomad
   ansible.builtin.systemd:
     name: podman.socket
+    scope: user
     enabled: true
     state: started
+  become: true
+  become_user: podman-svc
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ podman_uid }}"
 
 - name: Install podman-driver for Nomad
   tags: nomad
@@ -189,7 +217,7 @@
       # TODO change this to use rootless containers instead
       plugin "nomad-driver-podman" {
         config {
-          socket_path = "unix:///run/podman/podman.sock"
+          socket_path = "unix:///run/user/{{ podman_uid }}/podman/podman.sock"
         }
       }
     mode: '0644'
