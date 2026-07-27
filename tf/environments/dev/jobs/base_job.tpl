@@ -22,7 +22,7 @@ job "${service_name}" {
     }
 
     task "${service_name}-task" {
-      driver = "podman"
+      driver = "docker"
       config {
         image = "${docker_image}"
         ports = ["${service_name}"]
@@ -41,6 +41,16 @@ job "${service_name}" {
         env         = true
       }
 %{ endif }
+
+      template {
+        data        = <<-EOH
+        {{ range (nomadService "valkey-svc") }}
+        VALKEY_URL=valkey://{{ .Address }}:{{ .Port }}
+        {{ end }}
+        EOH
+        destination = "local/valkey.env"
+        env         = true
+      }
 
       env {
 %{ for key, value in env_vars ~}

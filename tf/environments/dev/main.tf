@@ -1598,7 +1598,6 @@ resource "nomad_job" "oonimeasurements" {
     env_vars = {
         BASE_URL                        = "https://api.${local.environment}.ooni.io"
         S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
-        VALKEY_URL                      = local.ooniapi_valkey_url
         RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
         # replace required due to template interpolation getting bugged
         RATE_LIMITS_WHITELISTED_IPADDRS = replace(jsonencode(["5.9.112.244"]), "\"", "\\\"")
@@ -1608,4 +1607,8 @@ resource "nomad_job" "oonimeasurements" {
   })
 
   depends_on = [nomad_variable.oonimeasurements_secrets]
+}
+
+resource "nomad_job" "valkey" {
+  jobspec = file("${path.module}/jobs/valkey.hcl")
 }
