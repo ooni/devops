@@ -17,7 +17,7 @@ job "valkey" {
       progress_deadline = "5m"
       auto_revert       = true
       auto_promote      = true
-    }
+      }
 
     task "valkey-task" {
       driver = "docker"

@@ -1587,10 +1587,14 @@ resource "nomad_variable" "oonimeasurements_secrets" {
   }
 }
 
+variable "oonimeasurements_tag" {
+  type = string
+}
+
 resource "nomad_job" "oonimeasurements" {
   jobspec = templatefile("${path.module}/jobs/base_job.tpl", {
     service_name             = "oonimeasurements"
-    docker_image             = "docker.io/ooni/api-oonimeasurements"
+    docker_image             = "docker.io/ooni/api-oonimeasurements:${var.oonimeasurements_tag}"
     task_memory              = 256 # in MB
     desired_count            = 1
     port                     = 8000
