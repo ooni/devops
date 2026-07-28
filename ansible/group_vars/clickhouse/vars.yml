@@ -246,7 +246,7 @@ clickhouse_custom_users:
     profile:
       - write
     quota: "fastpath"
-    databases: [ooni]
+    databases: [ooni, oonitest]
 
   - user:
     name: oonimeasurements
@@ -281,7 +281,7 @@ clickhouse_custom_users:
     profile:
       - write
     quota: ooniprobe
-    databases: [ooni]
+    databases: [ooni, oonitest]
 
   - user:
     name: oonirun
@@ -292,7 +292,7 @@ clickhouse_custom_users:
     profile:
       - write
     quota: oonirun
-    databases: [ooni]
+    databases: [ooni, oonitest]
 
   - user:
     name: oonitestlists
@@ -303,7 +303,7 @@ clickhouse_custom_users:
     profile:
       - write
     quota: oonitestlists
-    databases: [ooni]
+    databases: [ooni, oonitest]
 
   - user:
     name: notebook
@@ -369,25 +369,25 @@ clickhouse_custom_quotas:
 clickhouse_role_manage_grants: True
 clickhouse_custom_grants:
 - on:
-  databases: [ooni]
+  databases: [ooni, oonitest]
   tables: ["*"]
   privileges: [SELECT]
   to: [ooniprobe, oonimeasurements, oonirun, fastpath, notebook]
 
 - on:
-  databases: [ooni]
+  databases: [ooni, oonitest]
   tables: [url_priorities]
   privileges: [INSERT]
   to: [oonitestlists]
 
 - on:
-  databases: [ooni]
+  databases: [ooni, oonitest]
   tables: [faulty_measurements]
   privileges: [INSERT]
   to: [ooniprobe]
 
 - on:
-  databases: [ooni]
+  databases: [ooni, oonitest]
   tables: [fastpath, obs_web, obs_openvpn, jsonl, new_jsonl]
   privileges: [INSERT]
   to: [fastpath]
