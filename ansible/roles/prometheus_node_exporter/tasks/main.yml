@@ -11,7 +11,7 @@
     - oonidata
     - dehydrated
   vars:
-    ssl_domains: "{{ ssl_domains | default([inventory_hostname]) }}"
+    ssl_domains: "{{ hostvars[inventory_hostname].ssl_domains | default([inventory_hostname]) }}"
   when: use_https
 
 - name: create ooni configuration directory
