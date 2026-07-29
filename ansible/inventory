@@ -13,9 +13,6 @@ data3.htz-fsn.prod.ooni.nu
 [airflow]
 data1.htz-fsn.prod.ooni.nu
 
-[jupyter]
-notebook.ooni.org
-
 ## Location tags
 
 [htz_fsn]
