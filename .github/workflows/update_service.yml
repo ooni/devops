@@ -30,6 +30,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GH_PAT }}   # needs repo write to commit back
+          ref: nomad-experiment # TODO remove on actual deploy
 
       - name: Update service_tags.auto.tfvars.json
         env:
