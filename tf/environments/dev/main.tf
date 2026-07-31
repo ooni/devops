@@ -21,11 +21,6 @@ locals {
   ]
 }
 
-# nomad setup
-provider "nomad" {
-  address = data.aws_ssm_parameter.nomad_address.value
-  secret_id = data.aws_ssm_parameter.nomad_token.value
-}
 
 data "aws_ssm_parameter" "nomad_address" {
   name            = "/oonidevops/secrets/nomad_address"
@@ -1570,49 +1565,4 @@ resource "aws_route53_record" "jumphost_alias" {
   records = [
     module.ooni_jumphost.aws_instance_public_dns
   ]
-}
-
-## Nomad services
-
-# These are the secrets for oonimeasurements
-resource "nomad_variable" "oonimeasurements_secrets" {
-  path = "nomad/jobs/oonimeasurements"
-
-  items = {
-    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
-    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
-    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url_test.value
-    ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.value
-  }
-}
-
-variable "oonimeasurements_tag" {
-  type = string
-}
-
-resource "nomad_job" "oonimeasurements" {
-  jobspec = templatefile("${path.module}/jobs/base_job.tpl", {
-    service_name             = "oonimeasurements"
-    docker_image             = "docker.io/ooni/api-oonimeasurements:${var.oonimeasurements_tag}"
-    task_memory              = 256 # in MB
-    desired_count            = 1
-    port                     = 8000
-    secret_keys              = keys(nomad_variable.oonimeasurements_secrets.items)
-    env_vars = {
-        BASE_URL                        = "https://api.${local.environment}.ooni.io"
-        S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
-        RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
-        # replace required due to template interpolation getting bugged
-        RATE_LIMITS_WHITELISTED_IPADDRS = replace(jsonencode(["5.9.112.244"]), "\"", "\\\"")
-        RATE_LIMITS_UNMETERED_PAGES     = replace(jsonencode(["/metrics", "/health"]), "\"", "\\\"")
-        OTHER_COLLECTORS                = replace(jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"]), "\"", "\\\"")
-      }
-  })
-
-  depends_on = [nomad_variable.oonimeasurements_secrets]
-}
-
-resource "nomad_job" "valkey" {
-  jobspec = file("${path.module}/jobs/valkey.hcl")
 }
