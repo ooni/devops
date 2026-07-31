@@ -21,6 +21,22 @@ locals {
   ]
 }
 
+
+data "aws_ssm_parameter" "nomad_address" {
+  name            = "/oonidevops/secrets/nomad_address"
+  with_decryption = true
+}
+
+data "aws_ssm_parameter" "nomad_token" {
+  name            = "/oonidevops/secrets/nomad_token"
+  with_decryption = true
+}
+
+data "aws_ssm_parameter" "clickhouse_readonly_url_test" {
+  name            = "/oonidevops/secrets/clickhouse_readonly_test_url"
+  with_decryption = true
+}
+
 ## AWS Setup
 
 provider "aws" {
@@ -719,8 +735,21 @@ module "ooni_clickhouse_proxy" {
     from_port = 9000,
     to_port   = 9002, // for several clickhouse instances
     protocol  = "tcp",
-    cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, ["${module.ooni_fastpath.aws_instance_private_ip}/32", "${module.ooni_fastpath.aws_instance_public_ip}/32"],
-    ["${module.ooniapi_testlists.aws_instance_private_ip}/32", "${module.ooniapi_testlists.aws_instance_public_ip}/32"]),
+    cidr_blocks = concat(
+      module.network.vpc_subnet_private[*].cidr_block,
+      [
+        "${module.ooni_fastpath.aws_instance_private_ip}/32",
+        "${module.ooni_fastpath.aws_instance_public_ip}/32"
+      ],
+      [
+        "${module.ooniapi_testlists.aws_instance_private_ip}/32",
+        "${module.ooniapi_testlists.aws_instance_public_ip}/32"
+      ],
+      [
+        "${module.ooni_anonc.aws_instance_private_ip}/32",
+        "${module.ooni_anonc.aws_instance_public_ip}/32",
+      ]
+    ),
     }, {
     // For the prometheus proxy:
     from_port   = 9200,
@@ -1419,6 +1448,11 @@ module "ooni_anonc" {
     }, {
     from_port   = 443, # for the POC hosting
     to_port     = 443,
+    protocol    = "tcp",
+    cidr_blocks = ["0.0.0.0/0"],
+    }, {
+    from_port   = 4645, # for the nomad webui
+    to_port     = 4645,
     protocol    = "tcp",
     cidr_blocks = ["0.0.0.0/0"],
     }, {

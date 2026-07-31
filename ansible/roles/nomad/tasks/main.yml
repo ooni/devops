@@ -1,0 +1,294 @@
+---
+# For prometheus scrape requests
+- name: Flush all handlers
+  meta: flush_handlers
+
+- name: Install acl package (required for Ansible become to unprivileged users)
+  tags: nomad
+  ansible.builtin.apt:
+    name: acl
+    state: present
+    update_cache: true
+
+- name: Allow Nginx HTTPS traffic for Nomad (Port 4645)
+  become: true
+  tags: nomad
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/4645.nft
+    create: true
+    block: |
+      add rule inet filter input tcp dport 4645 counter accept comment "nomad web ui reverse proxy"
+  notify:
+   - Reload nftables
+
+- name: Install Docker prerequisites
+  tags: docker
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gpg
+      - coreutils
+    state: present
+
+- name: Create keyring directory
+  tags: [docker, nomad]
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download Docker GPG key
+  tags: docker
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /tmp/docker.asc
+    mode: '0644'
+
+- name: Dearmor Docker GPG key
+  tags: docker
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg /tmp/docker.asc
+  args:
+    creates: /usr/share/keyrings/docker-archive-keyring.gpg
+
+- name: Add Docker apt repository
+  tags: docker
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+    filename: docker
+    state: present
+
+- name: Install Docker
+  tags: docker
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: yes
+
+- name: Ensure Docker service is enabled and started
+  tags: docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Download HashiCorp GPG key
+  tags: nomad
+  ansible.builtin.get_url:
+    url: https://apt.releases.hashicorp.com/gpg
+    dest: /tmp/hashicorp.asc
+    mode: '0644'
+
+- name: Dearmor HashiCorp GPG key
+  tags: nomad
+  ansible.builtin.command:
+    cmd: gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg /tmp/hashicorp.asc
+  args:
+    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+- name: Add HashiCorp apt repository
+  tags: nomad
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main"
+    filename: hashicorp
+    state: present
+
+- name: Install Nomad
+  tags: nomad
+  ansible.builtin.apt:
+    name: nomad
+    state: present
+    update_cache: yes
+
+- name: Create Nomad plugins directory
+  tags: nomad
+  ansible.builtin.file:
+    path: /opt/nomad/plugins
+    state: directory
+    owner: nomad
+    group: nomad
+    mode: "0755"
+
+- name: Install podman
+  tags: nomad
+  ansible.builtin.apt:
+    name: podman
+    state: present
+    update_cache: yes
+
+- name: Create podman-svc group with fixed GID
+  tags: nomad
+  ansible.builtin.group:
+    name: podman-svc
+    gid: "{{ podman_uid }}"
+    system: yes
+
+- name: Create podman-svc user with fixed UID
+  tags: nomad
+  ansible.builtin.user:
+    name: podman-svc
+    uid: "{{ podman_uid }}"
+    group: podman-svc
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: yes
+
+# The following two actions fix a uid remapping bug
+# Error processing tar file(exit status 1): potentially insufficient UIDs or GIDs available in user namespace (requested 0:42 for /etc/gshadow): Check /etc/subuid and /etc/subgid: lchown /etc/gshadow: invalid argument
+- name: Set subuid range for podman-svc
+  tags: nomad
+  ansible.builtin.lineinfile:
+    path: /etc/subuid
+    line: "podman-svc:100000:65536"
+    create: yes
+    regexp: "^podman-svc:"
+
+- name: Set subgid range for podman-svc
+  tags: nomad
+  ansible.builtin.lineinfile:
+    path: /etc/subgid
+    line: "podman-svc:100000:65536"
+    create: yes
+    regexp: "^podman-svc:"
+
+- name: Enable linger for podman-svc
+  tags: nomad
+  ansible.builtin.command: loginctl enable-linger podman-svc
+  changed_when: false
+
+
+# Required for podman support in nomad
+# https://developer.hashicorp.com/nomad/plugins/drivers/podman
+- name: Enable rootless podman socket
+  tags: nomad
+  ansible.builtin.systemd:
+    name: podman.socket
+    scope: user
+    enabled: true
+    state: started
+  become: true
+  become_user: podman-svc
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ podman_uid }}"
+
+- name: Install podman-driver for Nomad
+  tags: nomad
+  ansible.builtin.apt:
+    name: nomad-driver-podman
+    state: present
+    update_cache: yes
+
+- name: Find nomad-driver-podman binary path
+  tags: nomad
+  ansible.builtin.command: which nomad-driver-podman
+  register: podman_driver_path
+  changed_when: false
+
+- name: Symlink podman driver into Nomad plugins directory
+  tags: nomad
+  ansible.builtin.file:
+    src: "{{ podman_driver_path.stdout }}"
+    dest: /opt/nomad/plugins/nomad-driver-podman
+    state: link
+    owner: nomad
+    group: nomad
+
+- name: Create Nomad configuration directory
+  tags: nomad
+  ansible.builtin.file:
+    path: /etc/nomad.d
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Setup Nomad in dev mod
+  tags: nomad
+  ansible.builtin.copy:
+    dest: /etc/nomad.d/nomad.hcl # Main config file
+    content: |
+      bind_addr = "127.0.0.1"
+      data_dir = "/opt/nomad/data"
+      plugin_dir = "/opt/nomad/plugins"
+      advertise {
+        http = "127.0.0.1"
+        rpc  = "127.0.0.1"
+        serf = "127.0.0.1"
+      }
+
+      server {
+        enabled          = true
+        bootstrap_expect = 1
+      }
+
+      client {
+        enabled = true
+        servers = ["127.0.0.1"]
+      }
+
+      acl {
+        enabled = true
+      }
+
+      tls {
+        http = false
+        rpc  = false
+      }
+
+      # TODO change this to use rootless containers instead
+      plugin "nomad-driver-podman" {
+        config {
+          socket_path = "unix:///run/user/{{ podman_uid }}/podman/podman.sock"
+        }
+      }
+    mode: '0644'
+    owner: root
+    group: root
+  notify: restart nomad
+
+- name: Create basic auth credentials file for Nomad WebUI
+  tags: nomad
+  community.general.htpasswd:
+    path: "{{ nomad_htpasswd_path }}"
+    name: "{{ nomad_webui_username }}"
+    password: "{{ nomad_webui_password }}"
+    owner: root
+    group: nginx
+    mode: '0640'
+
+- name: Configure Nginx reverse proxy for Nomad
+  tags: nomad
+  ansible.builtin.template:
+    src: nginx-nomad.j2
+    dest: /etc/nginx/sites-enabled/02-nomad.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+
+- name: Configure Nginx reverse proxy for the API
+  tags: nomad
+  ansible.builtin.template:
+    src: nginx-api.j2
+    dest: /etc/nginx/sites-enabled/03-api.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx
+
+- name: Remove a file
+  tags: nomad
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/01-prometheus
+    state: absent
+
+- name: Ensure Nomad service is enabled and started
+  tags: nomad
+  ansible.builtin.service:
+    name: nomad
+    state: started
+    enabled: yes
