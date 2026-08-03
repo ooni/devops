@@ -97,3 +97,15 @@
   tags:
     - oonidata
     - config
+
+# Event detector panel
+- name: Setup event detector password file and ensure permissions are set
+  community.general.htpasswd:
+    path: "/etc/ooni/detector_panel_passwd"
+    name: prom
+    password: "{{ detector_panel_passwd }}"
+    owner: root
+    group: "nginx"
+    mode: 0640
+  tags:
+    - detector_panel
