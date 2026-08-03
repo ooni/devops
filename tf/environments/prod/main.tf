@@ -1752,3 +1752,15 @@ resource "aws_route53_record" "jumphost_alias" {
     module.ooni_jumphost.aws_instance_public_dns
   ]
 }
+
+resource "aws_route53_record" "detector_panel_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "detector-panel.${local.environment}.ooni.io"
+  type    = "CNAME"
+  ttl     = 300
+
+  records = [
+    # Airflow host
+    "142.132.254.225"
+  ]
+}
