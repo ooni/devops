@@ -1756,7 +1756,7 @@ resource "aws_route53_record" "jumphost_alias" {
 resource "aws_route53_record" "detector_panel_alias" {
   zone_id = local.dns_zone_ooni_io
   name    = "detector-panel.${local.environment}.ooni.io"
-  type    = "CNAME"
+  type    = "A"
   ttl     = 300
 
   records = [
