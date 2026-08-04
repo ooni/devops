@@ -114,7 +114,7 @@
 - name: Setup event detector password file and ensure permissions are set
   community.general.htpasswd:
     path: "/etc/ooni/detector_panel_passwd"
-    name: prom
+    name: admin
     password: "{{ detector_panel_passwd }}"
     owner: root
     group: "nginx"
