@@ -119,5 +119,7 @@
     owner: root
     group: "nginx"
     mode: 0640
+  notify:
+      - reload nginx
   tags:
     - detector_panel
