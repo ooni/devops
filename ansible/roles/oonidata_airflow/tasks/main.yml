@@ -46,7 +46,7 @@
 
 - name: "Install pipeline with pip"
   ansible.builtin.shell:
-    cmd: "{{ miniconda_install_dir }}/bin/pip install --upgrade /opt/airflow/oonidata/oonipipeline/"
+    cmd: "{{ miniconda_install_dir }}/bin/pip install --upgrade '/opt/airflow/oonidata/oonipipeline/[analysis]'"
     chdir: "{{ miniconda_install_dir }}"
   become_user: miniconda
   tags:
@@ -108,6 +108,8 @@
   notify:
     - reload systemd
     - restart detector-panel
+  tags:
+    - detector_panel
 
 - name: Setup event detector password file and ensure permissions are set
   community.general.htpasswd:
