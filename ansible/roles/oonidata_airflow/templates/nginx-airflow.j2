@@ -54,9 +54,9 @@ server {
 server {
     listen 443 ssl http2;
     include /etc/nginx/ssl_intermediate.conf;
-    ssl_certificate {{ tls_cert_dir }}/{{ event_detector_panel_domain }}/fullchain.pem;
-    ssl_certificate_key {{ tls_cert_dir }}/{{ event_detector_panel_domain }}/privkey.pem;
-    ssl_trusted_certificate {{ tls_cert_dir }}/{{ event_detector_panel_domain }}/chain.pem;
+    ssl_certificate /var/lib/dehydrated/certs/{{inventory_hostname}}/fullchain.pem;
+    ssl_certificate_key /var/lib/dehydrated/certs/{{inventory_hostname}}/privkey.pem;
+    ssl_trusted_certificate /var/lib/dehydrated/certs/{{inventory_hostname}}/chain.pem;
     server_name {{ event_detector_panel_domain }};
     access_log  /var/log/nginx/{{ event_detector_panel_domain }}.access.log;
     error_log   /var/log/nginx/{{ event_detector_panel_domain }}.log warn;
