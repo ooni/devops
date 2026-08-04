@@ -99,6 +99,16 @@
     - config
 
 # Event detector panel
+- name: Deploy detector-panel systemd unit
+  ansible.builtin.template:
+    src: templates/detector-panel.service
+    dest: /etc/systemd/system/detector-panel.service
+    owner: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart detector-panel
+
 - name: Setup event detector password file and ensure permissions are set
   community.general.htpasswd:
     path: "/etc/ooni/detector_panel_passwd"
