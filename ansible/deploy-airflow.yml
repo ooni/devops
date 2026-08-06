@@ -15,5 +15,5 @@
     ssl_domains:
       - "data1.htz-fsn.prod.ooni.nu"
       - "airflow.prod.ooni.io"
-      - "detector-panel.prod.ooni.io"
+      - "{{event_detector_panel_domain}}"
     detector_panel_passwd: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/detector_panel_passwd', profile='oonidevops_user_prod') }}"
