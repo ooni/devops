@@ -1,0 +1,14 @@
+[Unit]
+Description=OONI Pipeline Events Panel
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/miniconda/bin/python -m oonipipeline.main events-panel --port 8501
+Restart=on-failure
+RestartSec=5
+User=oonipipeline
+WorkingDirectory=/opt/miniconda
+
+[Install]
+WantedBy=multi-user.target

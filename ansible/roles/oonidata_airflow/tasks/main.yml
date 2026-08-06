@@ -46,7 +46,7 @@
 
 - name: "Install pipeline with pip"
   ansible.builtin.shell:
-    cmd: "{{ miniconda_install_dir }}/bin/pip install --upgrade /opt/airflow/oonidata/oonipipeline/"
+    cmd: "{{ miniconda_install_dir }}/bin/pip install --upgrade '/opt/airflow/oonidata/oonipipeline/[analysis]'"
     chdir: "{{ miniconda_install_dir }}"
   become_user: miniconda
   tags:
@@ -97,3 +97,29 @@
   tags:
     - oonidata
     - config
+
+# Event detector panel
+- name: Deploy detector-panel systemd unit
+  ansible.builtin.template:
+    src: templates/detector-panel.service
+    dest: /etc/systemd/system/detector-panel.service
+    owner: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart detector-panel
+  tags:
+    - detector_panel
+
+- name: Setup event detector password file and ensure permissions are set
+  community.general.htpasswd:
+    path: "/etc/ooni/detector_panel_passwd"
+    name: admin
+    password: "{{ detector_panel_passwd }}"
+    owner: root
+    group: "nginx"
+    mode: 0640
+  notify:
+      - reload nginx
+  tags:
+    - detector_panel
