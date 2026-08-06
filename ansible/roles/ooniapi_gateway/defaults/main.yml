@@ -1,0 +1,63 @@
+---
+# Domain the gateway vhost answers on for path-based routing. Mirrors the
+# ALB's `ooniapi_frontend_main_domain_name` in
+# tf/modules/ooniapi_frontend/main.tf (e.g. "api.prod.ooni.io").
+# No default: set explicitly per host in host_vars.
+ooniapi_gateway_primary_domain: ""
+
+# Any additional hostnames that should hit the same path-routed vhost.
+# Mirrors extra entries in `ooniapi_frontend_alternative_domains` that
+# aren't handled elsewhere (e.g. "api.ooni.org" in prod).
+ooniapi_gateway_extra_server_names: []
+
+# Suffix used for the ALB's secondary, host-header-only routing rules, e.g.
+# "oonirun.prod.ooni.io". Mirrors `direct_domain_suffix` in
+# tf/modules/ooniapi_frontend/main.tf ("${stage}.ooni.io").
+# No default: set explicitly per host in host_vars.
+ooniapi_gateway_direct_domain_suffix: ""
+
+# Name of the dehydrated cert (the directory under
+# ooniapi_gateway_cert_path) that covers ooniapi_gateway_primary_domain,
+# every "<service>.{{ ooniapi_gateway_direct_domain_suffix }}" name, and
+# ooniapi_gateway_extra_server_names as SANs.
+#
+# This role does NOT manage that cert -- issuing it means extending (or
+# adding to) the `dehydrated` role's ssl_domains on this host, which in turn
+# requires DNS for every one of those names to already resolve here. That's
+# a DNS-cutover-time step, not a day-1 bootstrap step, so it's deliberately
+# left manual. See the role README notes.
+ooniapi_gateway_cert_name: "{{ ooniapi_gateway_primary_domain }}"
+ooniapi_gateway_cert_path: /var/lib/dehydrated/certs/
+
+# Flip to true only once ooniapi_gateway_cert_name actually exists on disk.
+# Until then the vhost file is rendered but not installed, so this role is
+# safe to run ahead of the real DNS cutover.
+ooniapi_gateway_cert_ready: false
+
+# Services fronted by this gateway, and the two host ports their blue/green
+# slots are bound to. host_port_a/host_port_b must match the values passed
+# to that service's ooniapi_service_deployer module invocation in Terraform.
+#
+# Example:
+# ooniapi_gateway_services:
+#   - name: reverseproxy
+#     host_port_a: 18001
+#     host_port_b: 18002
+#   - name: oonirun
+#     host_port_a: 18011
+#     host_port_b: 18012
+ooniapi_gateway_services: []
+
+# Cross-cloud passthrough for tier0 services not yet migrated off AWS
+# (currently just testlists). Set to its public hostname to proxy those
+# paths there until testlists itself is migrated; leave empty to omit
+# those routes entirely.
+ooniapi_gateway_testlists_upstream: ""
+
+# Podman network shared by every service's containers on this host.
+ooniapi_gateway_network_name: ooniapi
+
+# SSH user the deploy CodeBuild job connects as. Must match
+# `deploy_ssh_user` (default "deploy") in the ooniapi_service_deployer
+# Terraform module.
+ooniapi_gateway_deploy_user: deploy
