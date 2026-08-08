@@ -165,5 +165,5 @@ clickhouse_default_users:
 
 # configure extra domains for dehydrated
 ssl_domains:
-  - notebook1.htz-fns.prod.ooni.nu
+  - notebook1.htz-fsn.prod.ooni.nu
   - notebook.ooni.org
