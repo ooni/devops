@@ -1,0 +1,82 @@
+
+# 3-node ClickHouse cluster mirroring OONI's production "oonidata_cluster"
+# (1 shard / 3 replicas, embedded ClickHouse Keeper on each node -- see
+# ooni/devops ansible/group_vars/clickhouse/vars.yml).
+#
+# Each node's image tag is controlled independently via CH1_IMAGE / CH2_IMAGE
+# / CH3_IMAGE so the test harness can upgrade one node at a time while the
+# other two keep running on their previous version (a real rolling upgrade),
+# instead of all nodes always tracking one shared version.
+#
+# Data directories are named volumes that persist across `docker compose up
+# --force-recreate`, so swapping a node's image tag is a faithful simulation
+# of an in-place binary upgrade on a real host (same on-disk data, new server
+# binary).
+
+x-clickhouse-common: &clickhouse-common
+  ulimits:
+    nofile:
+      soft: 262144
+      hard: 262144
+  networks:
+    - chnet
+  healthcheck:
+    # clickhouse-client is guaranteed to be in the image regardless of version;
+    # wget/curl are not always present across the version range this test spans.
+    test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+    interval: 5s
+    timeout: 5s
+    retries: 20
+    start_period: 20s
+
+services:
+  ch1:
+    <<: *clickhouse-common
+    image: "clickhouse/clickhouse-server:${CH1_IMAGE:-24.8.6.70}"
+    container_name: ooni-ch1
+    hostname: ch1
+    ports:
+      - "${CH1_HTTP_PORT:-8123}:8123"
+      - "${CH1_NATIVE_PORT:-9000}:9000"
+    volumes:
+      - ch1_data:/var/lib/clickhouse
+      - ./config/common/common.xml:/etc/clickhouse-server/config.d/common.xml:ro
+      - ./config/common/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - ./config/ch1/node.xml:/etc/clickhouse-server/config.d/node.xml:ro
+
+  ch2:
+    <<: *clickhouse-common
+    image: "clickhouse/clickhouse-server:${CH2_IMAGE:-24.8.6.70}"
+    container_name: ooni-ch2
+    hostname: ch2
+    ports:
+      - "${CH2_HTTP_PORT:-8124}:8123"
+      - "${CH2_NATIVE_PORT:-9001}:9000"
+    volumes:
+      - ch2_data:/var/lib/clickhouse
+      - ./config/common/common.xml:/etc/clickhouse-server/config.d/common.xml:ro
+      - ./config/common/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - ./config/ch2/node.xml:/etc/clickhouse-server/config.d/node.xml:ro
+
+  ch3:
+    <<: *clickhouse-common
+    image: "clickhouse/clickhouse-server:${CH3_IMAGE:-24.8.6.70}"
+    container_name: ooni-ch3
+    hostname: ch3
+    ports:
+      - "${CH3_HTTP_PORT:-8125}:8123"
+      - "${CH3_NATIVE_PORT:-9002}:9000"
+    volumes:
+      - ch3_data:/var/lib/clickhouse
+      - ./config/common/common.xml:/etc/clickhouse-server/config.d/common.xml:ro
+      - ./config/common/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - ./config/ch3/node.xml:/etc/clickhouse-server/config.d/node.xml:ro
+
+networks:
+  chnet:
+    name: ooni-chnet
+
+volumes:
+  ch1_data:
+  ch2_data:
+  ch3_data:
