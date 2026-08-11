@@ -73,6 +73,9 @@
     PATH: "/usr/local/cargo/bin:{{ ansible_env.PATH }}"
   become: true
 
+# Both binaries are built as part of the workspace build above and copied to
+# every host regardless of which helper it runs, but only one systemd unit
+# ({{helper}}.service) is actually installed per host (see below).
 - name: Make jsonth accessible system wide
   ansible.builtin.copy:
     src: "/tmp/ooniprobe-rs/target/release/jsonth"
@@ -80,6 +83,7 @@
     mode: '0755'
     remote_src: yes
   become: yes
+  register: jsonth_binary
 
 - name: Make echo accessible system wide
   ansible.builtin.copy:
@@ -88,6 +92,7 @@
     mode: '0755'
     remote_src: yes
   become: yes
+  register: echo_binary
 
 - name: Clean up build directory
   ansible.builtin.file:
@@ -117,3 +122,14 @@
     name: "{{helper}}.service"
     state: started
     enabled: yes
+
+# Only the helper actually deployed on this host (the one matching {{helper}})
+# has a unit above; restart it here if its own binary changed, so a source
+# rebuild actually takes effect and not just on unit-file changes.
+- name: Restart helper if its binary changed
+  tags: test-helpers
+  ansible.builtin.systemd_service:
+    name: "{{ helper }}.service"
+    state: restarted
+  become: yes
+  when: (helper == 'jsonth' and jsonth_binary.changed) or (helper == 'echo' and echo_binary.changed)
