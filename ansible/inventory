@@ -50,6 +50,8 @@ fastpath.dev.ooni.io
 fastpath.prod.ooni.io
 json.th.dev.ooni.io
 echo.th.dev.ooni.io
+json.th.prod.ooni.io
+echo.th.prod.ooni.io
 fastpath2.prod.ooni.io
 reuploaderfastpath.prod.ooni.io
 anonc.dev.ooni.io

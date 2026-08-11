@@ -22,41 +22,60 @@
   become: yes
 
 # Install test helpers
-- name: Donwload binaries for test helpers
-  ansible.builtin.get_url:
-    url: "{{test_helpers_url}}"
-    dest: "/tmp/test-helpers.tar.gz"
-    mode: '0600'
+#
+# TODO(test-helpers-source-build): building from source here until
+# ooni/ooniprobe-rs has a release workflow that publishes precompiled
+# test-helpers binaries. Switch back to downloading+checksumming a release
+# tarball once that exists (see git history of this role for the previous
+# get_url/checksum-based approach).
+
+- name: Install build dependencies
+  ansible.builtin.apt:
+    name:
+      - git
+      - curl
+      - build-essential
+      - pkg-config
+      - libssl-dev
+    state: present
+    update_cache: yes
   become: true
 
-- name: Get checksum of downloaded file
+- name: Check if rustup toolchain is already installed
   ansible.builtin.stat:
-    path: "/tmp/test-helpers.tar.gz"
-    checksum_algorithm: sha256
-  register: file_stat
+    path: /usr/local/cargo/bin/cargo
+  register: cargo_installed
 
-- name: Verify checksum
-  ansible.builtin.fail:
-    msg: "Checksum failed! Expected: {{checksum}} but got: {{file_stat.stat.checksum}}"
-  when: file_stat.stat.checksum != checksum
+- name: Install rustup toolchain
+  ansible.builtin.shell: |
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+  environment:
+    RUSTUP_HOME: /usr/local/rustup
+    CARGO_HOME: /usr/local/cargo
+  when: not cargo_installed.stat.exists
+  become: true
 
-- name: Create test helpers temp dir
-  ansible.builtin.file:
-    path: "/tmp/test-helpers"
-    state: directory
-    mode: "0700"
-  become: yes
+- name: Clone ooniprobe-rs repo
+  ansible.builtin.git:
+    repo: "{{ test_helpers_repo }}"
+    dest: "/tmp/ooniprobe-rs"
+    version: "{{ test_helpers_version }}"
+    force: yes
+  become: true
 
-- name: Extract tar content
-  ansible.builtin.unarchive:
-    src: "/tmp/test-helpers.tar.gz"
-    dest: "/tmp/test-helpers"
-    remote_src: yes
-  become: yes
+- name: Build the test-helpers crate in release mode
+  ansible.builtin.command: /usr/local/cargo/bin/cargo build --release --package test-helpers
+  args:
+    chdir: "/tmp/ooniprobe-rs"
+  environment:
+    RUSTUP_HOME: /usr/local/rustup
+    CARGO_HOME: /usr/local/cargo
+    PATH: "/usr/local/cargo/bin:{{ ansible_env.PATH }}"
+  become: true
 
 - name: Make jsonth accessible system wide
   ansible.builtin.copy:
-    src: "/tmp/test-helpers/jsonth"
+    src: "/tmp/ooniprobe-rs/target/release/jsonth"
     dest: "/usr/local/bin/"
     mode: '0755'
     remote_src: yes
@@ -64,21 +83,15 @@
 
 - name: Make echo accessible system wide
   ansible.builtin.copy:
-    src: "/tmp/test-helpers/echo"
+    src: "/tmp/ooniprobe-rs/target/release/echo"
     dest: "/usr/local/bin/"
     mode: '0755'
     remote_src: yes
   become: yes
 
-- name: Clean up temporary files
+- name: Clean up build directory
   ansible.builtin.file:
-    path: "/tmp/test-helpers"
-    state: absent
-  become: yes
-
-- name: Remove downloaded tarball
-  ansible.builtin.file:
-    path: "/tmp/test-helpers.tar.gz"
+    path: "/tmp/ooniprobe-rs"
     state: absent
   become: yes
 
