@@ -1,0 +1,5 @@
+---
+- name: restart statsd_exporter
+  ansible.builtin.systemd_service:
+    name: statsd_exporter
+    state: restarted

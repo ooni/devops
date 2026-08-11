@@ -27,11 +27,30 @@
     node_exporter_download_check is changed
     or node_exporter_version_check.stdout | length == 0
 
+- name: Create node_exporter group.
+  group:
+    name: "{{ prometheus_group }}"
+    state: present
+
 - name: Create node_exporter user.
   user:
-    name: node_exporter
+    name: "{{ prometheus_user }}"
     shell: /sbin/nologin
+    group: "{{ prometheus_group }}"
     state: present
+
+- name: Add a user to a password file and ensure permissions are set
+  community.general.htpasswd:
+    path: "{{ node_exporter_htpasswd }}"
+    name: prom
+    password: "{{ prometheus_metrics_password }}"
+    owner: root
+    group: "{{ 'nginx' if use_nginx else prometheus_group }}"
+    mode: 0640
+  tags:
+    - monitoring
+    - node_exporter
+    - config
 
 - name: Copy the node_exporter systemd unit file.
   template:

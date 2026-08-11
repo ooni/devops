@@ -1,0 +1,13 @@
+---
+yace_filename: "yet-another-cloudwatch-exporter-0.63.0.linux-amd64"
+yace_download_url: "https://github.com/prometheus-community/yet-another-cloudwatch-exporter/releases/download/v0.63.0/{{yace_filename}}.tar.gz"
+
+yace_bin_path: "/usr/local/bin/yace"
+yace_config_dir: "/etc/yace"
+yace_config_path: "{{ yace_config_dir }}/config.yml"
+yace_listen_address: "0.0.0.0:5000"
+yace_log_format: "logfmt"
+yace_extra_flags: ""
+
+# Defaults to deriving env from inventory hostname (e.g. monitoringproxy.prod.ooni.io -> prod).
+env: "{{ inventory_hostname.split('.')[1] }}"

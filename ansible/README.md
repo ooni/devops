@@ -123,7 +123,9 @@ individual accounts and lock out the root user.
 When running the entire runbook ansible might try to run it as root.
 This can be avoided by selecting only the required tags using `-t <tagname>`.
 
-Ideally the root user should be disabled after succesfully creating user accounts.
+Ideally the root user should be disabled after succesfully creating user accounts. See role
+[ssh_users](https://github.com/ooni/devops/blob/main/ansible/roles/ssh_users/tasks/main.yml#L62)
+which adds AllowUsers to /etc/sshd_config.d/00-ansible_system_role.conf and disables root login.
 
 #### Roles layout
 

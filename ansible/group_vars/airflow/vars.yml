@@ -10,3 +10,11 @@ airflow_fernet_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/airflo
 airflow_webserver_secret_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/airflow_webserver_secret_key', profile='oonidevops_user_prod') }}"
 airflow_executor: "LocalExecutor"
 airflow_database_conn: "postgresql+psycopg2://airflow:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/airflow_postgresql_password', profile='oonidevops_user_prod') }}@ooni-tier0-postgres.c7mgscca82no.eu-central-1.rds.amazonaws.com/airflow"
+
+# StatsD metrics, sent to the local prometheus statsd_exporter
+# These variables come from the airflow role used by this playbook
+# https://github.com/ooni/airflow-role/blob/5ba757e17c3fd63a4dc794a74ad1912f624d84d7/defaults/main/airflow-cfg.yml#L85-L95
+airflow_statsd_on: True
+airflow_statsd_host: localhost
+airflow_statsd_port: 8125
+airflow_statsd_prefix: airflow

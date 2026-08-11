@@ -53,25 +53,6 @@
   notify:
    - reload nftables
 
-# Docker seems to have problems with nftables, so this command will translate all iptables
-# commands to nftables commands
-# - name: Update alternatives for iptables
-#   tags: docker
-#   become: yes
-#   ansible.builtin.command: "update-alternatives --set iptables /usr/sbin/iptables-nft"
-#   notify:
-#    - restart docker
-
-# - name: Update alternatives for iptables
-#   tags: docker
-#   become: yes
-#   ansible.builtin.command: "update-alternatives --set ip6tables /usr/sbin/ip6tables-nft"
-#   notify:
-#    - restart docker
-
-# - name: Flush all handlers # Required to apply iptables settings before docker runs
-#   meta: flush_handlers
-
 ### Create fastpath user
 - name: Ensure the fastpath group exists
   ansible.builtin.group:
@@ -145,23 +126,46 @@
   command: id -u {{fastpath_user}}
   register: user_uid
   changed_when: false
+  tags:
+    - fastpath
 
 - name: Get GID of a specific user
   command: id -g {{fastpath_user}}
   register: user_gid
   changed_when: false
+  tags:
+    - fastpath
+
+- name: Make containerd use nftables backend
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    line: 'firewall-backend="nftables"'
+    state: present
+  notify:
+   - restart docker
+  tags:
+    - fastpath
 
 - name: Ensure fastpath is running
   community.docker.docker_container:
     name: fastpath
-    image: ooni/fastpath:v0.88
+    image: ooni/fastpath:20260416-37f9e89c
     state: started
+    restart_policy: always
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from fastpath to the statsd exporter without
     # creating a network with redirection rules to match the ports
     network_mode: host
     # published_ports: # unused on network_mode: host
     #   - "8472:8472"
+    # Image CMD: python /home/fastpath/app/run_fastpath --write-to-disk
+    command:
+      - python
+      - /home/fastpath/app/run_fastpath
+      - --write-to-disk
+    env:
+      FASTPATH_QUEUE_PUT_TIMEOUT: "-1"
+      FASTPATH_NUM_WORKERS: "10"
     volumes:
       - /opt/{{fastpath_user}}/backend/fastpath/fastpath.conf:/etc/ooni/fastpath.conf
       - /var/lib/ooniapi:/var/lib/ooniapi
@@ -190,6 +194,7 @@
       - "9102:9102" # for /metrics
       - "8125:9125" # for reporting metrics
       - "8125:9125/udp"
+  tags: fastpath
 
 ### API Uploader set up
 - name: configure api uploader using s3 bucket

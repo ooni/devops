@@ -14,12 +14,17 @@ resource "aws_ecs_cluster" "main" {
     }
   }
 
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+
   tags = var.tags
 }
 
 
 data "aws_ssm_parameter" "ecs_optimized_ami" {
-  name = "/aws/service/ecs/optimized-ami/amazon-linux-2/recommended"
+  name = "/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended"
 }
 
 resource "aws_iam_role" "container_host" {
@@ -117,14 +122,14 @@ resource "aws_security_group" "container_host" {
 
     security_groups = concat([
       aws_security_group.web.id,
-    ], 
+      ],
     var.monitoring_sg_ids)
   }
 
   ingress {
-    protocol = "tcp"
+    protocol  = "tcp"
     from_port = 9100
-    to_port = 9100
+    to_port   = 9100
 
     security_groups = var.monitoring_sg_ids
   }
@@ -152,8 +157,8 @@ resource "aws_launch_template" "container_host" {
   instance_type = var.instance_type
 
   user_data = base64encode(templatefile("${path.module}/templates/ecs-setup.sh", {
-    ecs_cluster_name = var.name,
-    ecs_cluster_tags = var.tags
+    ecs_cluster_name   = var.name,
+    ecs_cluster_tags   = var.tags
     node_exporter_port = var.node_exporter_port
   }))
 
@@ -172,15 +177,6 @@ resource "aws_launch_template" "container_host" {
     ]
   }
 
-  block_device_mappings {
-    device_name = "/dev/sdf"
-
-    ebs {
-      volume_size           = var.instance_volume_size
-      delete_on_termination = true
-    }
-  }
-
   tag_specifications {
     resource_type = "instance"
     tags = merge(
@@ -197,7 +193,9 @@ resource "aws_autoscaling_group" "container_host" {
   vpc_zone_identifier = var.subnet_ids
   min_size            = var.asg_min
   max_size            = var.asg_max
-  desired_capacity    = var.asg_desired
+  # desired_capacity is usually managed by the capacity provider
+  # defined below. Note that this is an ECS cluster, so
+  # cluster capacity is directed by task load demands
 
   launch_template {
     id      = aws_launch_template.container_host.id
@@ -211,5 +209,43 @@ resource "aws_autoscaling_group" "container_host" {
     }
 
     triggers = ["tag"]
+  }
+
+  // This tag is required by the aws_ecs_capacity_provider resource
+  // See: https://registry.terraform.io/providers/hashicorp/aws/5.87.0/docs/resources/ecs_capacity_provider#example-usage
+  tag {
+    key                 = "AmazonECSManaged"
+    value               = true
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_ecs_capacity_provider" "capacity_provider" {
+  name = "${var.name}-capacity-provider"
+
+  auto_scaling_group_provider {
+    auto_scaling_group_arn         = aws_autoscaling_group.container_host.arn
+    managed_termination_protection = "ENABLED"
+    # managed_draining = "ENABLED"
+
+    managed_scaling {
+      maximum_scaling_step_size = 1000
+      minimum_scaling_step_size = 1
+      status                    = "ENABLED"
+      target_capacity           = 100
+    }
+  }
+}
+
+// You also need to link the capacity provider to the cluster
+resource "aws_ecs_cluster_capacity_providers" "cluster_capacity_providers" {
+  cluster_name = aws_ecs_cluster.main.name
+
+  capacity_providers = [aws_ecs_capacity_provider.capacity_provider.name]
+
+  default_capacity_provider_strategy {
+    base              = 1
+    weight            = 100
+    capacity_provider = aws_ecs_capacity_provider.capacity_provider.name
   }
 }

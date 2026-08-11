@@ -55,6 +55,7 @@ resource "aws_ecs_task_definition" "ooniapi_service" {
   container_definitions = jsonencode([
     {
       memoryReservation = var.task_memory,
+      memory            = var.memory_hard_limit
       essential         = true,
       image = try(
         data.aws_ecs_container_definition.ooniapi_service_current[0].image,
@@ -139,9 +140,60 @@ resource "aws_alb_target_group" "ooniapi_service" {
   vpc_id      = var.vpc_id
   target_type = "instance"
 
+  health_check {
+    enabled             = true
+    path                = "/health"
+    matcher             = "200"
+    protocol            = "HTTP"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 30
+  }
+
   lifecycle {
     create_before_destroy = true
   }
 
   tags = var.tags
+}
+
+resource "aws_appautoscaling_target" "ecs_target" {
+  // Use count to support conditional resource creation
+  count              = var.use_autoscaling ? 1 : 0
+  service_namespace  = "ecs"
+  scalable_dimension = "ecs:service:DesiredCount"
+  resource_id        = reverse(split(":", aws_ecs_service.ooniapi_service.id))[0]
+
+  min_capacity = var.service_desired_count
+  max_capacity = var.max_desired_count
+}
+
+resource "aws_appautoscaling_policy" "policies" {
+  for_each = {
+    for p in var.autoscale_policies :
+    p.name => p
+  }
+
+  name               = each.value.name
+  service_namespace  = "ecs"
+  scalable_dimension = aws_appautoscaling_target.ecs_target[0].scalable_dimension
+  resource_id        = aws_appautoscaling_target.ecs_target[0].resource_id
+  policy_type        = "TargetTrackingScaling"
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = lookup({
+        cpu    = "ECSServiceAverageCPUUtilization"
+        memory = "ECSServiceAverageMemoryUtilization"
+        },
+        each.value.resource_type,
+        "ECSServiceAverageMemoryUtilization"
+      )
+    }
+
+    target_value       = each.value.scaleout_treshold
+    scale_in_cooldown  = 60
+    scale_out_cooldown = 60
+  }
 }

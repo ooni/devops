@@ -2,6 +2,37 @@
 
 Below you will find runbooks for common tasks and operations to manage our infra.
 
+## OONI Data Pipeline
+
+### Deploying updates
+
+There are two main ways to update the OONI Data pipeline codebase.
+
+1. Faster iterative approach
+2. More stable ansible based
+
+#### Faster iterative appraoch
+
+This is mostly useful for while you are developing and need a quick turnaround.
+
+1. Login to `clickhouse1.prod.ooni.io`
+2. Update the codebase via git using `cd /opt/airflow/oonidata/oonipipeline && sudo -u airflow git pull`
+3. Upgrade the pip oonipipeline installation using `sudo -u miniconda /opt/miniconda/bin/pip install --upgrade /opt/airflow/oonidata/oonipipeline/`
+4. You can check the version by running `sudo -u airflow CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main --version`
+
+#### Ansible based
+
+TODO
+
+#### Deploying updates
+
+Backfilling event detector tables
+
+You can run a backfill task using the `event-detector` command, like so:
+```
+sudo -u airflow CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main event-detector --start-at 2024-01-01 --end-at 2025-01-01
+```
+
 ## Monitoring deployment runbook
 
 The monitoring stack is deployed and configured by
@@ -1160,12 +1191,12 @@ In order to add new users to the jupyterlab notebook server hosted
 `notebook.ooni.org` the steps are:
 
 1. Open a PR adding an entry to this list:
-   https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook1.htz-fsn.prod.ooni.nu (we need ssh key, email and username)
+   https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook.ooni.org (we need ssh key, email and username)
 2. An OONI core team member will run:
 ```
-./play deploy-bootstrap.yml -l notebook1.htz-fsn.prod.ooni.nu --diff -i inventory
+./play deploy-bootstrap.yml -l notebook.ooni.org --diff -i inventory
 ```
-3. An OONI core team member logs into `notebook1.htz-fsn.prod.ooni.nu` and runs:
+3. An OONI core team member logs into `notebook.ooni.org` and runs:
 ```
 sudo passwd NEWUSERNAME
 ```
@@ -1196,3 +1227,40 @@ If there are duplicate you can prune them with:
 ```
 CONFIG_FILE=/etc/ooni/pipeline/oonipipeline-config.toml /opt/miniconda/bin/python -m oonipipeline.main run check-duplicates --start-at 2025-01-01 --end-at 2025-02-01 --optimize
 ```
+
+## Adding External Users to the Notebooks Server
+
+Some users may request access to the notebooks server for research purposes. This allows them to access the ClickHouse database through a research-friendly interface. We can provide access by creating an account for them.
+
+The notebooks server uses the system’s actual user accounts to authenticate access to the Jupyter web interface. To create a user, we usually create a corresponding system account on the server. The process is as follows:
+
+1. Create a new user.
+2. Set their default password.
+3. Configure the account so that the password must be changed on the next login.
+4. Ask them to log in once to update their password.
+5. They can then log in to [notebook.ooni.org](https://notebook.ooni.org) with their new password.
+
+### Procedure
+
+0. Ask the person requesting a new account for the following details: **name**, **username** (used to log in to the server), and **SSH key**.
+1. Create a new user entry in the [notebook server’s host vars](https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook.ooni.org). Remember to also add the username to the `non_admin_usernames` variable
+2. In the `ansible` directory, run:
+
+   ```
+   ./play -i inventory deploy-bootstrap.yml -l notebook.ooni.org --diff
+   ```
+3. Log in to `notebook.ooni.org` via SSH.
+4. Set the default password for the new user using:
+
+   ```
+   sudo passwd <username>
+   ```
+5. Expire the password using:
+
+   ```
+   sudo passwd -e <username>
+   ```
+
+   This will force the user to update their password on the next login.
+6. Ask the user to SSH into the notebooks server; this action will prompt them to change their password.
+7. They are now able to log in to [notebook.ooni.org](https://notebook.ooni.org).

@@ -7,7 +7,7 @@ resource "aws_vpc" "main" {
   cidr_block           = var.vpc_main_cidr_block
   enable_dns_hostnames = true
   enable_dns_support   = true
- 
+
   assign_generated_ipv6_cidr_block = true
 
   tags = var.tags
@@ -16,8 +16,8 @@ resource "aws_vpc" "main" {
 resource "aws_subnet" "public" {
   count = var.az_count
 
-  cidr_block = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
-  ipv6_cidr_block                 = cidrsubnet(aws_vpc.main.ipv6_cidr_block, 8, count.index)
+  cidr_block      = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
+  ipv6_cidr_block = cidrsubnet(aws_vpc.main.ipv6_cidr_block, 8, count.index)
 
   availability_zone       = element(var.aws_availability_zones_available.names, count.index)
   vpc_id                  = aws_vpc.main.id
@@ -39,7 +39,7 @@ resource "aws_subnet" "private" {
 
   cidr_block = cidrsubnet(aws_vpc.main.cidr_block, 8, local.private_net_offset + count.index)
 
-  ipv6_cidr_block                 = cidrsubnet(aws_vpc.main.ipv6_cidr_block, 8, local.private_net_offset + count.index)
+  ipv6_cidr_block = cidrsubnet(aws_vpc.main.ipv6_cidr_block, 8, local.private_net_offset + count.index)
 
   availability_zone       = element(var.aws_availability_zones_available.names, count.index)
   vpc_id                  = aws_vpc.main.id

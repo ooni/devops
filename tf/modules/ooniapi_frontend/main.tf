@@ -12,6 +12,12 @@ resource "aws_alb" "ooniapi" {
     enabled = true
   }
 
+  connection_logs {
+    bucket  = aws_s3_bucket.load_balancer_logs.bucket
+    enabled = true
+    prefix  = "connection_log"
+  }
+
   lifecycle {
     create_before_destroy = true
   }
@@ -67,12 +73,12 @@ resource "aws_s3_bucket_policy" "alb_logs_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "AWSLoadBalancerLogging"
-        Effect    = "Allow"
+        Sid    = "AWSLoadBalancerLogging"
+        Effect = "Allow"
         Principal = {
           AWS = "arn:aws:iam::${var.region_to_account_id[var.aws_region]}:root"
         }
-        Action = "s3:PutObject"
+        Action   = "s3:PutObject"
         Resource = "${aws_s3_bucket.load_balancer_logs.arn}/*"
       }
     ]
@@ -106,9 +112,39 @@ resource "aws_athena_database" "load_balancer_logs" {
   bucket = aws_s3_bucket.athena_results.bucket
 }
 
+resource "aws_athena_named_query" "create_alb_connection_logs_table" {
+  name     = "create_alb_connection_logs_table"
+  database = aws_athena_database.load_balancer_logs.name
+
+  query     = <<EOT
+CREATE EXTERNAL TABLE IF NOT EXISTS alb_connection_logs (
+         time string,
+         client_ip string,
+         client_port int,
+         listener_port int,
+         tls_protocol string,
+         tls_cipher string,
+         tls_handshake_latency double,
+         leaf_client_cert_subject string,
+         leaf_client_cert_validity string,
+         leaf_client_cert_serial_number string,
+         tls_verify_status string,
+         conn_trace_id string
+         )
+         ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.RegexSerDe'
+         WITH SERDEPROPERTIES (
+         'serialization.format' = '1',
+         'input.regex' =
+          '([^ ]*) ([^ ]*) ([0-9]*) ([0-9]*) ([A-Za-z0-9.-]*) ([^ ]*) ([-.0-9]*) \"([^\"]*)\" ([^ ]*) ([^ ]*) ([^ ]*) ?([^ ]*)?( .*)?'
+         )
+         LOCATION 's3://${aws_s3_bucket.load_balancer_logs.bucket}/connection_log/AWSLogs/'
+    EOT
+  workgroup = aws_athena_workgroup.ooni_workgroup.name
+}
+
 resource "aws_athena_named_query" "create_alb_logs_table" {
-  name      = "create_alb_logs_table"
-  database  = aws_athena_database.load_balancer_logs.name
+  name     = "create_alb_logs_table"
+  database = aws_athena_database.load_balancer_logs.name
 
   query     = <<EOT
 CREATE EXTERNAL TABLE IF NOT EXISTS alb_access_logs (
@@ -151,11 +187,11 @@ CREATE EXTERNAL TABLE IF NOT EXISTS alb_access_logs (
             WITH SERDEPROPERTIES (
             'serialization.format' = '1',
             'input.regex' =
-        '([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*):([0-9]*) ([^ ]*)[:-]([0-9]*) ([-.0-9]*) ([-.0-9]*) ([-.0-9]*) (|[-0-9]*) (-|[-0-9]*) ([-0-9]*) ([-0-9]*) \"([^ ]*) (.*) (- |[^ ]*)\" \"([^\"]*)\" ([A-Z0-9-_]+) ([A-Za-z0-9.-]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^\"]*)\" ([-.0-9]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^ ]*)\" \"([^\\s]+?)\" \"([^\\s]+)\" \"([^ ]*)\" \"([^ ]*)\" ?([^ ]*)?'
+        '([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*):([0-9]*) ([^ ]*)[:-]([0-9]*) ([-.0-9]*) ([-.0-9]*) ([-.0-9]*) (|[-0-9]*) (-|[-0-9]*) ([-0-9]*) ([-0-9]*) \"([^ ]*) (.*) (- |[^ ]*)\" \"([^\"]*)\" ([A-Z0-9-_]+) ([A-Za-z0-9.-]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^\"]*)\" ([-.0-9]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^ ]*)\" \"([^\\s]+?)\" \"([^\\s]+)\" \"([^ ]*)\" \"([^ ]*)\" ?([^ ]*)?.*'
             )
         LOCATION 's3://${aws_s3_bucket.load_balancer_logs.bucket}/AWSLogs/'
         EOT
-    workgroup = aws_athena_workgroup.ooni_workgroup.name
+  workgroup = aws_athena_workgroup.ooni_workgroup.name
 }
 
 resource "aws_athena_workgroup" "ooni_workgroup" {
@@ -313,8 +349,7 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule" {
         "/api/v1/login",
         "/api/v1/register",
         "/api/v1/update/*",
-        # Activate this when the DB is connected in prod
-        "/api/v1/check-in*",
+        "/api/v1/check-in*"
       ]
     }
   }
@@ -333,7 +368,53 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
     path_pattern {
       values = [
         "/api/v1/test-helpers*",
-        "/report*"
+        "/api/v1/test-list/urls",
+        "/report*",
+        "/api/_/show_countries_prioritization",
+        "/api/_/debug_prioritization"
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 122
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
+  }
+
+  # anonymous credentials
+  condition {
+    path_pattern {
+      values = [
+        "/api/v1/manifest*",
+        "/api/v1/sign_credential*",
+        "/api/v1/submit_measurement*"
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_4" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 123
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
+  }
+
+  condition {
+    path_pattern {
+      values = [
+        "/bouncer/net-tests*",
+        "/api/v1/geolookup*",
+        "/api/v1/collectors*",
+        "/api/v1/test-list/tor-targets",
+        "/api/v1/test-list/psiphon-config"
       ]
     }
   }
@@ -423,7 +504,6 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_1" {
   condition {
     path_pattern {
       values = [
-        # "/unimplemented"
         "/api/v1/measurements/*",
         "/api/v1/raw_measurement",
         "/api/v1/measurement_meta",
@@ -449,10 +529,52 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
   condition {
     path_pattern {
       values = [
-         "/api/v1/aggregation",
-         "/api/v1/aggregation/*",
-         "/api/v1/observations",
-         "/api/v1/analysis",
+        "/api/v1/aggregation",
+        "/api/v1/aggregation/*",
+        "/api/v1/observations",
+        "/api/v1/analysis",
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_3" {
+
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 143
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
+  }
+
+  condition {
+    path_pattern {
+      values = [
+        "/api/v1/detector/changepoints",
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_testlists_rule" {
+  # hotfix: to allow us to deploy the frontend without the testlists service
+  count        = var.ooniapi_testlists_target_group_arn != null ? 1 : 0
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 144
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_testlists_target_group_arn
+  }
+  condition {
+    path_pattern {
+      values = [
+        "/api/_/url-submission/test-list/*",
+        "/api/_/url-priorities/list",
+        "/api/_/url-priorities/update",
+        "/api/v1/url-submission/submit",
+        "/api/v1/url-submission/update-url",
       ]
     }
   }

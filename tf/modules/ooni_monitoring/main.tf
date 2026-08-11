@@ -2,7 +2,7 @@ locals {
   name = "ecs-service-discovery-${var.environment}"
 
   tags = {
-    Name = local.name
+    Name        = local.name
     Environment = var.environment
   }
 }
@@ -42,13 +42,13 @@ resource "aws_iam_access_key" "ooni_monitoring" {
 }
 
 resource "aws_ssm_parameter" "ooni_monitoring_access_key" {
-  name = "/oonidevops/secrets/ooni_monitoring/access_key"
-  type = "SecureString"
+  name  = "/oonidevops/secrets/ooni_monitoring/access_key"
+  type  = "SecureString"
   value = aws_iam_access_key.ooni_monitoring.id
 }
 
 resource "aws_ssm_parameter" "ooni_monitoring_secret_key" {
-  name = "/oonidevops/secrets/ooni_monitoring/secret_key"
-  type = "SecureString"
+  name  = "/oonidevops/secrets/ooni_monitoring/secret_key"
+  type  = "SecureString"
   value = aws_iam_access_key.ooni_monitoring.secret
 }

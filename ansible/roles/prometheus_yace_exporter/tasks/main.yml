@@ -1,0 +1,95 @@
+---
+# This role installs YACE, a cloudwatch-prometheus exporter to retrieve cloudwatch data from
+# prometheus
+- name: Create yace group
+  ansible.builtin.group:
+    name: "yace"
+    state: present
+  become: true
+  tags: yace
+
+- name: Create yace user
+  ansible.builtin.user:
+    name: "yace"
+    group: "yace"
+    shell: /sbin/nologin
+    system: true
+    createhome: false
+  become: true
+  tags: yace
+
+- name: Create yace config directory
+  ansible.builtin.file:
+    path: "{{ yace_config_dir }}"
+    state: directory
+    owner: "yace"
+    group: "yace"
+    mode: "0750"
+  become: true
+  tags: yace
+
+- name: Check current yace version
+  ansible.builtin.command: "{{ yace_bin_path }} --version"
+  failed_when: false
+  changed_when: false
+  register: yace_installed # return code (rc) is != 0 when not installed
+  tags: yace
+
+- name: Download and unarchive yace
+  ansible.builtin.unarchive:
+    src: "{{ yace_download_url }}"
+    dest: /tmp/
+    remote_src: true
+    mode: "0700"
+  when: yace_installed.rc != 0
+  become: true
+  tags: yace
+
+- name: Install yace binary
+  ansible.builtin.copy:
+    src: "/tmp/{{ yace_filename }}/yace"
+    dest: "{{ yace_bin_path }}"
+    owner: "yace"
+    group: "yace"
+    mode: "0755"
+    remote_src: true
+  when: yace_installed.rc != 0
+  notify: restart yace
+  become: true
+  tags: yace
+
+- name: Render yace config
+  ansible.builtin.template:
+    src: config.yml
+    dest: "{{ yace_config_path }}"
+    owner: "yace"
+    group: "yace"
+    mode: "0640"
+  notify: restart yace
+  become: true
+  tags: yace
+
+- name: Install yace systemd unit
+  ansible.builtin.template:
+    src: yace.service
+    dest: /etc/systemd/system/yace.service
+    mode: "0644"
+  register: yace_service
+  notify: restart yace
+  become: true
+  tags: yace
+
+- name: Reload systemd daemon if yace unit changed
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: yace_service is changed
+  become: true
+  tags: yace
+
+- name: Ensure yace is running and enabled
+  ansible.builtin.service:
+    name: yace
+    state: started
+    enabled: true
+  become: true
+  tags: yace

@@ -1,0 +1,14 @@
+[Unit]
+Description=Prometheus StatsD Exporter
+After=network.target
+
+[Service]
+TimeoutStartSec=0
+User=statsd_exporter
+ExecStart={{ statsd_exporter_bin_path }} \
+  --statsd.listen-udp={{ statsd_exporter_statsd_listen_udp }} \
+  --web.listen-address={{ statsd_exporter_web_listen_address }}
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -30,6 +30,7 @@ resource "aws_iam_policy" "oonidevops" {
         "autoscaling:*",
         "application-autoscaling:*",
         "elasticloadbalancing:*",
+        "elasticache:*",
         "acm:*",
         "cloudformation:*",
         "cloudtrail:*",
@@ -52,7 +53,8 @@ resource "aws_iam_policy" "oonidevops" {
         "secretsmanager:*",
         "cloudhsm:*",
         "athena:*",
-        "glue:*"
+        "glue:*",
+        "events:*"
       ],
       "Resource": "*"
     }

@@ -11,9 +11,9 @@ resource "aws_security_group" "nginx_sg" {
   vpc_id = var.vpc_id
 
   ingress {
-    protocol    = "tcp"
-    from_port   = 9000
-    to_port     = 9000
+    protocol  = "tcp"
+    from_port = 9000
+    to_port   = 9000
   }
 
   ingress {

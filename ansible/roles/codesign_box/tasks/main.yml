@@ -5,21 +5,116 @@
     dest: "/home/ubuntu/.ssh/authorized_keys"
     owner: "ubuntu"
     mode: "0400"
+  tags: codesign
 
 - name: Install cloudhsm-cli
   ansible.builtin.apt:
     deb: https://s3.amazonaws.com/cloudhsmv2-software/CloudHsmClient/Jammy/cloudhsm-cli_latest_u22.04_amd64.deb
     update_cache: true
+  tags: codesign
 
 - name: Install cloudhsm-pkcs11
   ansible.builtin.apt:
     deb: https://s3.amazonaws.com/cloudhsmv2-software/CloudHsmClient/Jammy/cloudhsm-pkcs11_latest_u22.04_amd64.deb
+  tags: codesign
 
 - name: Install cloudhsm-pkcs11
   ansible.builtin.apt:
     name:
       - libengine-pkcs11-openssl
       - awscli
+  tags: codesign
+
+- name: Check if osslsigncode is already installed
+  ansible.builtin.command: which osslsigncode
+  register: osslsigncode_check
+  failed_when: false
+  changed_when: false
+  tags: codesign
+- name: Build and install osslsigncode from source
+  when: osslsigncode_check.rc != 0
+  tags: codesign
+  vars:
+    ossl_version: 2.13
+  block:
+    - name: Install osslsigncode build dependencies
+      ansible.builtin.apt:
+        name:
+          - cmake
+          - libssl-dev
+          - libcurl4-openssl-dev
+          - zlib1g-dev
+          - python3
+          - git
+        state: present
+        update_cache: true
+      tags: codesign
+
+    - name: Download osslsigncode release tarball
+      ansible.builtin.get_url:
+        url: "https://github.com/mtrojnar/osslsigncode/archive/refs/tags/{{ ossl_version }}.tar.gz"
+        dest: /tmp/osslsigncode.tar.gz
+        mode: "0644"
+      tags: codesign
+
+    - name: Extract osslsigncode tarball
+      ansible.builtin.unarchive:
+        src: /tmp/osslsigncode.tar.gz
+        dest: /tmp/
+        remote_src: true
+      tags: codesign
+
+    - name: Create build directory
+      ansible.builtin.file:
+        path: "/tmp/osslsigncode-{{ ossl_version }}/build"
+        state: directory
+        mode: "0755"
+      tags: codesign
+
+    - name: Configure osslsigncode with CMake
+      ansible.builtin.command:
+        cmd: cmake -S .. -DCMAKE_BUILD_TYPE=Release
+        chdir: "/tmp/osslsigncode-{{ ossl_version }}/build"
+      changed_when: true
+      tags: codesign
+
+    - name: Build osslsigncode
+      ansible.builtin.command:
+        cmd: cmake --build . --parallel
+        chdir: "/tmp/osslsigncode-{{ ossl_version }}/build"
+      changed_when: true
+      tags: codesign
+
+    - name: Install osslsigncode
+      ansible.builtin.command:
+        cmd: cmake --install .
+        chdir: "/tmp/osslsigncode-{{ossl_version}}/build"
+      changed_when: true
+      tags: codesign
+
+    - name: Clean up build directory
+      ansible.builtin.file:
+        path: "/tmp/osslsigncode-{{ossl_version}}"
+        state: absent
+      tags: codesign
+
+- name: Create aws directory
+  ansible.builtin.file:
+    path: "/home/ubuntu/.aws"
+    owner: ubuntu
+    group: adm
+    state: directory
+    mode: "0750"
+  tags: codesign
+
+- name: Write ~/.aws/credentials
+  ansible.builtin.template:
+    src: aws_credentials
+    dest: /home/ubuntu/.aws/credentials
+    owner: ubuntu
+    group: adm
+    mode: "u=rwx,g=r,o="
+  tags: codesign
 
 - name: Write customerCA.crt
   ansible.builtin.template:
@@ -28,6 +123,7 @@
     owner: root
     group: adm
     mode: "u=rwx,g=rx"
+  tags: codesign
 
 - name: Write Cert_bundle.pem
   ansible.builtin.template:
@@ -36,6 +132,7 @@
     owner: root
     group: adm
     mode: "u=rwx,g=rx"
+  tags: codesign
 
 - name: Write delete-hsms.sh command
   ansible.builtin.template:
@@ -44,6 +141,7 @@
     owner: root
     group: adm
     mode: "u=rwx,g=rx"
+  tags: codesign
 
 - name: Write create-hsms.sh command
   ansible.builtin.template:
@@ -52,16 +150,18 @@
     owner: root
     group: adm
     mode: "u=rwx,g=rx"
+  tags: codesign
 
 - name: Ensure .hsmcredentials file exists
   ansible.builtin.copy:
     dest: /home/ubuntu/.hsmcredentials
     content: |
-      HSM_PASSWORD=
+      HSM_CREDENTIALS=
     owner: ubuntu
     group: adm
     mode: "u=rw,g=,o="
     force: false
+  tags: codesign
 
 - name: Write sign-windows-exe.sh command
   ansible.builtin.template:
@@ -70,3 +170,4 @@
     owner: root
     group: adm
     mode: "u=rwx,g=rx"
+  tags: codesign

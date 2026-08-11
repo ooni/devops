@@ -10,7 +10,7 @@ variable "private_subnet_cidr" {
   description = "the cidr block of the private subnet to allow traffic from for the clickhouse proxy"
 }
 
- variable "tags" {
+variable "tags" {
   description = "tags to apply to the resources"
   default     = {}
   type        = map(string)
@@ -56,7 +56,7 @@ variable "dns_zone_ooni_io" {
 
 variable "clickhouse_url" {
   description = "clickhouse url to proxy requests to"
-  default = "backend-fsn.ooni.org" 
+  default     = "backend-fsn.ooni.org"
 }
 
 variable "clickhouse_port" {

@@ -1,6 +1,6 @@
 ---
 - name: Deploy notebook host
-  hosts: notebook1.htz-fsn.prod.ooni.nu
+  hosts: notebook.ooni.org
   become: true
   tags:
     - notebook
@@ -8,6 +8,5 @@
     notebook_domain: "notebook.ooni.org"
     ssl_domains:
       - "{{ inventory_hostname }}"
-      - "notebook.ooni.org"
   roles:
     - notebook

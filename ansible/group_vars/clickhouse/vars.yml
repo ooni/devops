@@ -2,10 +2,10 @@ nftables_clickhouse_allow:
   - fqdn: data1.htz-fsn.prod.ooni.nu
     ip: 142.132.254.225
   - fqdn: data2.htz-fsn.prod.ooni.nu
-    ip: 88.198.54.12
+    ip: 23.88.74.249
   - fqdn: data3.htz-fsn.prod.ooni.nu
     ip: 168.119.7.188
-  - fqdn: notebook1.htz-fsn.prod.ooni.nu
+  - fqdn: notebook.ooni.org
     ip: 138.201.19.39
   - fqdn: backend-hel.ooni.org
     ip: 65.108.192.151
@@ -17,15 +17,21 @@ nftables_clickhouse_allow:
     ip: "{{ lookup('dig', 'clickhouseproxy.dev.ooni.io/A') }}"
   - fqdn: clickhouseproxy.prod.ooni.io
     ip: "{{ lookup('dig', 'clickhouseproxy.prod.ooni.io/A') }}"
+  - fqdn: fastpath.prod.ooni.io
+    ip: "{{ lookup('dig', 'fastpath.prod.ooni.io/A') }}"
+  - fqdn: fastpath2.prod.ooni.io
+    ip: "{{ lookup('dig', 'fastpath2.prod.ooni.io/A') }}"
+  - fqdn: reuploaderfastpath.prod.ooni.io
+    ip: "{{ lookup('dig', 'reuploaderfastpath.prod.ooni.io/A') }}"
 
 nftables_zookeeper_allow:
   - fqdn: data1.htz-fsn.prod.ooni.nu
     ip: 142.132.254.225
   - fqdn: data2.htz-fsn.prod.ooni.nu
-    ip: 88.198.54.12
+    ip: 23.88.74.249
   - fqdn: data3.htz-fsn.prod.ooni.nu
     ip: 168.119.7.188
-  - fqdn: notebook1.htz-fsn.prod.ooni.nu
+  - fqdn: notebook.ooni.org
     ip: 138.201.19.39
 
 clickhouse_version: 24.8.6.70
@@ -33,10 +39,13 @@ clickhouse_version: 24.8.6.70
 clickhouse_config:
   max_connections: 4096
   keep_alive_timeout: 3
-  max_concurrent_queries: 100
+  max_concurrent_queries: 300
   max_server_memory_usage: 0
   max_thread_pool_size: 10000
   max_server_memory_usage_to_ram_ratio: 0.9
+  # for 1GB/s 50% utilization cap
+  max_replicated_sends_network_bandwidth_for_server: 62500000
+  max_replicated_fetches_network_bandwidth_for_server: 62500000
   total_memory_profiler_step: 4194304
   total_memory_tracker_sample_probability: 0
   uncompressed_cache_size: 8589934592
@@ -87,11 +96,11 @@ clickhouse_keeper:
     hostname: clickhouse1.prod.ooni.io
     port: 9234
 
-  #- keeper_server:
-  #  server: data2.htz-fsn.prod.ooni.nu
-  #  id: 2
-  #  hostname: clickhouse2.prod.ooni.io
-  #  port: 9234
+  - keeper_server:
+    server: data2.htz-fsn.prod.ooni.nu
+    id: 2
+    hostname: clickhouse2.prod.ooni.io
+    port: 9234
 
   - keeper_server:
     server: data3.htz-fsn.prod.ooni.nu
@@ -99,21 +108,15 @@ clickhouse_keeper:
     hostname: clickhouse3.prod.ooni.io
     port: 9234
 
-  - keeper_server:
-    server: notebook1.htz-fsn.prod.ooni.nu
-    id: 4
-    hostname: notebook1.htz-fsn.prod.ooni.nu
-    port: 9234
-
 clickhouse_zookeeper:
   - node:
     host: clickhouse1.prod.ooni.io
     port: 9181
   - node:
-    host: clickhouse3.prod.ooni.io
+    host: clickhouse2.prod.ooni.io
     port: 9181
   - node:
-    host: notebook1.htz-fsn.prod.ooni.nu
+    host: clickhouse3.prod.ooni.io
     port: 9181
 
 clickhouse_remote_servers:
@@ -127,9 +130,9 @@ clickhouse_remote_servers:
           - replica:
             host: clickhouse1.prod.ooni.io
             port: 9000
-          #- replica:
-          #  host: clickhouse2.prod.ooni.io
-          #  port: 9000
+          - replica:
+            host: clickhouse2.prod.ooni.io
+            port: 9000
           - replica:
             host: clickhouse3.prod.ooni.io
             port: 9000
@@ -161,6 +164,7 @@ clickhouse_distributed_ddl:
   cleanup_delay_period: 60
   max_tasks_in_queue: 1000
 
+clickhouse_role_manage_settings_profiles: True
 clickhouse_default_profiles:
   default:
     readonly: 2
@@ -170,12 +174,34 @@ clickhouse_default_profiles:
     max_partitions_per_insert_block: 100
   readonly:
     readonly: 1
+    # 1 GB
+    max_memory_usage: 1001001000
   write:
     readonly: 0
     max_memory_usage: 61001001000
+  admin:
+    readonly: 0
 
 clickhouse_listen_hosts:
   - "::"
+
+# Users examples
+clickhouse_admin_user: admin
+clickhouse_admin_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_admin_password', profile='oonidevops_user_prod') }}"
+
+clickhouse_admin_users:
+  - user:
+    name: "{{ clickhouse_admin_user }}"
+    password_sha256_hex: "{{ clickhouse_admin_password | hash('sha256') }}"
+    networks:
+      - "127.0.0.1"
+      - "::1"
+    profile: admin
+    quota: "default"
+    access_management: 1
+    named_collection_control: 1
+    show_named_collections: 1
+    show_named_collections_secrets: 1
 
 clickhouse_default_users:
   - user:
@@ -199,6 +225,172 @@ clickhouse_default_users:
       - "0.0.0.0/0"
     profile: write
     quota: default
+
+clickhouse_role_manage_users: True
+clickhouse_custom_users:
+  - user:
+    name: fastpath
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_fastpath_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: "fastpath"
+    databases: [ooni, oonitest]
+
+  - user:
+    name: oonimeasurements
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    settings:
+      # 1 GB
+      - "max_memory_usage = 1001001000"
+      # 60 seconds
+      - "max_execution_time = 30"
+      # 500 GB
+      - "max_bytes_to_read = 501001001000"
+      # 5 B
+      - "max_rows_to_read = 5001001000"
+      # 5s
+      - "timeout_before_checking_execution_speed = 5"
+      # 50k
+      - "max_result_rows = 51000"
+    profile:
+      - readonly
+    quota: oonimeasurements
+    databases: [ooni, oonitest]
+
+  - user:
+    name: ooniprobe
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_ooniprobe_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: ooniprobe
+    databases: [ooni, oonitest]
+
+  - user:
+    name: oonirun
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonirun_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: oonirun
+    databases: [ooni, oonitest]
+
+  - user:
+    name: oonitestlists
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonitestlists_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: oonitestlists
+    databases: [ooni, oonitest]
+
+  - user:
+    name: notebook
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_notebook_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '0.0.0.0/0'"
+    profile:
+      - write
+    quota: notebook
+    databases: [ooni]
+
+clickhouse_role_manage_quotas: True
+clickhouse_custom_quotas:
+  - quota:
+    name: oonimeasurements
+    duration: 600
+    queries: 12000
+    errors: 1000
+    result_rows: 0
+    read_rows: 0
+    execution_time: 1000
+
+    # no limits set
+  - quota:
+    name: ooniprobe
+    duration: 0
+    queries: 0
+    errors: 0
+    result_rows: 0
+    read_rows: 0
+    execution_time: 0
+
+    # no limits set
+  - quota:
+    name: oonirun
+    duration: 0
+    queries: 0
+    errors: 0
+    result_rows: 0
+    read_rows: 0
+    execution_time: 0
+
+  - quota:
+    name: oonitestlists
+    duration: 600
+    queries: 12000
+    errors: 1000
+    result_rows: 0
+    read_rows: 0
+    execution_time: 1000
+
+    # no limits set
+  - quota:
+    name: notebook
+    duration: 0
+    queries: 0
+    errors: 0
+    result_rows: 0
+    read_rows: 0
+    execution_time: 0
+
+clickhouse_role_manage_grants: True
+clickhouse_custom_grants:
+- on:
+  databases: [ooni, oonitest]
+  tables: ["*"]
+  privileges: [SELECT]
+  to: [ooniprobe, oonimeasurements, oonirun, fastpath, notebook]
+
+- on:
+  databases: [ooni, oonitest]
+  tables: [url_priorities]
+  privileges: [INSERT]
+  to: [oonitestlists]
+
+- on:
+  databases: [ooni, oonitest]
+  tables: [faulty_measurements]
+  privileges: [INSERT]
+  to: [ooniprobe]
+
+- on:
+  databases: [ooni, oonitest]
+  tables: [fastpath, obs_web, obs_openvpn, jsonl, new_jsonl]
+  privileges: [INSERT]
+  to: [fastpath]
+
+clickhouse_custom_grant_roles:
+  - roles: [oonimeasurements]
+    to: [oonimeasurements]
+
+clickhouse_role_manage_roles: True
+clickhouse_custom_roles:
+  - role:
+    name: oonimeasurements
 
 clickhouse_default_quotas:
   - quota:

@@ -1,3 +1,2 @@
 use_https: true
-http_port: 80
-https_port: 443
+use_nginx: true

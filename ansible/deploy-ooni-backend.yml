@@ -8,10 +8,6 @@
         admin_group_name: adm
     - role: base-backend
     - role: nftables
-    - role: nginx
-      tags: nginx
-      vars:
-        nginx_user: "www-data"
     - role: dehydrated
       tags: dehydrated
       expand: yes
@@ -20,6 +16,7 @@
           # with dehydrated the first entry is the cert FQDN
           # and the other ones are alternative names
           - "backend-hel.ooni.org"
+        nginx_user: "www-data"
     - role: ooni-backend
       vars: 
         ssl_domain: backend-hel.ooni.org

@@ -1,7 +1,7 @@
 ssh_users:
   sloncocs:
     login: sloncocs
-    comment: Elizaveta 
+    comment: Elizaveta
     keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMlol+UQauDLLMB//CpGBiigJftQmqk5Wm2c1TXk9RNz elizaveta@openobservatory.org"]
   agrabeli:
     login: agrabeli
@@ -110,14 +110,24 @@ ssh_users:
     comment: Toomore Chiang
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHNIq5cvGr998xyW1uylgzLvD4JQ6/9SOds2LZ5Jbm9R toomore@ocf.tw"
+  dillon:
+    login: dillon
+    comment: Dillon (Voidly)
+    keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKQztdHIbaVzZww+5fJyIjIwCYY7FVT/zCrVnd8yYJWO info@voidly.ai"
+  aagbsn:
+    login: aagbsn
+    comment: Aaron Gibson
+    keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC91p0KabJ1OGKKVLiOlECaP7nYBPUStXUVUsFw/pis2 aaron@openobservatory.org"
   imap:
     login: imap
     comment: iMAP partners (only for training by Siti/Sinar Project)
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
 
-admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis ]
-non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, lex, imap, sloncocs]
+admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, aagbsn]
+non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, dillon, lex, imap, sloncocs, aagbsn]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 
@@ -126,12 +136,17 @@ clickhouse_default_profiles:
     readonly: 2
   write:
     readonly: 0
+  admin:
+    readonly: 0
 
-clickhouse_version: "24.10.2.80"
 clickhouse_release_type: stable
 clickhouse_listen_hosts:
   - "127.0.0.1"
 
+# this only applies to SQL managed users
+clickhouse_role_manage_users: false
+clickhouse_role_manage_grants: false
+# these are handled via config files
 clickhouse_default_users:
   - user:
     name: default
@@ -147,3 +162,8 @@ clickhouse_default_users:
       - "127.0.0.1"
     profile: write
     quota: default
+
+# configure extra domains for dehydrated
+ssl_domains:
+  - notebook1.htz-fns.prod.ooni.nu
+  - notebook.ooni.org

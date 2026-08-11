@@ -31,6 +31,18 @@ scrape_configs:
 {% for target in (bbjob.targets|sort) %}
         - "{{ target }}"
 {% endfor %}
+# Adds custom labels to metrics for this job
+{% if (bbjob.ignore_instance_down | default(false)) or (bbjob.labels is defined) %}
+        labels:
+{% if bbjob.ignore_instance_down | default(false) %}
+          ignore_instance_down: "true"
+{% endif %}
+{% if bbjob.labels is defined %}
+{% for k, v in bbjob.labels.items() %}
+          {{ k }}: "{{ v }}"
+{% endfor %}
+{% endif %}
+{% endif %}
     relabel_configs:
       - source_labels: [__address__]
         regex: (.*)(:80)?
@@ -69,8 +81,9 @@ scrape_configs:
     static_configs:
       - targets:
         - https://data1.htz-fsn.prod.ooni.nu/metrics/node_exporter
+        - https://data2.htz-fsn.prod.ooni.nu/metrics/node_exporter
         - https://data3.htz-fsn.prod.ooni.nu/metrics/node_exporter
-        - https://notebook1.htz-fsn.prod.ooni.nu/metrics/node_exporter
+        - https://notebook.ooni.org/metrics/node_exporter
         - http://0.do.th.prod.ooni.io:9001/metrics
         - http://1.do.th.prod.ooni.io:9001/metrics
         - http://2.do.th.prod.ooni.io:9001/metrics
@@ -139,8 +152,9 @@ scrape_configs:
     static_configs:
       - targets:
         - data1.htz-fsn.prod.ooni.nu
+        - data2.htz-fsn.prod.ooni.nu
         - data3.htz-fsn.prod.ooni.nu
-        - notebook1.htz-fsn.prod.ooni.nu
+        - notebook.ooni.org
 
   - job_name: 'raw-netdata'
     scrape_interval: 5s
@@ -203,7 +217,6 @@ scrape_configs:
       - ooni.io:443
       - ooni.torproject.org:443
       - openobservatory.github.io:443
-      - ooni.netlify.app:443
 
 
   # See ansible/roles/ooni-backend/tasks/main.yml for the scraping targets
@@ -215,16 +228,16 @@ scrape_configs:
   #    - targets:
   #      - backend-hel.ooni.org:444
 
-  # EC2 instances monitoring: 
+  # EC2 instances monitoring:
   - job_name: 'ooni-aws-ec2-dev'
     scrape_interval: 5s
-    scheme: https 
-    metrics_path: "/metrics" 
+    scheme: https
+    metrics_path: "/metrics"
     ec2_sd_configs:
-      - access_key: "{{prometheus_aws_access_key_dev}}" 
+      - access_key: "{{prometheus_aws_access_key_dev}}"
         secret_key: "{{prometheus_aws_secret_key_dev}}"
         region: "eu-central-1"
-        port: 9100  
+        port: 9100
         filters: &instance_filters
           - name: instance-state-name
             values: ['running']
@@ -233,6 +246,8 @@ scrape_configs:
     relabel_configs: &ec2_relabeling # Change the host to the proxy host with relabeling
       - source_labels: [__meta_ec2_tag_Environment] # take environment from tags
         target_label: env
+      - source_labels: [__meta_ec2_tag_Name] # EC2 instance Name tag
+        target_label: ec2_name
       - source_labels: [__address__]
         regex: "([0-9\\.]+):([0-9]+)" # <ip>:<port>"
         replacement: "$1"
@@ -268,14 +283,14 @@ scrape_configs:
 
   - job_name: 'ooni-aws-ec2-prod'
     scrape_interval: 5s
-    scheme: https 
-    metrics_path: "/metrics" 
+    scheme: https
+    metrics_path: "/metrics"
     ec2_sd_configs:
-      - access_key: "{{prometheus_aws_access_key_prod}}" 
+      - access_key: "{{prometheus_aws_access_key_prod}}"
         secret_key: "{{prometheus_aws_secret_key_prod}}"
         region: "eu-central-1"
-        port: 9100  
-        filters: 
+        port: 9100
+        filters:
           *instance_filters
     relabel_configs: # Change the host to the proxy host with relabeling
       *ec2_relabeling
@@ -288,7 +303,7 @@ scrape_configs:
       username: 'prom'
       password: '{{ prometheus_metrics_password }}'
     file_sd_configs:
-      - files: 
+      - files:
         - '/var/lib/prometheus/file_discovery/*.json'
     relabel_configs: # Change the host to the proxy host with relabeling
       # Store ip in ecs_host
@@ -327,15 +342,17 @@ scrape_configs:
 
   - job_name: "fastpath"
     static_configs:
-    - targets: 
+    - targets:
       - fastpath.dev.ooni.io:9102
       - fastpath.prod.ooni.io:9102
+      - fastpath2.prod.ooni.io:9102
+      - reuploaderfastpath.prod.ooni.io:9102
     scrape_interval: 5s
     scheme: https
     relabel_configs: # Change the host to the proxy host with relabeling
       # Store ip in ecs_host
       - source_labels: [__address__]
-        regex: "([a-z\\.]+):([0-9]+)" # <host>:<port>"
+        regex: "([a-zA-Z0-9\\.-]+):([0-9]+)" # <host>:<port>"
         replacement: "$1"
         target_label: "ec2_host"
         action: "replace"
@@ -347,7 +364,7 @@ scrape_configs:
         action: "replace"
       # Store the full adress with path in proxy_host
       - source_labels: [__address__]
-        regex: "([a-z\\.]+):([0-9]+)" # <host>:<port>
+        regex: "([a-zA-Z0-9\\.-]+):([0-9]+)" # <host>:<port>
         replacement: "{{monitoring_proxy_host}}:9200/${1}/${2}/metrics" # proxy.org:9200/<hostname>/<port>/metrics
         target_label: "__proxy_host"
         action: "replace"
@@ -370,4 +387,37 @@ scrape_configs:
         replacement: "/$2"
         target_label: "__metrics_path__"
         action: "replace"
-...
+
+  - job_name: "testlists"
+    static_configs:
+    - targets:
+      - testlist-ec2.prod.ooni.io
+      - testlist-ec2.dev.ooni.io
+    scrape_interval: 5s
+    scheme: http
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password }}'
+
+  - job_name: "airflow"
+    scheme: https
+    metrics_path: /metrics/statsd_exporter
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password }}'
+    static_configs:
+      - targets:
+        - airflow.prod.ooni.io
+
+  - job_name: "cloudwatch_exporter" # yace
+    scheme: http
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+        - monitoringproxy.dev.ooni.io:5000
+        - monitoringproxy.prod.ooni.io:5000
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: 'monitoringproxy\.(dev|prod)\.ooni\.io:5000'
+        target_label: env
+        replacement: '$1'

@@ -1,13 +1,13 @@
 ---
 - name: Deploy oonidata clickhouse hosts
   hosts:
-    - notebook1.htz-fsn.prod.ooni.nu
+    - notebook.ooni.org
     - data1.htz-fsn.prod.ooni.nu
-    # - data2.htz-fsn.prod.ooni.nu
+    - data2.htz-fsn.prod.ooni.nu
     - data3.htz-fsn.prod.ooni.nu
   become: true
-  tags:
-    - clickhouse
   roles:
-    - prometheus_node_exporter
-    - oonidata_clickhouse
+    - role: prometheus_node_exporter
+      tags: [node_exporter]
+    - role: oonidata_clickhouse
+      tags: [clickhouse]

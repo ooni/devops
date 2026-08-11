@@ -10,15 +10,27 @@ server {
 
     include /etc/nginx/ssl_intermediate.conf;
 
-    ssl_certificate {{ tls_cert_dir }}/{{ inventory_hostname }}/fullchain.pem;
-    ssl_certificate_key {{ tls_cert_dir }}/{{ inventory_hostname }}/privkey.pem;
-    ssl_trusted_certificate {{ tls_cert_dir }}/{{ inventory_hostname }}/chain.pem;
+    ssl_certificate {{ tls_cert_dir }}/{{ airflow_public_fqdn }}/fullchain.pem;
+    ssl_certificate_key {{ tls_cert_dir }}/{{ airflow_public_fqdn }}/privkey.pem;
+    ssl_trusted_certificate {{ tls_cert_dir }}/{{ airflow_public_fqdn }}/chain.pem;
 
     server_name {{ airflow_public_fqdn }};
     access_log  /var/log/nginx/{{ airflow_public_fqdn }}.access.log;
     error_log   /var/log/nginx/{{ airflow_public_fqdn }}.log warn;
 
     add_header Access-Control-Allow-Origin *;
+
+    ## Prometheus statsd_exporter metrics
+    location /metrics/statsd_exporter {
+        auth_basic           "Administrator's Area";
+        auth_basic_user_file /etc/ooni/prometheus_passwd;
+
+        proxy_pass http://127.0.0.1:9102/metrics;
+
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
 
     ## Airflow reverse proxy
     location / {
@@ -30,6 +42,33 @@ server {
 
 	    client_max_body_size 100M;
 
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header X-Scheme $scheme;
+        proxy_buffering off;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    include /etc/nginx/ssl_intermediate.conf;
+    ssl_certificate /var/lib/dehydrated/certs/{{event_detector_panel_domain}}/fullchain.pem;
+    ssl_certificate_key /var/lib/dehydrated/certs/{{event_detector_panel_domain}}/privkey.pem;
+    ssl_trusted_certificate /var/lib/dehydrated/certs/{{event_detector_panel_domain}}/chain.pem;
+    server_name {{ event_detector_panel_domain }};
+    access_log  /var/log/nginx/{{ event_detector_panel_domain }}.access.log;
+    error_log   /var/log/nginx/{{ event_detector_panel_domain }}.log warn;
+
+    location / {
+        auth_basic           "Administrator's Area";
+        auth_basic_user_file /etc/ooni/detector_panel_passwd;
+        proxy_pass http://127.0.0.1:8501;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        client_max_body_size 100M;
         # WebSocket support
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
