@@ -1,7 +1,7 @@
-- name: restart echo
+- name: restart echoth
   tags: test-helpers
   ansible.builtin.systemd_service:
-    name: echo
+    name: echoth
     state: restarted
 
 - name: restart jsonth

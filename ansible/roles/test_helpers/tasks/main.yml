@@ -22,83 +22,14 @@
   become: yes
 
 # Install test helpers
-#
-# TODO(test-helpers-source-build): building from source here until
-# ooni/ooniprobe-rs has a release workflow that publishes precompiled
-# test-helpers binaries. Switch back to downloading+checksumming a release
-# tarball once that exists (see git history of this role for the previous
-# get_url/checksum-based approach).
-
-- name: Install build dependencies
-  ansible.builtin.apt:
-    name:
-      - git
-      - curl
-      - build-essential
-      - pkg-config
-      - libssl-dev
-    state: present
-    update_cache: yes
-  become: true
-
-- name: Check if rustup toolchain is already installed
-  ansible.builtin.stat:
-    path: /usr/local/cargo/bin/cargo
-  register: cargo_installed
-
-- name: Install rustup toolchain
-  ansible.builtin.shell: |
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
-  environment:
-    RUSTUP_HOME: /usr/local/rustup
-    CARGO_HOME: /usr/local/cargo
-  when: not cargo_installed.stat.exists
-  become: true
-
-- name: Clone ooniprobe-rs repo
-  ansible.builtin.git:
-    repo: "{{ test_helpers_repo }}"
-    dest: "/tmp/ooniprobe-rs"
-    version: "{{ test_helpers_version }}"
+- name: Download the {{ helper }} test helper binary
+  ansible.builtin.get_url:
+    url: "{{ test_helpers_base_url }}/{{ test_helpers_binary_source }}"
+    dest: "/usr/local/bin/{{ helper }}"
+    mode: '0755'
     force: yes
-  become: true
-
-- name: Build the test-helpers crate in release mode
-  ansible.builtin.command: /usr/local/cargo/bin/cargo build --release --package test-helpers
-  args:
-    chdir: "/tmp/ooniprobe-rs"
-  environment:
-    RUSTUP_HOME: /usr/local/rustup
-    CARGO_HOME: /usr/local/cargo
-    PATH: "/usr/local/cargo/bin:{{ ansible_env.PATH }}"
-  become: true
-
-# Both binaries are built as part of the workspace build above and copied to
-# every host regardless of which helper it runs, but only one systemd unit
-# ({{helper}}.service) is actually installed per host (see below).
-- name: Make jsonth accessible system wide
-  ansible.builtin.copy:
-    src: "/tmp/ooniprobe-rs/target/release/jsonth"
-    dest: "/usr/local/bin/"
-    mode: '0755'
-    remote_src: yes
   become: yes
-  register: jsonth_binary
-
-- name: Make echo accessible system wide
-  ansible.builtin.copy:
-    src: "/tmp/ooniprobe-rs/target/release/echo"
-    dest: "/usr/local/bin/"
-    mode: '0755'
-    remote_src: yes
-  become: yes
-  register: echo_binary
-
-- name: Clean up build directory
-  ansible.builtin.file:
-    path: "/tmp/ooniprobe-rs"
-    state: absent
-  become: yes
+  register: helper_binary
 
 # Create systemd units
 
@@ -123,13 +54,10 @@
     state: started
     enabled: yes
 
-# Only the helper actually deployed on this host (the one matching {{helper}})
-# has a unit above; restart it here if its own binary changed, so a source
-# rebuild actually takes effect and not just on unit-file changes.
 - name: Restart helper if its binary changed
   tags: test-helpers
   ansible.builtin.systemd_service:
     name: "{{ helper }}.service"
     state: restarted
   become: yes
-  when: (helper == 'jsonth' and jsonth_binary.changed) or (helper == 'echo' and echo_binary.changed)
+  when: helper_binary.changed

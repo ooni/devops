@@ -1,8 +1,2 @@
-# TODO(test-helpers-source-build): the test helpers moved into the
-# test-helpers crate of https://github.com/ooni/ooniprobe-rs and there is no
-# release workflow producing precompiled binaries for it yet. Until that
-# workflow exists we build from source below. Once precompiled binaries are
-# published again, switch this role back to downloading+checksumming a
-# release tarball (see git history of this file for the previous approach).
-test_helpers_repo: https://github.com/ooni/ooniprobe-rs.git
-test_helpers_version: main 
+test_helpers_version: v0.1.6-beta
+test_helpers_base_url: "https://github.com/ooni/ooniprobe-rs/releases/download/{{ test_helpers_version }}"
