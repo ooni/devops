@@ -1398,7 +1398,7 @@ module "testlists_builder" {
 
   service_name            = "testlists"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "fix_1238_testlists_worktree"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
   trigger_path            = "ooniapi/services/testlists/**"
