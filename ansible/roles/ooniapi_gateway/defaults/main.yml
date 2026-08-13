@@ -54,10 +54,15 @@ ooniapi_gateway_services: []
 # those routes entirely.
 ooniapi_gateway_testlists_upstream: ""
 
-# Podman network shared by every service's containers on this host.
+# Docker network shared by every service's containers on this host.
 ooniapi_gateway_network_name: ooniapi
 
 # SSH user the deploy CodeBuild job connects as. Must match
 # `deploy_ssh_user` (default "deploy") in the ooniapi_service_deployer
 # Terraform module.
 ooniapi_gateway_deploy_user: deploy
+
+# Private directory the deploy job scp's files into before they're
+# moved/installed into place. Must match STAGING_DIR in
+# tf/modules/ooniapi_service_deployer/files/deploy.py.
+ooniapi_gateway_staging_dir: /var/lib/ooniapi/deploy-staging

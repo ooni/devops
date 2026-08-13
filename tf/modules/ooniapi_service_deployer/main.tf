@@ -161,16 +161,16 @@ resource "aws_codebuild_project" "ooniapi" {
   }
 }
 
-## Podman Quadlet blue/green deploy (deploy_mode = "blue_green")
+## Docker Compose blue/green deploy (deploy_mode = "blue_green")
 
-resource "aws_s3_object" "quadlet_unit" {
+resource "aws_s3_object" "compose_file" {
   for_each = var.deploy_mode == "blue_green" ? { a = var.host_port_a, b = var.host_port_b } : {}
 
-  bucket       = var.quadlet_units_bucket
-  key          = "${var.service_name}/${var.service_name}-${each.key}.container"
+  bucket       = var.deploy_bucket
+  key          = "${var.service_name}/${var.service_name}-${each.key}.yaml"
   content_type = "text/plain"
 
-  content = templatefile("${path.module}/templates/quadlet.container.tftpl", {
+  content = templatefile("${path.module}/templates/compose.yaml.tftpl", {
     service_name   = var.service_name
     slot           = each.key
     host_port      = each.value
@@ -184,7 +184,7 @@ resource "aws_s3_object" "quadlet_unit" {
 resource "aws_s3_object" "nginx_upstream" {
   count = var.deploy_mode == "blue_green" ? 1 : 0
 
-  bucket       = var.quadlet_units_bucket
+  bucket       = var.deploy_bucket
   key          = "${var.service_name}/${var.service_name}-upstream.conf"
   content_type = "text/plain"
 
@@ -193,6 +193,16 @@ resource "aws_s3_object" "nginx_upstream" {
     host_port_a  = var.host_port_a
     host_port_b  = var.host_port_b
   })
+}
+
+resource "aws_s3_object" "deploy_script" {
+  count = var.deploy_mode == "blue_green" ? 1 : 0
+
+  bucket       = var.deploy_bucket
+  key          = "${var.service_name}/deploy.py"
+  content_type = "text/x-python"
+  source       = "${path.module}/files/deploy.py"
+  etag         = filemd5("${path.module}/files/deploy.py")
 }
 
 resource "aws_iam_policy" "deploy" {
@@ -235,7 +245,7 @@ resource "aws_iam_policy" "deploy" {
       {
         Effect   = "Allow"
         Action   = ["s3:GetObject"]
-        Resource = ["arn:aws:s3:::${var.quadlet_units_bucket}/${var.service_name}/*"]
+        Resource = ["arn:aws:s3:::${var.deploy_bucket}/${var.service_name}/*"]
       },
       {
         Effect = "Allow"
@@ -314,16 +324,8 @@ resource "aws_codebuild_project" "deploy" {
       value = tostring(var.host_port_b)
     }
     environment_variable {
-      name  = "CONTAINER_PORT"
-      value = tostring(var.container_port)
-    }
-    environment_variable {
-      name  = "NETWORK_NAME"
-      value = var.network_name
-    }
-    environment_variable {
-      name  = "QUADLET_BUCKET"
-      value = var.quadlet_units_bucket
+      name  = "DEPLOY_BUCKET"
+      value = var.deploy_bucket
     }
     environment_variable {
       name  = "DEPLOY_HOST_PRIMARY"

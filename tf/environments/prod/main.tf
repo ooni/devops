@@ -279,14 +279,15 @@ resource "aws_secretsmanager_secret_version" "oonipg_url" {
   )
 }
 
-### Blue/green deploy secrets (Podman Quadlet on dedicated Hetzner hosts)
+### Blue/green deploy secrets (Docker + systemd on dedicated Hetzner hosts)
 #
 # These mirror the values already passed as `task_secrets` to the ECS task
 # definitions above, but consolidated into one JSON blob per service so the
 # "blue_green" deploy_mode CodeBuild job can fetch them in a single
-# secretsmanager:GetSecretValue call and push each key as a Podman secret.
-# Values are pulled from the same underlying data sources used by the ECS
-# `task_secrets` maps, so both deploy paths stay in sync automatically.
+# secretsmanager:GetSecretValue call and write each key into the target
+# slot's env file. Values are pulled from the same underlying data sources
+# used by the ECS `task_secrets` maps, so both deploy paths stay in sync
+# automatically.
 
 data "aws_secretsmanager_secret_version" "ooniapi_user_access_key_id" {
   secret_id = module.ooniapi_user.aws_access_key_id_arn
@@ -522,7 +523,7 @@ module "ooni_th_droplet" {
 module "ooniapi_reverseproxy_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # Flip to "blue_green" to switch this service to the Docker + systemd
   # blue/green deploy on the dedicated Hetzner hosts.
   deploy_mode = "ecs"
 
@@ -958,7 +959,7 @@ EOF
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # Flip to "blue_green" to switch this service to the Docker + systemd
   # blue/green deploy on the dedicated Hetzner hosts.
   deploy_mode = "ecs"
 
@@ -1149,7 +1150,7 @@ module "fastpath_builder" {
 module "ooniapi_oonirun_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # Flip to "blue_green" to switch this service to the Docker + systemd
   # blue/green deploy on the dedicated Hetzner hosts.
   deploy_mode = "ecs"
 
@@ -1167,10 +1168,10 @@ module "ooniapi_oonirun_deployer" {
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
 
   # Pre-wired for the future flip to deploy_mode = "blue_green"
-  env_vars                   = {}
-  secrets                    = keys(local.ooniapi_deploy_service_secrets.oonirun)
-  service_secrets_arn        = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonirun"].arn
-  deploy_ssh_key_secret_arn  = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  env_vars                  = {}
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.oonirun)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonirun"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_oonirun" {
@@ -1211,7 +1212,7 @@ module "ooniapi_oonirun" {
 module "ooniapi_oonifindings_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # Flip to "blue_green" to switch this service to the Docker + systemd
   # blue/green deploy on the dedicated Hetzner hosts.
   deploy_mode = "ecs"
 
@@ -1230,9 +1231,9 @@ module "ooniapi_oonifindings_deployer" {
 
   # Pre-wired for the future flip to deploy_mode = "blue_green"
   env_vars                  = {}
-  secrets                    = keys(local.ooniapi_deploy_service_secrets.oonifindings)
-  service_secrets_arn        = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonifindings"].arn
-  deploy_ssh_key_secret_arn  = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.oonifindings)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonifindings"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_oonifindings" {
@@ -1273,7 +1274,7 @@ module "ooniapi_oonifindings" {
 module "ooniapi_ooniauth_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # Flip to "blue_green" to switch this service to the Docker + systemd
   # blue/green deploy on the dedicated Hetzner hosts.
   deploy_mode = "ecs"
 
@@ -1307,9 +1308,9 @@ module "ooniapi_ooniauth_deployer" {
       "contact@openobservatory.org"
     ])
   }
-  secrets                    = keys(local.ooniapi_deploy_service_secrets.ooniauth)
-  service_secrets_arn        = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["ooniauth"].arn
-  deploy_ssh_key_secret_arn  = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.ooniauth)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["ooniauth"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_ooniauth" {
@@ -1369,7 +1370,7 @@ module "ooniapi_ooniauth" {
 module "ooniapi_oonimeasurements_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # Flip to "blue_green" to switch this service to the Podman Quadlet
+  # Flip to "blue_green" to switch this service to the Docker + systemd
   # blue/green deploy on the dedicated Hetzner hosts.
   deploy_mode = "ecs"
 
@@ -1398,9 +1399,9 @@ module "ooniapi_oonimeasurements_deployer" {
     RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
     RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])
   }
-  secrets                    = keys(local.ooniapi_deploy_service_secrets.oonimeasurements)
-  service_secrets_arn        = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonimeasurements"].arn
-  deploy_ssh_key_secret_arn  = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.oonimeasurements)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonimeasurements"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
 }
 
 module "ooniapi_oonimeasurements" {
