@@ -1035,137 +1035,38 @@ module "fastpath_builder" {
 
 
 #### Test Helpers Machines
+#
 
 module "ooni_test_helpers_json" {
-  source = "../../modules/ec2"
+  source = "../../modules/ooni_th_binary_droplet"
 
-  stage = local.environment
+  stage    = local.environment
+  name     = "oonijsonth"
+  hostname = "json.th"
 
-  vpc_id              = module.network.vpc_id
-  subnet_id           = module.network.vpc_subnet_public[0].id
-  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
-  dns_zone_ooni_io    = local.dns_zone_ooni_io
+  ssh_keys = [
+    "3d:81:99:17:b5:d1:20:a5:fe:2b:14:96:67:93:d6:34",
+    "f6:4b:8b:e2:0e:d2:97:c5:45:5c:07:a6:fe:54:60:0e"
+  ]
 
-  key_name      = module.adm_iam_roles.oonidevops_key_name
-  instance_type = "t3.micro"
-
-  name = "oonijsonth"
-  ingress_rules = [{
-    from_port   = 22,
-    to_port     = 22,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 80, # jsonth
-    to_port     = 80,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 9100, # Prometheus monitoring
-    to_port     = 9100,
-    protocol    = "tcp"
-    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
-    }]
-
-  egress_rules = [{
-    from_port   = 0,
-    to_port     = 0,
-    protocol    = "-1",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port        = 0,
-    to_port          = 0,
-    protocol         = "-1",
-    ipv6_cidr_blocks = ["::/0"],
-  }]
-
-  sg_prefix = "oonijsonth"
-  tg_prefix = "tshp"
-
-  disk_size = 20
-
-  tags = merge(
-    local.tags,
-    { Name = "ooni-tier0-jsonth" }
-  )
+  dns_zone_ooni_io = local.dns_zone_ooni_io
 }
 
-# Echo test helper, requires a dedicated machine bc it's a tcp server,
+# Echo test helper requires a dedicated machine bc it's a tcp server,
 # not an HTTP server. It's impossible to reroute using nginx
 module "ooni_test_helpers_echo" {
-  source = "../../modules/ec2"
+  source = "../../modules/ooni_th_binary_droplet"
 
-  stage = local.environment
+  stage    = local.environment
+  name     = "ooniechoth"
+  hostname = "echo.th"
 
-  vpc_id              = module.network.vpc_id
-  subnet_id           = module.network.vpc_subnet_public[0].id
-  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
-  dns_zone_ooni_io    = local.dns_zone_ooni_io
-
-  key_name      = module.adm_iam_roles.oonidevops_key_name
-  instance_type = "t3.micro"
-
-  name = "ooniechoth"
-  ingress_rules = [{
-    from_port   = 22,
-    to_port     = 22,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 80, # echo
-    to_port     = 80,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 9100, # Prometheus monitoring
-    to_port     = 9100,
-    protocol    = "tcp"
-    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"]
-    }]
-
-  egress_rules = [{
-    from_port   = 0,
-    to_port     = 0,
-    protocol    = "-1",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port        = 0,
-    to_port          = 0,
-    protocol         = "-1",
-    ipv6_cidr_blocks = ["::/0"],
-  }]
-
-  sg_prefix = "ooniechoth"
-  tg_prefix = "echo"
-
-  disk_size = 20
-
-  tags = merge(
-    local.tags,
-    { Name = "ooni-tier0-echoth" }
-  )
-}
-
-resource "aws_route53_record" "testhelpers_json_alias" {
-  zone_id = local.dns_zone_ooni_io
-  name    = "json.th.${local.environment}.ooni.io"
-  type    = "CNAME"
-  ttl     = 300
-
-  records = [
-    module.ooni_test_helpers_json.aws_instance_public_dns
+  ssh_keys = [
+    "3d:81:99:17:b5:d1:20:a5:fe:2b:14:96:67:93:d6:34",
+    "f6:4b:8b:e2:0e:d2:97:c5:45:5c:07:a6:fe:54:60:0e"
   ]
-}
 
-resource "aws_route53_record" "testhelpers_echo_alias" {
-  zone_id = local.dns_zone_ooni_io
-  name    = "echo.th.${local.environment}.ooni.io"
-  type    = "CNAME"
-  ttl     = 300
-
-  records = [
-    module.ooni_test_helpers_echo.aws_instance_public_dns
-  ]
+  dns_zone_ooni_io = local.dns_zone_ooni_io
 }
 
 

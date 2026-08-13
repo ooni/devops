@@ -1,2 +1,5 @@
 test_helpers_version: v0.1.6-beta
 test_helpers_base_url: "https://github.com/ooni/ooniprobe-rs/releases/download/{{ test_helpers_version }}"
+
+# monitoring server IP
+monitoring_server_ip: "{{ lookup('dig', 'monitoring.ooni.org') }}"

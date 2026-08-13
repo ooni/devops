@@ -1,14 +1,25 @@
 ---
 
-# For prometheus scrape requests
-- name: Allow traffic on port 9100
+# For prometheus scrape requests.
+- name: Allow traffic on port 9100 from the monitoring host only
   become: true
   tags: prometheus-proxy
   blockinfile:
     path: /etc/ooni/nftables/tcp/9100.nft
     create: yes
     block: |
-      add rule inet filter input tcp dport 9100 counter accept comment "node exporter"
+      add rule inet filter input ip saddr {{ monitoring_server_ip }} tcp dport 9100 counter accept comment "node exporter"
+  notify:
+   - reload nftables
+
+- name: Allow traffic on the {{ helper }} test helper port
+  become: true
+  tags: test-helpers
+  blockinfile:
+    path: "/etc/ooni/nftables/tcp/{{ port }}.nft"
+    create: yes
+    block: |
+      add rule inet filter input tcp dport {{ port }} counter accept comment "{{ helper }} test helper"
   notify:
    - reload nftables
 
