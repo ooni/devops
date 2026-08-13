@@ -4,6 +4,7 @@
     state: directory
     owner: root
   tags:
+    - prometheus_node_exporter
     - monitoring
     - node_exporter
     - config
@@ -16,6 +17,7 @@
   notify:
     - Restart nginx
   tags:
+    - prometheus_node_exporter
     - monitoring
     - node_exporter
     - config

@@ -12,6 +12,7 @@
   tags:
     - nginx
     - nftables
+    - network
 
 - name: install nginx via the nginxinc.nginx galaxy role
   include_role:
@@ -101,6 +102,7 @@
     - ssl_modern.conf
   tags:
     - nginx
+    - config
 
 - name: remove `default` vhost
   file: path={{item}} state=absent
@@ -111,6 +113,7 @@
     - /etc/nginx/sites-enabled/default
   tags:
     - nginx
+    - config
 
 - name: Create nginx sites directory
   ansible.builtin.file:
@@ -118,9 +121,11 @@
     state: directory
   tags:
     - nginx
+    - config
 
 - name: set nginx.conf
   template: src=nginx.conf dest=/etc/nginx/nginx.conf mode=0444
   notify: reload nginx
   tags:
     - nginx
+    - config

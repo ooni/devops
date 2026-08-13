@@ -191,6 +191,41 @@ When deploying files or updating files already existing on the hosts it can be u
 This helps track down how files on the host were modified and why.
 :::
 
+#### Tagging convention
+
+Tasks are tagged along two independent axes, so that `--tags`/`--skip-tags` can be used to run (or skip) a
+meaningful slice of a playbook without guessing what else might be silently pulled in or left out:
+
+* **Component tag** — matches the role name (`nginx`, `dehydrated`, `nftables`, `prometheus_node_exporter`,
+  `docker`, `ooniapi_gateway`, ...). Selects everything belonging to that role.
+* **Phase tag** — a small, fixed vocabulary describing *what kind* of operation the task performs, independent of
+  which role it lives in:
+
+  | Tag          | Meaning                                                                                                             |
+  |--------------|----------------------------------------------------------------------------------------------------------------------|
+  | `packages`   | apt/package installs — slow, safe to skip when nothing package-level changed                                      |
+  | `config`     | template/config file rendering — fast, safe to run often                                                           |
+  | `certs`      | dehydrated cert issuance/renewal — rate-limited by Let's Encrypt, must be independently skippable (e.g. before DNS is cut over to a new host) |
+  | `network`    | nftables rules and docker network setup                                                                            |
+  | `service`    | service enable/start/restart/reload operations                                                                     |
+  | `monitoring` | prometheus/node_exporter wiring and health checks                                                                  |
+  | `secrets`    | sudoers rules and deploy-credential/password setup                                                                 |
+
+  Most tasks should carry exactly one component tag and one phase tag.
+
+  Examples:
+  ```
+  ./play -i inventory deploy-monitoring-proxy.yml -l monitoringproxy.prod.ooni.io --tags config
+  ./play -i inventory deploy-ooni-backend.yml -l backend-hel.ooni.org --skip-tags certs
+  ./play -i inventory deploy-clickhouse-proxy.yml -l clickhouseproxy.prod.ooni.io --tags monitoring
+  ```
+
+:::note
+This taxonomy is applied incrementally as roles are touched, not retrofitted across the whole codebase in one go
+— currently `nginx`, `dehydrated`, and `prometheus_node_exporter` follow it. Don't assume every task elsewhere
+already does.
+:::
+
 ### Platform specific known bugs
 
 On macOS you might run into this issue: https://github.com/ansible/ansible/issues/76322
