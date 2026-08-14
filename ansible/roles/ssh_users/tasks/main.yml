@@ -60,6 +60,7 @@
     owner: root
     group: root
     mode: 0440
+    validate: 'sshd -t -f %s'
 
 - name: Ensure sudoers dir exists
   tags: ssh_users
