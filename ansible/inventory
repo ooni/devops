@@ -35,6 +35,9 @@ ams-ps.ooni.nu
 #mia-echoth.ooni.nu
 #mia-httpth.ooni.nu
 
+[do_fra]
+wc.th.dev.ooni.io
+
 [aws-proxy]
 clickhouseproxy.dev.ooni.io
 clickhouseproxy.prod.ooni.io
