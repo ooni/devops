@@ -35,8 +35,9 @@
 # Install test helpers
 - name: Download the {{ helper }} test helper binary
   ansible.builtin.get_url:
-    url: "{{ test_helpers_base_url }}/{{ test_helpers_binary_source }}"
+    url: "{{ test_helpers_base_url }}/{{ helper }}"
     dest: "/usr/local/bin/{{ helper }}"
+    checksum: "sha256:{{ test_helpers_checksum }}"
     mode: '0755'
     force: yes
   become: yes

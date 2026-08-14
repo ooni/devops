@@ -17,6 +17,7 @@
         http_port: 8080 # if we leave port 80, it's taken by nginx
     - role: test_helpers
       vars:
-        helper: echoth
-        test_helpers_binary_source: echo
+        helper: ooechohelpd
+        # sha256 of https://github.com/ooni/ooniprobe-rs/releases/download/v0.1.6/ooechohelpd
+        test_helpers_checksum: 10511a8b918c2244eba9e17c32f3cec9efbc5ffa51d6ad7f59fe648cd0986615
         port: 80

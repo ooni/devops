@@ -6,7 +6,7 @@ StartLimitBurst=3
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/echoth --port {{port}}
+ExecStart=/usr/local/bin/ooechohelpd --port {{port}}
 Restart=on-failure
 RestartSec=5
 User=testhelpers

@@ -1,10 +1,4 @@
 
-# choices: jsonth, echoth
-helper: "jsonth"
+# choices: oojsonhelpd, ooechohelpd
+helper: "oojsonhelpd"
 port: "80"
-
-# Name of the released binary asset to download for this helper. Defaults to
-# the helper name.
-# The echo test helper's release asset is published as "echo"
-# but we rename it locallly to avoid shadowing the `echo` command
-test_helpers_binary_source: "{{ helper }}"

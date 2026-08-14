@@ -17,5 +17,7 @@
         http_port: 8080 # if we leave port 80, it's taken by nginx
     - role: test_helpers
       vars:
-        helper: jsonth
+        helper: oojsonhelpd
+        # sha256 of https://github.com/ooni/ooniprobe-rs/releases/download/v0.1.6/oojsonhelpd
+        test_helpers_checksum: 3d977e1418ea398f520dff3de951e36010a294dc3d1b564c961542cc3729a224
         port: 80
