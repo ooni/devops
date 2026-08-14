@@ -26,6 +26,7 @@
       - git
       - htop
       - iotop
+      - locales
       - lsof
       - lvm2
       - man-db
@@ -43,6 +44,24 @@
     state: latest
     update_cache: yes
     install_recommends: no
+
+- name: Generate en_US.UTF-8 locale
+  community.general.locale_gen:
+    name: en_US.UTF-8
+    state: present
+
+- name: Set system locale
+  ansible.builtin.lineinfile:
+    path: /etc/default/locale
+    create: yes
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - { key: "LANG", value: "en_US.UTF-8" }
+    - { key: "LC_ALL", value: "en_US.UTF-8" }
 
 - name: Set timezone
   community.general.timezone:
