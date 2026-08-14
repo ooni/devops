@@ -1037,6 +1037,14 @@ module "fastpath_builder" {
 #### Test Helpers Machines
 #
 
+# Registers the same oonidevops keypair used for the EC2 instances (see
+# module.adm_iam_roles) as a DigitalOcean account key, so it can be installed
+# on droplets via their ssh_keys argument too.
+resource "digitalocean_ssh_key" "oonidevops" {
+  name       = "oonidevops"
+  public_key = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
+}
+
 module "ooni_test_helpers_json" {
   source = "../../modules/ooni_th_binary_droplet"
 
@@ -1044,10 +1052,7 @@ module "ooni_test_helpers_json" {
   name     = "oonijsonth"
   hostname = "json.th"
 
-  ssh_keys = [
-    "3d:81:99:17:b5:d1:20:a5:fe:2b:14:96:67:93:d6:34",
-    "f6:4b:8b:e2:0e:d2:97:c5:45:5c:07:a6:fe:54:60:0e"
-  ]
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
 }
@@ -1061,10 +1066,7 @@ module "ooni_test_helpers_echo" {
   name     = "ooniechoth"
   hostname = "echo.th"
 
-  ssh_keys = [
-    "3d:81:99:17:b5:d1:20:a5:fe:2b:14:96:67:93:d6:34",
-    "f6:4b:8b:e2:0e:d2:97:c5:45:5c:07:a6:fe:54:60:0e"
-  ]
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
 }
