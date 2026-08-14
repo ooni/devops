@@ -58,41 +58,41 @@ jobs:
       #- name: Setup tmate session
       #  uses: mxschmitt/action-tmate@v3
 
-      - uses: actions/github-script@v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const commentTitle = "Ansible Run Output";
-            const ansiblePlaybookOutput = `${{ steps.playbook.outputs.ansible_playbook}}`;
-            const parts = ansiblePlaybookOutput.split(/PLAY RECAP \*+/);
-            const ansiblePlaybookRecap = parts.length > 1 ? parts[1].trim() : '';
+      #- uses: actions/github-script@v9
+      #  with:
+      #    github-token: ${{ secrets.GITHUB_TOKEN }}
+      #    script: |
+      #      const commentTitle = "Ansible Run Output";
+      #      const ansiblePlaybookOutput = `${{ steps.playbook.outputs.ansible_playbook}}`;
+      #      const parts = ansiblePlaybookOutput.split(/PLAY RECAP \*+/);
+      #      const ansiblePlaybookRecap = parts.length > 1 ? parts[1].trim() : '';
 
-            const commentBody = `
-            #### Ansible Playbook Recap 🔍
+      #      const commentBody = `
+      #      #### Ansible Playbook Recap 🔍
 
-            \`\`\`\n
-            ${ansiblePlaybookRecap}
-            \`\`\`
+      #      \`\`\`\n
+      #      ${ansiblePlaybookRecap}
+      #      \`\`\`
 
-            #### Ansible playbook output 📖\`${{ steps.playbook.outcome }}\`
+      #      #### Ansible playbook output 📖\`${{ steps.playbook.outcome }}\`
 
-            <details><summary>Show Execution</summary>
+      #      <details><summary>Show Execution</summary>
 
-            \`\`\`\n
-            ${ansiblePlaybookOutput}
-            \`\`\`
+      #      \`\`\`\n
+      #      ${ansiblePlaybookOutput}
+      #      \`\`\`
 
-            </details>
+      #      </details>
 
-            |                   |                                    |
-            |-------------------|------------------------------------|
-            | Pusher            | @${{ github.actor }}               |
-            | Action            |  ${{ github.event_name }}          |
-            | Working Directory |  ${{ env.tf_actions_working_dir }} |
-            | Workflow          |  ${{ github.workflow }}            |
-            | Last updated      |  ${(new Date()).toUTCString()}     |
-            `;
+      #      |                   |                                    |
+      #      |-------------------|------------------------------------|
+      #      | Pusher            | @${{ github.actor }}               |
+      #      | Action            |  ${{ github.event_name }}          |
+      #      | Working Directory |  ${{ env.tf_actions_working_dir }} |
+      #      | Workflow          |  ${{ github.workflow }}            |
+      #      | Last updated      |  ${(new Date()).toUTCString()}     |
+      #      `;
 
-            // Call the script to write the comment
-            const script = require('./scripts/ghactions/comment-on-pr.js');
-            await script({github, context, core, commentTitle, commentBody});
+      #      // Call the script to write the comment
+      #      const script = require('./scripts/ghactions/comment-on-pr.js');
+      #      await script({github, context, core, commentTitle, commentBody});
