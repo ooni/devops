@@ -66,10 +66,10 @@
     state: started
     enabled: yes
 
-- name: Restart helper if its binary changed
+- name: Restart helper if its binary or unit file changed
   tags: test-helpers
   ansible.builtin.systemd_service:
     name: "{{ helper }}.service"
     state: restarted
   become: yes
-  when: helper_binary.changed
+  when: helper_binary.changed or helper_unit.changed
