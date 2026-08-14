@@ -1033,6 +1033,45 @@ module "fastpath_builder" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 }
 
+
+#### Test Helpers Machines
+#
+
+# Registers the same oonidevops keypair used for the EC2 instances (see
+# module.adm_iam_roles) as a DigitalOcean account key, so it can be installed
+# on droplets via their ssh_keys argument too.
+resource "digitalocean_ssh_key" "oonidevops" {
+  name       = "oonidevops"
+  public_key = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
+}
+
+module "ooni_test_helpers_json" {
+  source = "../../modules/ooni_th_binary_droplet"
+
+  stage    = local.environment
+  name     = "oonijsonth"
+  hostname = "json.th"
+
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
+
+  dns_zone_ooni_io = local.dns_zone_ooni_io
+}
+
+# Echo test helper requires a dedicated machine bc it's a tcp server,
+# not an HTTP server. It's impossible to reroute using nginx
+module "ooni_test_helpers_echo" {
+  source = "../../modules/ooni_th_binary_droplet"
+
+  stage    = local.environment
+  name     = "ooniechoth"
+  hostname = "echo.th"
+
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
+
+  dns_zone_ooni_io = local.dns_zone_ooni_io
+}
+
+
 module "reuploader_builder" {
   source      = "../../modules/ooni_docker_build"
   trigger_tag = ""
