@@ -51,12 +51,13 @@
     dest: /etc/systemd/system/{{helper}}.service
     mode: '0755'
     owner: root
-  notify:
-    - "restart {{helper}}"
+  register: helper_unit
 
 - name: reload systemd
   tags: test-helpers
-  shell: systemctl daemon-reload
+  ansible.builtin.systemd_service:
+    daemon_reload: yes
+  when: helper_unit.changed
 
 - name: Start helper
   tags: test-helpers

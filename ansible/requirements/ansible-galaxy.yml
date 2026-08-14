@@ -1,6 +1,6 @@
 roles: 
   - src: nginxinc.nginx
-    version: 0.24.3
+    version: 0.26.0
   - src: geerlingguy.certbot
     version: 5.2.0
   - src: https://github.com/idealista/clickhouse_role
