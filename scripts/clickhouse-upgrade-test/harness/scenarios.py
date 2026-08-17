@@ -51,12 +51,24 @@ def fresh_cluster(base_version: str, log=print) -> dict:
     return env
 
 
+def _strip_sql_comments(sql: str) -> str:
+    """
+    Drop full-line `--` comments before splitting on `;`. Doing this on the
+    raw text (rather than just filtering post-split fragments) matters
+    because a comment block containing punctuation-semicolons (e.g. prose
+    like "note: X; also Y") would otherwise fool a naive `text.split(";")`
+    into treating the tail of the comment as its own statement.
+    """
+    kept_lines = [line for line in sql.splitlines() if not line.strip().startswith("--")]
+    return "\n".join(kept_lines)
+
+
 def load_schema_and_seed(log=print) -> None:
     nodes = make_nodes()
     entry = nodes[0]  # ch1 -- schema/seed load happens through one node, ON CLUSTER fans it out
     log("[setup] applying schema (ON CLUSTER oonidata_cluster)...")
-    schema_sql = (SQL_DIR / "001_schema.sql").read_text()
-    for stmt in [s.strip() for s in schema_sql.split(";") if s.strip() and not s.strip().startswith("--")]:
+    schema_sql = _strip_sql_comments((SQL_DIR / "001_schema.sql").read_text())
+    for stmt in [s.strip() for s in schema_sql.split(";") if s.strip()]:
         entry.execute(stmt)
 
     log("[setup] generating + loading synthetic seed data (see harness/seed_data.py for why it's synthetic)...")

@@ -1,22 +1,93 @@
 -- Schema for the test cluster.
 --
--- Sourced from two places:
---  * ooni/devops scripts/cluster-migration/schema.sql -- the actual
---    production DDL for `fastpath`, `citizenlab`, `jsonl`,
---    `analysis_web_measurement`, `event_detector_changepoints` and
---    `faulty_measurements`. These are reproduced close to verbatim
---    (ReplicatedReplacingMergeTree, ON CLUSTER oonidata_cluster, the
---    '/clickhouse/{cluster}/tables/<db>/<table>/{shard}' zk path convention).
---  * ooni/backend column definitions for `obs_web` and `analysis_web_measurement`
---    (ooniapi/services/oonimeasurements/tests/fixtures/initdb/clickhouse.sql)
---    and `fastpath`/`citizenlab`/`jsonl`/`event_detector_changepoints`
---    (ooniapi/services/oonimeasurements/tests/migrations/0_clickhouse_init_tables.sql).
---    The backend repo's copies are plain MergeTree/ReplacingMergeTree because
---    they're used for single-node CI tests; here they're converted to their
---    replicated equivalents so we exercise the same replication path prod
---    uses. `obs_web` does not appear in devops' schema.sql (it's created by
---    a different repo/pipeline not in scope here), so its DDL below is
---    derived from the backend fixture's column list.
+-- `fastpath`, `citizenlab`, `jsonl`, `analysis_web_measurement`,
+-- `event_detector_changepoints`, `event_detector_cusums`, and
+-- `faulty_measurements` are reproduced verbatim (columns/engine/ORDER BY/
+-- indexes) from ooni/devops scripts/cluster-migration/schema.sql, which is
+-- this cluster's own migration script and the closest thing to an
+-- authoritative current-state schema dump we have -- see
+-- verification notes below for how this was cross-checked against
+-- ooni/backend.
+--
+-- `url_priorities` has no definition anywhere in ooni/devops -- it doesn't
+-- appear in schema.sql at all, even though the ansible grants
+-- (group_vars/clickhouse/vars.yml -> clickhouse_custom_grants) reference it
+-- explicitly for the `oonitestlists` user. Its DDL below is ported from
+-- ooni/backend's copy (see below) to ReplicatedCollapsingMergeTree since
+-- there's no devops source to match against.
+--
+-- `obs_web` doesn't appear in devops' schema.sql either (it's created by a
+-- different repo/pipeline not in scope here), so its DDL is derived from
+-- ooni/backend ooniapi/services/oonimeasurements/tests/fixtures/initdb/clickhouse.sql.
+--
+-- ==========================================================================
+-- Verification against ooni/backend (2026-08-11)
+-- ==========================================================================
+-- Every ooniapi/services/{oonimeasurements,ooniprobe,oonirun,testlists}
+-- ClickHouse fixture was diffed column-by-column against devops'
+-- schema.sql. Three real divergences were found and are recorded here
+-- rather than silently "fixed" one way or the other, since devops and
+-- backend disagree with each other, not just with this test:
+--
+-- 1. `event_detector_changepoints`: devops' schema.sql and ooni/backend's
+--    ooniapi/services/oonimeasurements/tests/migrations/0_clickhouse_init_tables.sql
+--    define TWO DIFFERENT, INCOMPATIBLE column sets for this table --
+--    devops uses `last_ts` + `*_obs_w_sum` + `*_w_sum` + `current_mean`
+--    (an exponentially-weighted-sum CUSUM design, paired with the separate
+--    `event_detector_cusums` table below), while backend's oonimeasurements
+--    fixture uses `*_current_state` string enums instead (no w_sum/obs_w_sum
+--    columns, no separate cusums table). An earlier version of this file
+--    accidentally used backend's column set here while crediting it to
+--    devops in this header -- that's fixed now; this table matches devops'
+--    schema.sql exactly. If backend's oonimeasurements service is actually
+--    reading/writing `*_current_state` columns against production, this is
+--    a real bug worth raising separately -- either that table was migrated
+--    to the w_sum design after oonimeasurements' fixture was last updated,
+--    or oonimeasurements is silently failing to read columns it expects.
+-- 2. `fastpath`: backend's legacy ooniprobe/oonirun/testlists fixtures
+--    (`ooniapi/services/{ooniprobe,oonirun,testlists}/tests/fixtures/initdb/01-scheme.sql`,
+--    all three byte-for-byte identical to each other) define `probe_cc`/
+--    `test_name` as plain `String` and `probe_asn` as `UInt32`, add
+--    `is_verified` via a bare `ALTER ... ADD COLUMN` with no default, and
+--    have neither the `fastpath_rid_idx`/`measurement_uid_idx` indexes nor
+--    `measurement_uid` in the ORDER BY key. devops' schema.sql has
+--    `LowCardinality(String)`, `probe_asn Int32` (signed -- ASNs are
+--    unsigned by definition, so this looks like a latent devops bug, not
+--    something to copy), the two indexes, `measurement_uid` in ORDER BY,
+--    and `is_verified` defaulted to 'u' via a later `MODIFY COLUMN`. This
+--    file follows devops' schema.sql (kept `Int32` as-is rather than
+--    "fixing" it to `UInt32`, to stay faithful to what's actually deployed
+--    -- flagging it here instead).
+-- 3. `analysis_web_measurement`: backend's oonimeasurements fixture omits
+--    `PARTITION BY substring(measurement_uid, 1, 6)` and leaves `domain`
+--    out of the `ORDER BY` key that devops' schema.sql has. This file
+--    follows devops.
+-- 4. `jsonl`: backend's fixtures (oonimeasurements AND the legacy
+--    ooniprobe/oonirun/testlists trio) define a plain `MergeTree` with only
+--    `report_id`/`input`/`s3path`/`linenum`/`measurement_uid` -- no `date`,
+--    `source`, or `update_time` columns, and no Replicated/versioned
+--    engine. devops' schema.sql has all three extra columns and uses
+--    `ReplicatedReplacingMergeTree(..., update_time)`. This file follows
+--    devops; if `date`/`source` are genuinely new/planned columns, backend
+--    code may not be populating them.
+-- 5. `faulty_measurements`: ooniprobe's fixture
+--    (tests/fixtures/initdb/03-faulty-msm-detection.sql) adds
+--    `SETTINGS async_insert=1, wait_for_async_insert=0`; devops' schema.sql
+--    has no such settings on this table. Not schema-breaking (an insert
+--    behavior setting, not a column/engine difference) so not copied here,
+--    just noted.
+--
+-- Separately, backend's legacy ooniprobe/oonirun/testlists fixtures define
+-- eleven more tables that don't exist anywhere in devops' schema.sql at
+-- all: `test_groups` (Join engine), `accounts` + `session_expunge`
+-- (EmbeddedRocksDB), `counters_test_list` + `counters_asn_test_list`
+-- (materialized views over fastpath+citizenlab), `msmt_feedback`,
+-- `fingerprints_dns` + `fingerprints_http` (EmbeddedRocksDB),
+-- `asnmeta`, `incidents`, and a `oonirun` table (distinct from the
+-- `oonirun` *service*). These aren't included here -- unclear whether
+-- they're still live on oonidata_cluster or leftovers from the pre-split
+-- monolith devops' schema.sql doesn't track. Flagging for a decision
+-- rather than guessing; see the PR description / follow-up discussion.
 --
 -- All DDL runs ON CLUSTER so it exercises ClickHouse's distributed_ddl queue
 -- (the same mechanism prod uses to apply schema changes to all 3 replicas).
@@ -262,22 +333,27 @@ CREATE TABLE IF NOT EXISTS ooni.event_detector_changepoints ON CLUSTER oonidata_
     `dns_other_blocked` Nullable(Float32),
     `tcp_blocked` Nullable(Float32),
     `tls_blocked` Nullable(Float32),
-    `dns_isp_blocked_current_state` String DEFAULT 'ok',
+    `last_ts` DateTime64(3, 'UTC'),
+    `dns_isp_blocked_obs_w_sum` Nullable(Float32),
+    `dns_isp_blocked_w_sum` Nullable(Float32),
     `dns_isp_blocked_s_pos` Nullable(Float32),
     `dns_isp_blocked_s_neg` Nullable(Float32),
-    `dns_other_blocked_current_state` String DEFAULT 'ok',
+    `dns_other_blocked_obs_w_sum` Nullable(Float32),
+    `dns_other_blocked_w_sum` Nullable(Float32),
     `dns_other_blocked_s_pos` Nullable(Float32),
     `dns_other_blocked_s_neg` Nullable(Float32),
-    `tcp_blocked_current_state` String DEFAULT 'ok',
+    `tcp_blocked_obs_w_sum` Nullable(Float32),
+    `tcp_blocked_w_sum` Nullable(Float32),
     `tcp_blocked_s_pos` Nullable(Float32),
     `tcp_blocked_s_neg` Nullable(Float32),
-    `tls_blocked_current_state` String DEFAULT 'ok',
+    `tls_blocked_obs_w_sum` Nullable(Float32),
+    `tls_blocked_w_sum` Nullable(Float32),
     `tls_blocked_s_pos` Nullable(Float32),
     `tls_blocked_s_neg` Nullable(Float32),
     `change_dir` Nullable(Int8),
-    `current_state` String DEFAULT 'ok',
     `s_pos` Nullable(Float32),
     `s_neg` Nullable(Float32),
+    `current_mean` Nullable(Float32),
     `h` Nullable(Float32),
     `block_type` String
 )
@@ -288,6 +364,57 @@ ENGINE = ReplicatedReplacingMergeTree(
 PARTITION BY toYYYYMM(ts)
 ORDER BY (probe_asn, probe_cc, ts, domain)
 SETTINGS index_granularity = 8192;
+
+CREATE TABLE IF NOT EXISTS ooni.event_detector_cusums ON CLUSTER oonidata_cluster
+(
+    `probe_asn` UInt32,
+    `probe_cc` String,
+    `domain` String,
+    `ts` DateTime64(3, 'UTC'),
+    `dns_isp_blocked_obs_w_sum` Nullable(Float64),
+    `dns_isp_blocked_w_sum` Nullable(Float64),
+    `dns_isp_blocked_s_pos` Nullable(Float64),
+    `dns_isp_blocked_s_neg` Nullable(Float64),
+    `dns_other_blocked_obs_w_sum` Nullable(Float64),
+    `dns_other_blocked_w_sum` Nullable(Float64),
+    `dns_other_blocked_s_pos` Nullable(Float64),
+    `dns_other_blocked_s_neg` Nullable(Float64),
+    `tcp_blocked_obs_w_sum` Nullable(Float64),
+    `tcp_blocked_w_sum` Nullable(Float64),
+    `tcp_blocked_s_pos` Nullable(Float64),
+    `tcp_blocked_s_neg` Nullable(Float64),
+    `tls_blocked_obs_w_sum` Nullable(Float64),
+    `tls_blocked_w_sum` Nullable(Float64),
+    `tls_blocked_s_pos` Nullable(Float64),
+    `tls_blocked_s_neg` Nullable(Float64)
+)
+ENGINE = ReplicatedReplacingMergeTree(
+    '/clickhouse/{cluster}/tables/ooni/event_detector_cusums/{shard}',
+    '{replica}'
+)
+PARTITION BY toYYYYMM(ts)
+ORDER BY (probe_asn, probe_cc, domain)
+SETTINGS index_granularity = 8192;
+
+-- No definition exists anywhere in ooni/devops (see header note); ported from
+-- ooni/backend ooniapi/services/{ooniprobe,oonirun,testlists}/tests/fixtures/initdb/01-scheme.sql
+-- (CollapsingMergeTree -> ReplicatedCollapsingMergeTree).
+CREATE TABLE IF NOT EXISTS ooni.url_priorities ON CLUSTER oonidata_cluster
+(
+    `sign` Int8,
+    `category_code` String,
+    `cc` String,
+    `domain` String,
+    `url` String,
+    `priority` Int32
+)
+ENGINE = ReplicatedCollapsingMergeTree(
+    '/clickhouse/{cluster}/tables/ooni/url_priorities/{shard}',
+    '{replica}',
+    sign
+)
+ORDER BY (category_code, cc, domain, url, priority)
+SETTINGS index_granularity = 1024;
 
 CREATE TABLE IF NOT EXISTS ooni.faulty_measurements ON CLUSTER oonidata_cluster
 (
