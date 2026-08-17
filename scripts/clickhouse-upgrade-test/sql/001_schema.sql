@@ -89,6 +89,42 @@
 -- monolith devops' schema.sql doesn't track. Flagging for a decision
 -- rather than guessing; see the PR description / follow-up discussion.
 --
+-- ==========================================================================
+-- Verification against live production `SHOW CREATE TABLE` (2026-08-11)
+-- ==========================================================================
+-- Aaron ran `SHOW CREATE TABLE` directly against prod for the tables below;
+-- ground truth beats every repo's copy of it, so these override anything
+-- said above where they conflict.
+--
+-- - `fastpath`: exact match, column-for-column, engine args, ORDER BY,
+--   both indexes. devops' schema.sql (what this file already followed) is
+--   accurate for this table.
+-- - `obs_web`: three real divergences from the backend-fixture-derived
+--   version this file had. Fixed:
+--     1. Missing `probe_id FixedString(64)` column (added at the end,
+--        matching prod's column order).
+--     2. Missing all three indexes (`measurement_start_time_idx`,
+--        `probe_cc_idx`, `probe_asn_idx`, all `minmax`).
+--     3. Missing `PARTITION BY concat(substring(bucket_date, 1, 4),
+--        substring(bucket_date, 6, 2))` entirely -- this table isn't
+--        partitioned by toYYYYMM(x) like the others, it derives the
+--        partition from the `bucket_date` string column.
+--   Also note (not a bug, just a fact worth recording): the ZK path is
+--   `/clickhouse/{cluster}/tables/ooni/obs_web_repl/{shard}`, i.e. the
+--   table was apparently renamed from `obs_web_repl` to `obs_web` at some
+--   point -- `RENAME TABLE` doesn't touch the underlying ZK path, so the
+--   mismatch between table name and path is expected, not something to
+--   "correct" to `.../obs_web/{shard}`.
+--
+-- Remaining tables (`citizenlab`, `citizenlab_flip`, `jsonl`,
+-- `analysis_web_measurement`, `event_detector_changepoints`,
+-- `event_detector_cusums`, `faulty_measurements`, `url_priorities`) are
+-- still only cross-checked against ooni/devops and ooni/backend, not
+-- against a live `SHOW CREATE TABLE` -- `url_priorities` especially, since
+-- it has no devops source at all to begin with (see above). Get
+-- `SHOW CREATE TABLE` for those next and this note should get replaced by
+-- an update (or a confirmation that no changes were needed) for each one.
+--
 -- All DDL runs ON CLUSTER so it exercises ClickHouse's distributed_ddl queue
 -- (the same mechanism prod uses to apply schema changes to all 3 replicas).
 
@@ -213,8 +249,15 @@ PRIMARY KEY measurement_uid
 ORDER BY (measurement_uid, measurement_start_time, probe_cc, probe_asn, domain)
 SETTINGS index_granularity = 8192;
 
--- Derived from ooni/backend ooniapi/services/oonimeasurements/tests/fixtures/initdb/clickhouse.sql
--- (converted from ReplacingMergeTree to its replicated equivalent).
+-- Verified 2026-08-11 against `SHOW CREATE TABLE ooni.obs_web` run directly
+-- against production. Columns originally came from ooni/backend
+-- ooniapi/services/oonimeasurements/tests/fixtures/initdb/clickhouse.sql,
+-- but that fixture was missing `probe_id`, all three indexes, and the
+-- PARTITION BY clause -- all added here to match prod exactly. Note the ZK
+-- path is `.../obs_web_repl/{shard}`, not `.../obs_web/{shard}` -- the
+-- table was evidently renamed from `obs_web_repl` to `obs_web` at some
+-- point (RENAME TABLE doesn't change the underlying ZK path), so this is
+-- not a typo to "fix".
 CREATE TABLE IF NOT EXISTS ooni.obs_web ON CLUSTER oonidata_cluster
 (
     `measurement_uid` String,
@@ -310,12 +353,17 @@ CREATE TABLE IF NOT EXISTS ooni.obs_web ON CLUSTER oonidata_cluster
     `http_request_redirect_from` Nullable(String),
     `http_request_body_is_truncated` Nullable(UInt8),
     `http_t` Nullable(Float64),
-    `probe_analysis` Nullable(String)
+    `probe_analysis` Nullable(String),
+    `probe_id` FixedString(64),
+    INDEX measurement_start_time_idx measurement_start_time TYPE minmax GRANULARITY 2,
+    INDEX probe_cc_idx probe_cc TYPE minmax GRANULARITY 1,
+    INDEX probe_asn_idx probe_asn TYPE minmax GRANULARITY 1
 )
 ENGINE = ReplicatedReplacingMergeTree(
-    '/clickhouse/{cluster}/tables/ooni/obs_web/{shard}',
+    '/clickhouse/{cluster}/tables/ooni/obs_web_repl/{shard}',
     '{replica}'
 )
+PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time, probe_cc, probe_asn)
 SETTINGS index_granularity = 8192;

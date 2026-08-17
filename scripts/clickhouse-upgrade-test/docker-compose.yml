@@ -18,6 +18,12 @@ x-clickhouse-common: &clickhouse-common
     nofile:
       soft: 262144
       hard: 262144
+  # ClickHouse auto-sizes several caches/pools off perceived available RAM,
+  # which on a shared host means 3 nodes each behave as if they can have most
+  # of the machine -- fine on a laptop, but enough to OOM a standard GitHub
+  # Actions runner (~7GB) once all 3 are up with data loaded. Capping this
+  # keeps the CI workflow from flaking.
+  mem_limit: 1500m
   networks:
     - chnet
   healthcheck:

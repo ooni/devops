@@ -75,3 +75,55 @@ def render_full_report(results: dict) -> str:
 
 def write_report(results: dict, path: Path) -> None:
     path.write_text(render_full_report(results))
+
+
+def render_ci_step(step: dict) -> str:
+    """Render one step from ci_step.py's results/steps/*.json -- these use
+    one of three shapes (setup / upgrade-node / verify-ddl); dispatch on
+    which keys are present the same way scenarios.step_ok() does."""
+    label = step.get("label", "?")
+
+    if "on_cluster_alter_ok" in step:
+        ok = step["on_cluster_alter_ok"]
+        lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
+        lines.append(f"`ALTER TABLE ... ON CLUSTER` at version `{step.get('version')}`: " + ("succeeded" if ok else f"FAILED: {step.get('error')}"))
+        lines.append("")
+        return "\n".join(lines)
+
+    if "base_version" in step and "node" not in step:
+        ok = step.get("ok")
+        lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
+        if ok:
+            lines.append(f"Fresh 3-node cluster brought up at `{step.get('base_version')}`, schema + seed data loaded and converged.")
+        else:
+            lines.append(f"FAILED: {step.get('error')}")
+        lines.append("")
+        return "\n".join(lines)
+
+    # upgrade-node shaped
+    return f"### `{label}`\n\n" + render_step(step)
+
+
+def render_ci_steps_report(steps: list[dict]) -> str:
+    """Assemble the report ci_step.py's `report` subcommand writes, from
+    whatever results/steps/*.json files exist on disk -- possibly a subset,
+    if an earlier CI step failed and later ones were skipped."""
+    from .scenarios import step_ok  # local import: avoids a report<->scenarios import cycle at module load time
+
+    lines = ["# ClickHouse Upgrade Test -- CI Step Report", ""]
+    if not steps:
+        lines.append("_No step results found -- did every step run before this one?_")
+        return "\n".join(lines)
+
+    any_fail = any(not step_ok(s) for s in steps)
+    lines.append(f"**Overall: {'ALL STEPS PASSED' if not any_fail else 'AT LEAST ONE STEP FAILED -- see below'}**")
+    lines.append("")
+    lines.append(f"{len(steps)} step(s) recorded:")
+    lines.append("")
+    for step in steps:
+        ok = step_ok(step)
+        lines.append(f"- `{step.get('label')}`: {'PASS' if ok else 'FAIL'}")
+    lines.append("")
+    for step in steps:
+        lines.append(render_ci_step(step))
+    return "\n".join(lines)

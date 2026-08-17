@@ -77,3 +77,30 @@ def config_check() -> str:
     """Validate compose file syntax/interpolation without contacting a registry."""
     proc = _run(["config"], check=True)
     return proc.stdout
+
+
+def current_env() -> dict:
+    """
+    Reconstruct {"CH1_IMAGE": tag, "CH2_IMAGE": tag, "CH3_IMAGE": tag} by
+    inspecting the already-running containers, rather than requiring a
+    caller to thread an env dict through. This is what lets each upgrade
+    step run as its own independent process (e.g. one `ci_step.py` CLI
+    invocation per GitHub Actions step) while still knowing what image the
+    *other* two nodes are currently on, without a side-channel state file
+    that could drift from reality.
+
+    A service with no running container yet (nothing brought up) is simply
+    omitted -- callers fall back to docker-compose.yml's own defaults.
+    """
+    env = {}
+    for i, svc in enumerate(["ch1", "ch2", "ch3"], start=1):
+        proc = subprocess.run(
+            ["docker", "inspect", f"ooni-{svc}", "--format", "{{.Config.Image}}"],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            image = proc.stdout.strip()
+            tag = image.rsplit(":", 1)[-1] if ":" in image else image
+            env[f"CH{i}_IMAGE"] = tag
+    return env

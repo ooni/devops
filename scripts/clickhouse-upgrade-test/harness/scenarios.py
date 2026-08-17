@@ -130,6 +130,76 @@ def _hop_ok(step: dict) -> bool:
     )
 
 
+# ---------------------------------------------------------------------------
+# Granular, individually invokable steps.
+#
+# Each of these is a self-contained unit of work: bring up a fresh cluster,
+# upgrade exactly one node, or verify ON CLUSTER DDL still propagates. They
+# don't depend on being called from within the same Python process as a
+# previous step -- state is recovered from the running containers via
+# compose.current_env(), not threaded through function arguments. That's
+# what lets ci_step.py invoke each one as its own separate CLI call, so a
+# CI workflow can turn each one into its own GitHub Actions step with its
+# own pass/fail checkmark, timing, and log -- rather than one opaque job
+# that only reports pass/fail for the whole upgrade path at once.
+#
+# scenario_staged_lts() and scenario_direct_jump() below are the
+# single-process equivalent for local/`make test` use, built out of these
+# same functions so the two entry points can never silently diverge.
+# ---------------------------------------------------------------------------
+
+
+def setup_step(base_version: str, label: str = "setup", log=print) -> dict:
+    try:
+        fresh_cluster(base_version, log=log)
+        load_schema_and_seed(log=log)
+        return {"label": label, "base_version": base_version, "ok": True}
+    except Exception as e:
+        return {"label": label, "base_version": base_version, "ok": False, "error": str(e)}
+
+
+def upgrade_node_step(node_name: str, new_version: str, label: str | None = None, log=print) -> dict:
+    env = compose.current_env()
+    step, _env = _run_upgrade_step(env, node_name, new_version, log=log)
+    if label:
+        step["label"] = label
+    return step
+
+
+def verify_ddl_step(version: str, label: str | None = None, log=print) -> dict:
+    """Once every replica is on `version`, confirm ON CLUSTER DDL still works
+    cluster-wide (a real thing OONI does during normal operation, not just
+    something that matters mid-upgrade)."""
+    nodes = make_nodes()
+    marker = f"test_marker_{version.replace('.', '_')}"
+    try:
+        nodes[0].execute(
+            f"ALTER TABLE ooni.citizenlab ON CLUSTER oonidata_cluster "
+            f"ADD COLUMN IF NOT EXISTS {marker} String DEFAULT ''"
+        )
+        ok, error = True, None
+    except Exception as e:
+        ok, error = False, str(e)
+        log(f"[verify-ddl] ON CLUSTER ALTER failed at {version}: {error}")
+    return {
+        "label": label or f"verify-ddl-{version}",
+        "version": version,
+        "on_cluster_alter_ok": ok,
+        "error": error,
+    }
+
+
+def step_ok(step: dict) -> bool:
+    """Pass/fail check that works across all three step shapes above
+    (setup / upgrade-node / verify-ddl) -- used by ci_step.py to set its
+    process exit code, and by report.py to compute an overall verdict."""
+    if "on_cluster_alter_ok" in step:
+        return bool(step["on_cluster_alter_ok"])
+    if "base_version" in step and "node" not in step:
+        return bool(step.get("ok"))
+    return _hop_ok(step)
+
+
 def scenario_staged_lts(log=print) -> dict:
     scenario = {
         "name": "Staged rolling upgrade via LTS hops",
@@ -141,33 +211,24 @@ def scenario_staged_lts(log=print) -> dict:
         ),
         "steps": [],
     }
-    env = fresh_cluster(BASE_VERSION, log=log)
-    load_schema_and_seed(log=log)
+    setup = setup_step(BASE_VERSION, label="setup", log=log)
+    if not setup.get("ok"):
+        scenario["verdict"] = f"ERROR during setup: {setup.get('error')}"
+        return scenario
 
     hop_versions = [v for v, _months in LTS_HOPS[1:]]  # skip the starting version
     all_ok = True
     for hop_version in hop_versions:
         for node_name in NODE_ORDER:
-            step, env = _run_upgrade_step(env, node_name, hop_version, log=log)
+            step = upgrade_node_step(node_name, hop_version, log=log)
             scenario["steps"].append(step)
-            ok = _hop_ok(step)
+            ok = step_ok(step)
             all_ok = all_ok and ok
             log(f"[staged] {step['label']}: {'OK' if ok else 'PROBLEM DETECTED'}")
 
-        # Once every replica is on this hop's version, confirm ON CLUSTER DDL still
-        # works cluster-wide (a real thing OONI does during normal operation).
-        nodes = make_nodes()
-        try:
-            nodes[0].execute(
-                f"ALTER TABLE ooni.citizenlab ON CLUSTER oonidata_cluster "
-                f"ADD COLUMN IF NOT EXISTS test_marker_{hop_version.replace('.', '_')} String DEFAULT ''"
-            )
-            ddl_ok = True
-        except Exception as e:
-            ddl_ok = False
-            log(f"[staged] ON CLUSTER ALTER failed after reaching {hop_version}: {e}")
-        scenario.setdefault("ddl_checks", []).append({"version": hop_version, "on_cluster_alter_ok": ddl_ok})
-        all_ok = all_ok and ddl_ok
+        ddl_result = verify_ddl_step(hop_version, log=log)
+        scenario.setdefault("ddl_checks", []).append(ddl_result)
+        all_ok = all_ok and step_ok(ddl_result)
 
     scenario["verdict"] = "PASS -- rolling, node-by-node upgrade completed with no data loss, no replication errors, zero full-shard downtime" if all_ok else "FAIL -- see steps above for where it broke"
     return scenario
@@ -186,14 +247,16 @@ def scenario_direct_jump(log=print) -> dict:
         ),
         "steps": [],
     }
-    env = fresh_cluster(BASE_VERSION, log=log)
-    load_schema_and_seed(log=log)
+    setup = setup_step(BASE_VERSION, label="setup", log=log)
+    if not setup.get("ok"):
+        scenario["verdict"] = f"ERROR during setup: {setup.get('error')}"
+        return scenario
 
     all_ok = True
     for node_name in NODE_ORDER:
-        step, env = _run_upgrade_step(env, node_name, LATEST_VERSION, log=log)
+        step = upgrade_node_step(node_name, LATEST_VERSION, log=log)
         scenario["steps"].append(step)
-        ok = _hop_ok(step)
+        ok = step_ok(step)
         all_ok = all_ok and ok
         log(f"[direct] {step['label']}: {'OK' if ok else 'PROBLEM DETECTED'}")
 
