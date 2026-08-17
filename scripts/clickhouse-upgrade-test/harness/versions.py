@@ -19,6 +19,26 @@ more than a year apart in version should not be run together mid-upgrade.
 BASE_VERSION -> LATEST_VERSION spans ~23 months, so a single-hop rolling
 upgrade is out of that window; each LTS_HOPS step individually stays inside
 it (5-7 months apart).
+
+--- 26.3 is treated as a separate, not-yet-recommended phase --------------
+
+Per review on ooni/devops#477 (hellais): 26.3 ships a backward-incompatible
+change to how nested data types serialize
+(https://clickhouse.com/docs/resources/changelogs/oss/2026#263-backward-incompatible-change,
+"Propagate data types serialization versions to nested data types") that the
+changelog itself warns can make *downgrading* after upgrading past it lossy.
+Since OONI's rollback plan for any bad upgrade is "downgrade the node back",
+crossing 26.3 forecloses that option -- so unlike every other hop here, it
+should not be treated as routine until it's been soaked for a while.
+
+RECOMMENDED_NOW is the path this project currently suggests actually running
+in production: stop at 25.8.29.51, the last LTS strictly before 26.3.
+LTS_HOPS (used by the "staged" CI scenario) still walks all the way to
+LATEST_VERSION -- the whole point of this harness is to keep building
+confidence in the 26.3+ leg via testing *before* it's recommended for prod,
+not to stop testing it. Treat a green staged-upgrade run as "the harness
+found nothing wrong with going past 26.3", not as "go ahead and do it in
+production now".
 """
 
 BASE_VERSION = "24.8.6.70"        # current production version (issue #437)
@@ -32,6 +52,22 @@ LTS_HOPS = [
     ("25.8.29.51", 5),
     ("26.3.17.110", 7),
     ("26.7.3.19", 4),        # final hop lands on latest stable (not itself LTS)
+]
+
+# What we'd actually tell someone to run in production *today* -- stops one
+# LTS short of 26.3's downgrade-losing-data serialization change. See the
+# module docstring section above. Not consumed by the CI workflow (which
+# still exercises the full LTS_HOPS ladder for validation purposes); this
+# is the number the README's recommendation and any runbook should quote.
+RECOMMENDED_NOW = "25.8.29.51"
+
+# The 26.3+ leg: still tested, not yet recommended for production until it's
+# been through more validation (see module docstring). Kept as its own list
+# so a future decision to promote it doesn't require re-deriving which hops
+# are "new" vs already-recommended.
+PENDING_FURTHER_VALIDATION = [
+    ("26.3.17.110", 7),
+    ("26.7.3.19", 4),
 ]
 
 # For the "direct jump" scenario we go straight from BASE to LATEST.

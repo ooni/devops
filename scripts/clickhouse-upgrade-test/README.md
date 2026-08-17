@@ -18,13 +18,18 @@ scheduled-downtime, all-nodes-at-once upgrade?**
   work", queries can fail with arbitrary errors, and downgrading stops being
   an option.
 - **Recommendation: do a rolling, node-by-node upgrade, but stage it through
-  each intermediate LTS release rather than jumping straight to latest.**
-  No full-cluster downtime is needed either way — the risk isn't downtime,
-  it's version skew during the upgrade window.
+  each intermediate LTS release rather than jumping straight to latest —
+  and, for now, stop at `25.8.29.51` rather than going all the way to
+  latest.** No full-cluster downtime is needed either way — the risk isn't
+  downtime, it's version skew during the upgrade window.
 
   ```
-  24.8.6.70  →  25.3.14.14  →  25.8.29.51  →  26.3.17.110  →  26.7.3.19
-   (current)      LTS            LTS            LTS          (latest stable)
+  24.8.6.70  →  25.3.14.14  →  25.8.29.51  |  26.3.17.110  →  26.7.3.19
+   (current)      LTS         LTS (stop     |    LTS          (latest stable)
+                               here for now) |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                             |  tested by this harness, but not
+                                             |  yet recommended for prod -- see
+                                             |  "Why we stop at 25.8, not 26.3" below
   ```
 
   Each hop is 4–7 months of releases apart, comfortably inside the
@@ -140,27 +145,109 @@ curl -sL https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/samples/analysis
 scenario — or just skip the seed step in `harness/scenarios.py:load_schema_and_seed`
 and load these instead).
 
-## What was and wasn't verified in this sandbox
+## Why we stop at 25.8.29.51, not 26.3.17.110, for now
 
-Verified here:
+Raised in review on [ooni/devops#477](https://github.com/ooni/devops/pull/477)
+(hellais) — addressed here point by point:
+
+1. **"Read the changelog for tricky breaking changes."** 26.3 ships
+   ["Propagate data types serialization versions to nested data
+   types"](https://clickhouse.com/docs/resources/changelogs/oss/2026#263-backward-incompatible-change),
+   which the changelog itself flags as able to make **downgrading after
+   upgrading lossy**. That's the one that matters most operationally: if a
+   node upgraded past 26.3 needs to be rolled back, data loss is on the
+   table. Everything from `24.8.6.70` through `25.8.29.51` does not carry
+   that specific warning. This is why `harness/versions.py` now exposes
+   `RECOMMENDED_NOW = "25.8.29.51"` separately from the full `LTS_HOPS`
+   ladder this harness tests — see the module docstring there for the full
+   reasoning.
+2. **"Renamed `searchAny`/`searchAll` to `hasAnyTokens`/`hasAllTokens`
+   (25.10) — make sure we aren't using these."** Confirmed absent from
+   `oonipipeline` (`ooni/data`, the data-pipeline repo this cluster feeds —
+   found via `ansible/roles/oonidata_airflow` / `ansible/roles/notebook`).
+   **Still open:** `ooni/backend` hasn't been grepped for these yet.
+3. **"Disallow truncating replicated databases — might apply to us in the
+   data pipeline."** It does, and there are two independent production
+   sites doing it, not one:
+   - `ooni/data` (`oonipipeline`) `tasks/updaters/citizenlab_test_lists_updater.py`
+   - `ooni/backend` `analysis/analysis/citizenlab_test_lists_updater.py`
+
+   Both run the identical sequence: `TRUNCATE TABLE citizenlab_flip`
+   (a `ReplicatedReplacingMergeTree` table, per `sql/001_schema.sql`) →
+   `INSERT INTO citizenlab_flip` → `EXCHANGE TABLES citizenlab_flip AND
+   citizenlab` — the swapped-ZK-path pair documented there. It's not yet
+   confirmed which of these two is the one actually deployed/cron'd today
+   vs. legacy code left over from a migration between repos — worth a
+   direct check before assuming only one matters.
+
+   Lower-severity but same category, found while checking test suites for
+   "run against the target version" (point 4): `ooni/backend`'s
+   `oonirun` and `ooniprobe` service test fixtures (`tests/conftest.py`)
+   both call `TRUNCATE TABLE` on `url_priorities` and `faulty_measurements`
+   respectively — both of which are also `Replicated*` engines per the live
+   schema. These only run against ephemeral test containers today, but if
+   those test suites get pointed at a candidate ClickHouse version (see
+   point 4), a truncate-replicated restriction would surface there too, not
+   just in the data pipeline. `oonipipeline`'s own `cli/commands.py`
+   `TRUNCATE TABLE event_detector_cusums SYNC` and its `tests/conftest.py`
+   truncates are lower risk since `event_detector_cusums`/`_changepoints`
+   are plain (non-replicated) `ReplacingMergeTree` per the live schema dump.
+
+   **Still open:** pinning down which exact ClickHouse version introduced
+   the truncate-replicated restriction (the reviewer's comment didn't
+   include a changelog link for this one) and confirming whether it blocks
+   this specific truncate-then-swap pattern outright or only under some
+   conditions (e.g. only for `TRUNCATE ... ON CLUSTER` / whole databases,
+   not a single replicated table via one node).
+4. **"Run the target version against the real API + data pipeline."** Not
+   yet done — this harness currently only exercises replication /
+   on-disk-format compatibility with synthetic data, not `ooni/backend`'s
+   API or `oonipipeline`'s own test suite against a candidate ClickHouse
+   version. Tracked as follow-up work; not addressed by this patch.
+5. **Full changelog sweep, 24.9 through 26.7, for every "Backward
+   Incompatible Change" entry** (not just the two the reviewer happened to
+   quote) — in progress, not complete. What's confirmed so far is captured
+   in points 1-3 above.
+
+Net effect for now: `LTS_HOPS` (what this harness's `staged` CI job
+actually tests) still walks the full ladder to `26.7.3.19`, because the
+whole point of testing is to build the confidence needed to eventually move
+past 26.3 — a green run there is evidence, not a green light. The
+production recommendation (`RECOMMENDED_NOW`, and the README TL;DR above)
+stops one hop earlier until points 2, 4, and 5 above are closed out.
+
+## What was and wasn't verified
+
+This harness has now actually run in GitHub Actions (see
+`.github/workflows/clickhouse_upgrade_test.yml`, exercised on
+[ooni/devops#477](https://github.com/ooni/devops/pull/477)), which has real
+network access this project's original build/review sandbox didn't. That
+run got through `setup` and the `24.8.6.70 -> 25.3.14.14` upgrade of `ch1`
+cleanly, then flagged `ch2`'s upgrade as failed — which turned out to be a
+**false positive in this harness's own error-detection logic**, not a real
+ClickHouse compatibility problem: forcibly recreating a node's container
+(how this harness simulates an in-place upgrade) drops the other nodes'
+open connections to it, which ClickHouse logs as a `CANNOT_READ_ALL_DATA`
+/ `NETWORK`-class error regardless of version — a harmless, self-healing
+side effect of the container bounce itself. The write-then-read-back probe
+and row-count convergence checks (run immediately after, in that same
+step) had already confirmed replication was working fine. `harness/validate.py`
+now classifies errors as `transient` (expected from any container bounce,
+non-gating) vs `hard` (checksum/format/corruption-class — only these fail a
+step) instead of failing on any occurrence; see the `validate.py` module
+comments for the full before/after error-counter diffing this replaced.
+
+Originally verified only inside a sandbox with restricted egress (no Docker
+Hub / S3 access):
 - `docker-compose.yml` parses and interpolates correctly (`docker compose config`).
 - All ClickHouse XML config files (`config/**/*.xml`) are well-formed.
 - All Python modules compile and the seed-data generator runs and produces
   well-formed `INSERT` statements against the real column lists.
-- The Docker daemon itself works in this sandbox (`docker run` succeeds for
-  locally available images).
 
-Not verified here (blocked by sandbox network policy — Docker Hub and S3
-are both unreachable; `docker pull` fails with `403 Forbidden` regardless of
-image):
-- Actually pulling the `clickhouse/clickhouse-server` images.
-- Running the containers and confirming the Keeper ensemble forms, the
-  replicated tables replicate, and the upgrade steps behave as designed.
-
-**You'll need to run `make test` yourself in an environment with normal
-internet access** (a dev laptop, a CI runner, an EC2 box) to get the actual
-report. Budget ~10-20 minutes to pull 5 different `clickhouse-server` image
-tags the first time; subsequent runs reuse the Docker image cache.
+**Still worth doing:** re-run the `staged` and `direct-jump` CI jobs now
+that the false-positive is fixed, and treat their actual (not
+hypothesized) results as ground truth — including for the `direct-jump`
+job, whose failure log hasn't been reviewed yet at the time of this patch.
 
 ## Files
 
