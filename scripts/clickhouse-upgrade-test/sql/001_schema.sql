@@ -116,17 +116,42 @@
 --   mismatch between table name and path is expected, not something to
 --   "correct" to `.../obs_web/{shard}`.
 --
--- Remaining tables (`citizenlab`, `citizenlab_flip`, `jsonl`,
--- `analysis_web_measurement`, `event_detector_changepoints`,
--- `event_detector_cusums`, `faulty_measurements`, `url_priorities`) are
--- still only cross-checked against ooni/devops and ooni/backend, not
--- against a live `SHOW CREATE TABLE` -- `url_priorities` especially, since
--- it has no devops source at all to begin with (see above). Get
--- `SHOW CREATE TABLE` for those next and this note should get replaced by
--- an update (or a confirmation that no changes were needed) for each one.
+-- Round 2 (2026-08-11, same day): got `SHOW CREATE TABLE` for the rest --
+-- `citizenlab`, `citizenlab_flip`, `jsonl`, `analysis_web_measurement`,
+-- `event_detector_changepoints`, `event_detector_cusums`,
+-- `faulty_measurements`. Findings, each fixed inline at the relevant table:
+--
+-- - `jsonl`, `faulty_measurements`: exact matches, no changes. devops'
+--   schema.sql was accurate for both.
+-- - `citizenlab` / `citizenlab_flip`: columns match, but their ZK paths are
+--   swapped relative to what the table names suggest -- `citizenlab`'s data
+--   lives under `.../citizenlab_flip/{shard}` and vice versa (a swap-pair
+--   pattern, not a mistake to tidy up). Also, `citizenlab_flip` was missing
+--   from this file entirely -- only `citizenlab` had been added.
+-- - `analysis_web_measurement`: missing 4 columns (`top_dns_rule_id`,
+--   `top_tcp_rule_id`, `top_tls_rule_id`, `probe_id`) and all 3 indexes.
+-- - `event_detector_changepoints` and `event_detector_cusums`: both
+--   *completely* rewritten. devops' schema.sql -- which is to say, what
+--   round 1 above followed -- doesn't match production for either table at
+--   all: real prod uses plain, non-replicated `ReplacingMergeTree` for
+--   both (no `Replicated` prefix, no `ON CLUSTER`-implied coordination
+--   across replicas -- confirmed from the `ENGINE =` line, which has no ZK
+--   path/replica args), neither has a `PARTITION BY`, and both have
+--   entirely different column sets than devops' schema.sql describes. This
+--   means devops' own migration script was stale/aspirational for these
+--   two tables specifically, not just backend's fixtures -- worth raising
+--   with whoever maintains scripts/cluster-migration/schema.sql, since
+--   anyone using it as a reference for these two tables would be misled.
+--
+-- Every table in this file has now been checked against a live
+-- `SHOW CREATE TABLE`, not just against devops/backend's copies of it.
+-- Only genuinely open item left: the eleven legacy-monolith-only tables
+-- noted above (test_groups, accounts, etc.) -- still an open question
+-- whether those belong here at all, not a verification gap.
 --
 -- All DDL runs ON CLUSTER so it exercises ClickHouse's distributed_ddl queue
--- (the same mechanism prod uses to apply schema changes to all 3 replicas).
+-- (the same mechanism prod uses to apply schema changes to all 3 replicas,
+-- for every table except event_detector_changepoints/cusums -- see above).
 
 CREATE DATABASE IF NOT EXISTS ooni ON CLUSTER oonidata_cluster;
 
@@ -198,7 +223,36 @@ ENGINE = ReplicatedReplacingMergeTree(
 ORDER BY (measurement_start_time, report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
+-- Verified 2026-08-11 against live `SHOW CREATE TABLE`. The ZK paths for
+-- citizenlab and citizenlab_flip are swapped relative to what their table
+-- names would suggest: `citizenlab` stores its data under the
+-- `.../citizenlab_flip/{shard}` path and vice versa. This isn't a typo to
+-- "fix" -- these two tables are a swap pair (load fresh data into whichever
+-- one isn't currently live, then the application-facing name gets
+-- repointed), and this cross-wiring is what you get after however many
+-- swaps have happened over the table's history. devops' schema.sql defines
+-- citizenlab_flip with its own straightforwardly-matching path, which is
+-- wrong -- either it was accurate once and drifted after a later swap, or
+-- it was never applied for this table and both tables' current state came
+-- from somewhere else entirely.
 CREATE TABLE IF NOT EXISTS ooni.citizenlab ON CLUSTER oonidata_cluster
+(
+    `domain` String,
+    `url` String,
+    `cc` FixedString(32),
+    `category_code` String
+)
+ENGINE = ReplicatedReplacingMergeTree(
+    '/clickhouse/{cluster}/tables/ooni/citizenlab_flip/{shard}',
+    '{replica}'
+)
+ORDER BY (domain, url, cc, category_code)
+SETTINGS index_granularity = 4;
+
+-- Was missing from this file entirely until 2026-08-11 -- devops' schema.sql
+-- defines it, but it got dropped when this file was first put together.
+-- See the note on `citizenlab` above re: the swapped ZK paths.
+CREATE TABLE IF NOT EXISTS ooni.citizenlab_flip ON CLUSTER oonidata_cluster
 (
     `domain` String,
     `url` String,
@@ -212,6 +266,12 @@ ENGINE = ReplicatedReplacingMergeTree(
 ORDER BY (domain, url, cc, category_code)
 SETTINGS index_granularity = 4;
 
+-- Verified 2026-08-11 against live `SHOW CREATE TABLE`. Was missing 4
+-- columns (`top_dns_rule_id`, `top_tcp_rule_id`, `top_tls_rule_id`,
+-- `probe_id`) and all 3 indexes -- same `measurement_start_time_idx` /
+-- `probe_cc_idx` / `probe_asn_idx` minmax trio as `obs_web`. Neither devops'
+-- schema.sql nor the ooni/backend fixture this file originally followed had
+-- any of these.
 CREATE TABLE IF NOT EXISTS ooni.analysis_web_measurement ON CLUSTER oonidata_cluster
 (
     `domain` String,
@@ -238,7 +298,14 @@ CREATE TABLE IF NOT EXISTS ooni.analysis_web_measurement ON CLUSTER oonidata_clu
     `tcp_ok` Float32,
     `tls_blocked` Float32,
     `tls_down` Float32,
-    `tls_ok` Float32
+    `tls_ok` Float32,
+    `top_dns_rule_id` LowCardinality(String),
+    `top_tcp_rule_id` LowCardinality(String),
+    `top_tls_rule_id` LowCardinality(String),
+    `probe_id` FixedString(64),
+    INDEX measurement_start_time_idx measurement_start_time TYPE minmax GRANULARITY 2,
+    INDEX probe_cc_idx probe_cc TYPE minmax GRANULARITY 1,
+    INDEX probe_asn_idx probe_asn TYPE minmax GRANULARITY 1
 )
 ENGINE = ReplicatedReplacingMergeTree(
     '/clickhouse/{cluster}/tables/ooni/analysis_web_measurement/{shard}',
@@ -368,6 +435,21 @@ PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time, probe_cc, probe_asn)
 SETTINGS index_granularity = 8192;
 
+-- Completely rewritten 2026-08-11 against live `SHOW CREATE TABLE`. Neither
+-- ooni/devops' schema.sql NOR ooni/backend's oonimeasurements fixture
+-- matches production for this table -- ground truth is a third, simpler
+-- design that doesn't match either repo's copy:
+--   - Plain `ReplacingMergeTree`, not `ReplicatedReplacingMergeTree` --
+--     this table is NOT replicated in production. Kept `ON CLUSTER` here
+--     anyway so the DDL still fans out and creates an independent copy on
+--     all 3 nodes (matching how devops actually issues this table's DDL),
+--     but be aware the 3 copies will NOT stay in sync with each other the
+--     way every other table in this file does -- that's a real production
+--     fact, not a simplification for the test.
+--   - No `PARTITION BY` at all (devops' schema.sql had `toYYYYMM(ts)`).
+--   - One `current_state` column, not per-metric `*_current_state` columns
+--     (that's `event_detector_cusums`, below, a different table). No
+--     `obs_w_sum`/`w_sum`/`current_mean`/`last_ts` columns anywhere.
 CREATE TABLE IF NOT EXISTS ooni.event_detector_changepoints ON CLUSTER oonidata_cluster
 (
     `probe_asn` UInt32,
@@ -381,72 +463,61 @@ CREATE TABLE IF NOT EXISTS ooni.event_detector_changepoints ON CLUSTER oonidata_
     `dns_other_blocked` Nullable(Float32),
     `tcp_blocked` Nullable(Float32),
     `tls_blocked` Nullable(Float32),
-    `last_ts` DateTime64(3, 'UTC'),
-    `dns_isp_blocked_obs_w_sum` Nullable(Float32),
-    `dns_isp_blocked_w_sum` Nullable(Float32),
-    `dns_isp_blocked_s_pos` Nullable(Float32),
-    `dns_isp_blocked_s_neg` Nullable(Float32),
-    `dns_other_blocked_obs_w_sum` Nullable(Float32),
-    `dns_other_blocked_w_sum` Nullable(Float32),
-    `dns_other_blocked_s_pos` Nullable(Float32),
-    `dns_other_blocked_s_neg` Nullable(Float32),
-    `tcp_blocked_obs_w_sum` Nullable(Float32),
-    `tcp_blocked_w_sum` Nullable(Float32),
-    `tcp_blocked_s_pos` Nullable(Float32),
-    `tcp_blocked_s_neg` Nullable(Float32),
-    `tls_blocked_obs_w_sum` Nullable(Float32),
-    `tls_blocked_w_sum` Nullable(Float32),
-    `tls_blocked_s_pos` Nullable(Float32),
-    `tls_blocked_s_neg` Nullable(Float32),
     `change_dir` Nullable(Int8),
     `s_pos` Nullable(Float32),
     `s_neg` Nullable(Float32),
-    `current_mean` Nullable(Float32),
+    `current_state` String,
     `h` Nullable(Float32),
     `block_type` String
 )
-ENGINE = ReplicatedReplacingMergeTree(
-    '/clickhouse/{cluster}/tables/ooni/event_detector_changepoints/{shard}',
-    '{replica}'
-)
-PARTITION BY toYYYYMM(ts)
+ENGINE = ReplacingMergeTree
 ORDER BY (probe_asn, probe_cc, ts, domain)
 SETTINGS index_granularity = 8192;
 
+-- Completely rewritten 2026-08-11 against live `SHOW CREATE TABLE` -- same
+-- situation as event_detector_changepoints above: devops' schema.sql
+-- version (obs_w_sum/w_sum/PARTITION BY toYYYYMM/Replicated) doesn't match
+-- production at all. Real production is also plain `ReplacingMergeTree`
+-- (version column `ts` this time), no PARTITION BY, and tracks
+-- current_state + last_change + last_ts per metric instead of weighted
+-- sums. Same non-replicated caveat as above applies here too.
 CREATE TABLE IF NOT EXISTS ooni.event_detector_cusums ON CLUSTER oonidata_cluster
 (
     `probe_asn` UInt32,
     `probe_cc` String,
     `domain` String,
     `ts` DateTime64(3, 'UTC'),
-    `dns_isp_blocked_obs_w_sum` Nullable(Float64),
-    `dns_isp_blocked_w_sum` Nullable(Float64),
+    `dns_isp_blocked_current_state` String DEFAULT 'ok',
     `dns_isp_blocked_s_pos` Nullable(Float64),
     `dns_isp_blocked_s_neg` Nullable(Float64),
-    `dns_other_blocked_obs_w_sum` Nullable(Float64),
-    `dns_other_blocked_w_sum` Nullable(Float64),
+    `dns_other_blocked_current_state` String DEFAULT 'ok',
     `dns_other_blocked_s_pos` Nullable(Float64),
     `dns_other_blocked_s_neg` Nullable(Float64),
-    `tcp_blocked_obs_w_sum` Nullable(Float64),
-    `tcp_blocked_w_sum` Nullable(Float64),
+    `tcp_blocked_current_state` String DEFAULT 'ok',
     `tcp_blocked_s_pos` Nullable(Float64),
     `tcp_blocked_s_neg` Nullable(Float64),
-    `tls_blocked_obs_w_sum` Nullable(Float64),
-    `tls_blocked_w_sum` Nullable(Float64),
+    `tls_blocked_current_state` String DEFAULT 'ok',
     `tls_blocked_s_pos` Nullable(Float64),
-    `tls_blocked_s_neg` Nullable(Float64)
+    `tls_blocked_s_neg` Nullable(Float64),
+    `dns_isp_blocked_last_change` Int8 DEFAULT 0,
+    `dns_isp_blocked_last_ts` Nullable(DateTime64(3, 'UTC')),
+    `dns_other_blocked_last_change` Int8 DEFAULT 0,
+    `dns_other_blocked_last_ts` Nullable(DateTime64(3, 'UTC')),
+    `tcp_blocked_last_change` Int8 DEFAULT 0,
+    `tcp_blocked_last_ts` Nullable(DateTime64(3, 'UTC')),
+    `tls_blocked_last_change` Int8 DEFAULT 0,
+    `tls_blocked_last_ts` Nullable(DateTime64(3, 'UTC'))
 )
-ENGINE = ReplicatedReplacingMergeTree(
-    '/clickhouse/{cluster}/tables/ooni/event_detector_cusums/{shard}',
-    '{replica}'
-)
-PARTITION BY toYYYYMM(ts)
+ENGINE = ReplacingMergeTree(ts)
 ORDER BY (probe_asn, probe_cc, domain)
 SETTINGS index_granularity = 8192;
 
 -- No definition exists anywhere in ooni/devops (see header note); ported from
 -- ooni/backend ooniapi/services/{ooniprobe,oonirun,testlists}/tests/fixtures/initdb/01-scheme.sql
--- (CollapsingMergeTree -> ReplicatedCollapsingMergeTree).
+-- (CollapsingMergeTree -> ReplicatedCollapsingMergeTree). Verified
+-- 2026-08-11 against live `SHOW CREATE TABLE`: exact match, including the
+-- ZK path -- no changes needed despite having no devops source to check
+-- against originally.
 CREATE TABLE IF NOT EXISTS ooni.url_priorities ON CLUSTER oonidata_cluster
 (
     `sign` Int8,
