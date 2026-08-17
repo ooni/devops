@@ -131,12 +131,104 @@ def probe_write_then_read(write_node: ChNode, read_nodes: list[ChNode], timeout:
     return result
 
 
+# --- error-code classification -------------------------------------------
+#
+# Forcibly killing/recreating a peer container -- exactly what
+# `docker compose up --no-deps --force-recreate` does to simulate an
+# in-place node upgrade -- severs any in-flight connections the other two
+# nodes had open to it. ClickHouse reliably logs NETWORK / CANNOT_READ_ALL_
+# DATA / REPLICA-session-class errors on the *surviving* nodes when that
+# happens, even when the container comes back on the exact same version.
+# That's a side effect of the bounce itself, not evidence of a version
+# incompatibility -- and it self-heals, which is exactly what the
+# write-then-read-back probe and row-count convergence checks (run right
+# after) are there to confirm.
+#
+# Genuine cross-version incompatibility shows up differently: checksum
+# mismatches, an unsupported/unknown data-part format version, "too old
+# software version" errors, corrupted data. Those only fire for an actual
+# data-format/version reason, never from a plain socket bounce, so they're
+# treated as hard failures that gate a hop.
+TRANSIENT_ERROR_NAME_PATTERNS = [
+    "%NETWORK%",
+    "%CANNOT_READ_ALL_DATA%",
+    "%UNFINISHED%",
+    "%REPLICA%",
+    "%SOCKET%",
+    "%CONNECTION%",
+    "%TIMEOUT%",
+    "%ALL_CONNECTION_TRIES_FAILED%",
+]
+HARD_ERROR_NAME_PATTERNS = [
+    "%CHECKSUM%",
+    "%UNKNOWN_FORMAT%",
+    "%TOO_OLD%",
+    "%NOT_ENOUGH_SPACE%",
+    "%CORRUPTED%",
+    "%INCOMPATIBLE%",
+]
+_ALL_WATCHED_PATTERNS = TRANSIENT_ERROR_NAME_PATTERNS + HARD_ERROR_NAME_PATTERNS
+
+
+def _classify(name: str) -> str:
+    for p in TRANSIENT_ERROR_NAME_PATTERNS:
+        if p.strip("%") in name:
+            return "transient"
+    return "hard"
+
+
+def error_snapshot(node: ChNode) -> dict[str, dict]:
+    """
+    Current cumulative system.errors rows for the watched error codes, keyed
+    by name. `value` is a monotonic counter since server start -- meaningless
+    read in isolation, but diffing two snapshots taken before/after a step
+    (see new_errors_since()) tells you exactly how many *new* occurrences
+    happened during that specific step. A `last_error_time > now() -
+    INTERVAL n MINUTE` window can't do that reliably across a multi-step CI
+    job: an error logged during hop 1 is still "recent" by the time hop 4
+    runs, so it keeps getting re-reported as if it just happened.
+    """
+    like_clauses = " OR ".join(f"name LIKE '{p}'" for p in _ALL_WATCHED_PATTERNS)
+    try:
+        rows = node.query_rows(
+            f"SELECT name, value, last_error_message, last_error_time "
+            f"FROM system.errors WHERE {like_clauses}"
+        )
+    except ClickHouseError:
+        return {}
+    return {r["name"]: r for r in rows}
+
+
+def new_errors_since(node: ChNode, baseline: dict[str, dict]) -> list[dict]:
+    """
+    Diff a fresh error snapshot against `baseline` (captured before the step
+    started). Returns only error codes whose counter increased during this
+    step, each tagged 'transient' or 'hard' per the pattern lists above --
+    it's this classification, not raw presence of an error, that
+    scenarios._hop_ok() gates a hop's pass/fail on.
+    """
+    current = error_snapshot(node)
+    out = []
+    for name, row in current.items():
+        before_value = int(baseline.get(name, {}).get("value", 0) or 0)
+        after_value = int(row.get("value", 0) or 0)
+        if after_value > before_value:
+            out.append({
+                "name": name,
+                "value": after_value,
+                "new_since_step_start": after_value - before_value,
+                "last_error_message": row.get("last_error_message", ""),
+                "last_error_time": row.get("last_error_time"),
+                "kind": _classify(name),
+            })
+    return out
+
+
 def recent_replication_errors(node: ChNode, since_minutes: int = 30) -> list[dict]:
     """
-    Errors ClickHouse itself has logged for replication-related exception
-    codes since the upgrade step started. This is what actually shows up
-    when nodes run mismatched, incompatible versions (e.g. checksum
-    mismatches, unknown part format, protocol errors).
+    Standalone (non-diffed) view for ad-hoc health snapshots -- e.g.
+    full_health_snapshot() below -- where there's no "before" baseline to
+    diff against. NOT used to decide hop pass/fail; see new_errors_since().
     """
     try:
         return node.query_rows(
@@ -144,16 +236,7 @@ def recent_replication_errors(node: ChNode, since_minutes: int = 30) -> list[dic
             SELECT name, value, last_error_message, last_error_time
             FROM system.errors
             WHERE last_error_time > now() - INTERVAL {since_minutes} MINUTE
-              AND (
-                name LIKE '%REPLICA%' OR
-                name LIKE '%CHECKSUM%' OR
-                name LIKE '%UNKNOWN_FORMAT%' OR
-                name LIKE '%TOO_OLD%' OR
-                name LIKE '%NETWORK%' OR
-                name LIKE '%UNFINISHED%' OR
-                name LIKE '%NOT_ENOUGH_SPACE%' OR
-                name LIKE '%CANNOT_READ_ALL_DATA%'
-              )
+              AND ({" OR ".join(f"name LIKE '{p}'" for p in _ALL_WATCHED_PATTERNS)})
             ORDER BY last_error_time DESC
             """
         )

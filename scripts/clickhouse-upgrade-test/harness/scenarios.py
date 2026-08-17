@@ -89,6 +89,16 @@ def _run_upgrade_step(env: dict, node_name: str, new_version: str, log=print) ->
     nodes = make_nodes()
     other_nodes = [n for n in nodes if n.name != node_name]
 
+    # Snapshot error counters *before* bouncing the container. Forcibly
+    # recreating node_name is expected to sever the other nodes' in-flight
+    # connections to it and log a handful of NETWORK / CANNOT_READ_ALL_DATA /
+    # REPLICA-session errors on them -- a side effect of the bounce, not
+    # evidence the new version broke anything. Diffing against this baseline
+    # (validate.new_errors_since) is what lets us tell that apart from a
+    # genuine, version-caused error appearing during this same step. See
+    # harness/validate.py for the full rationale and classification.
+    error_baseline = {n.name: validate.error_snapshot(n) for n in nodes}
+
     log(f"[upgrade] recreating {node_name} on image {new_version} (others stay up)...")
     env = compose.upgrade_node(node_name, new_version, env)
 
@@ -102,7 +112,8 @@ def _run_upgrade_step(env: dict, node_name: str, new_version: str, log=print) ->
 
     converged, counts = validate.wait_for_convergence(nodes, timeout=90)
     versions = validate.get_versions(nodes)
-    errors = {n.name: validate.recent_replication_errors(n) for n in nodes}
+    errors = {n.name: validate.new_errors_since(n, error_baseline[n.name]) for n in nodes}
+    hard_errors = {name: [e for e in errs if e["kind"] == "hard"] for name, errs in errors.items()}
     queue_problems = {n.name: validate.replication_queue_problems(n) for n in nodes}
 
     step = {
@@ -115,7 +126,11 @@ def _run_upgrade_step(env: dict, node_name: str, new_version: str, log=print) ->
         "converged": converged,
         "row_counts": counts,
         "probe": probe,
+        # Both transient and hard new errors, kept for visibility in the report.
         "errors_found": errors,
+        # Only these gate pass/fail -- see _hop_ok() and validate.py's
+        # TRANSIENT_ERROR_NAME_PATTERNS / HARD_ERROR_NAME_PATTERNS.
+        "hard_errors_found": hard_errors,
         "queue_problems": queue_problems,
     }
     return step, env
@@ -126,7 +141,7 @@ def _hop_ok(step: dict) -> bool:
         step.get("node_came_back_up")
         and step.get("converged")
         and step.get("probe", {}).get("fully_replicated")
-        and not any(v for v in step.get("errors_found", {}).values())
+        and not any(v for v in step.get("hard_errors_found", {}).values())
     )
 
 
@@ -159,11 +174,27 @@ def setup_step(base_version: str, label: str = "setup", log=print) -> dict:
 
 
 def upgrade_node_step(node_name: str, new_version: str, label: str | None = None, log=print) -> dict:
-    env = compose.current_env()
-    step, _env = _run_upgrade_step(env, node_name, new_version, log=log)
-    if label:
+    label = label or f"upgrade-{node_name}-{new_version}"
+    try:
+        env = compose.current_env()
+        step, _env = _run_upgrade_step(env, node_name, new_version, log=log)
         step["label"] = label
-    return step
+        return step
+    except Exception as e:
+        # Mirrors setup_step()'s try/except: a docker/compose-level failure
+        # (daemon hiccup, port conflict, etc.) should land as a clean,
+        # diagnosable failed step -- same shape step_ok()/_hop_ok() already
+        # know how to fail on (node_came_back_up defaults to falsy) -- not
+        # an uncaught traceback that kills the whole CI job with no
+        # results/steps/<label>.json written at all.
+        log(f"[upgrade] {label} raised before completing: {e}")
+        return {
+            "label": label,
+            "node": node_name,
+            "new_version": new_version,
+            "node_came_back_up": False,
+            "error": str(e),
+        }
 
 
 def verify_ddl_step(version: str, label: str | None = None, log=print) -> dict:

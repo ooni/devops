@@ -25,14 +25,34 @@ def render_step(step: dict) -> str:
         f"(probe id `{probe.get('probe_id')}`)"
     )
     errs = step.get("errors_found", {})
-    any_errs = any(v for v in errs.values())
-    lines.append(f"- Replication-related errors logged by ClickHouse: **{'YES' if any_errs else 'none'}**")
-    if any_errs:
-        for node, errlist in errs.items():
+    hard = step.get("hard_errors_found", {})
+    any_hard = any(v for v in hard.values())
+    any_transient = any(
+        e.get("kind") == "transient" for errlist in errs.values() for e in errlist
+    )
+    lines.append(
+        f"- Version-incompatibility errors logged by ClickHouse: "
+        f"**{'YES -- FAILS THIS STEP' if any_hard else 'none'}**"
+    )
+    if any_hard:
+        for node, errlist in hard.items():
             if errlist:
                 lines.append(f"  - `{node}`:")
                 for e in errlist[:5]:
-                    lines.append(f"    - `{e.get('name')}`: {e.get('last_error_message', '')[:200]}")
+                    lines.append(
+                        f"    - `{e.get('name')}` (+{e.get('new_since_step_start')} since step start): "
+                        f"{e.get('last_error_message', '')[:200]}"
+                    )
+    if any_transient:
+        lines.append(
+            "- Transient connection errors during the container bounce "
+            "(expected side effect of force-recreating a peer; non-gating -- see harness/validate.py):"
+        )
+        for node, errlist in errs.items():
+            transient = [e for e in errlist if e.get("kind") == "transient"]
+            if transient:
+                names = ", ".join(f"`{e['name']}` (+{e['new_since_step_start']})" for e in transient)
+                lines.append(f"  - `{node}`: {names}")
     qprob = step.get("queue_problems", {})
     any_q = any(v for v in qprob.values())
     if any_q:
