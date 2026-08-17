@@ -17,25 +17,23 @@ scheduled-downtime, all-nodes-at-once upgrade?**
   **~1 year apart** — beyond that window the docs warn the cluster "may not
   work", queries can fail with arbitrary errors, and downgrading stops being
   an option.
-- **Recommendation: do a rolling, node-by-node upgrade, but stage it through
-  each intermediate LTS release rather than jumping straight to latest —
-  and, for now, stop at `25.8.29.51` rather than going all the way to
-  latest.** No full-cluster downtime is needed either way — the risk isn't
-  downtime, it's version skew during the upgrade window.
+- **Recommendation, as of the last real CI run (see "Real CI findings"
+  below): do a rolling, node-by-node upgrade to `25.3.14.14` and stop
+  there for now.** Going from `25.3.14.14` to `25.8.29.51` hit a real,
+  reproducible ClickHouse incompatibility in CI, not a hypothetical one —
+  see below before doing this hop in production.
 
   ```
-  24.8.6.70  →  25.3.14.14  →  25.8.29.51  |  26.3.17.110  →  26.7.3.19
-   (current)      LTS         LTS (stop     |    LTS          (latest stable)
-                               here for now) |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                                             |  tested by this harness, but not
-                                             |  yet recommended for prod -- see
-                                             |  "Why we stop at 25.8, not 26.3" below
+  24.8.6.70  →  25.3.14.14  |  25.4.13.22 → 25.5.11.15 → 25.6.13.41 → 25.7.8.71 → 25.8.29.51  →  26.3.17.110 → 26.7.3.19
+   (current)   LTS (stop     |  \_______________________ bisection hops ________________/  LTS         LTS      (latest)
+               here for now) |  inserted after a real CI failure partway through this LTS-to-LTS
+                              |  hop -- see "Real CI findings" below. Not yet safe to recommend past this point.
   ```
 
-  Each hop is 4–7 months of releases apart, comfortably inside the
-  compatibility window. Do all 3 replicas one at a time for a given hop
-  before starting the next hop (never skip ahead on one node while another
-  is still 2+ hops behind).
+  No full-cluster downtime is needed for a hop that's actually safe — the
+  risk isn't downtime, it's version skew during the upgrade window, and
+  this project just found a concrete instance of it earlier in the ladder
+  than expected.
 
 This repo contains a dockerized test that *exercises* this rather than just
 asserting it: it spins up a 3-node cluster shaped exactly like OONI's
@@ -145,7 +143,59 @@ curl -sL https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/samples/analysis
 scenario — or just skip the seed step in `harness/scenarios.py:load_schema_and_seed`
 and load these instead).
 
-## Why we stop at 25.8.29.51, not 26.3.17.110, for now
+## Real CI findings: a genuine incompatibility, earlier than expected
+
+A real staged-upgrade CI run
+([ooni/devops#477](https://github.com/ooni/devops/pull/477), run
+[32044578317](https://github.com/ooni/devops/actions/runs/32044578317))
+got cleanly through `24.8.6.70 -> 25.3.14.14` (including the transient,
+non-gating connection blips a container recreate is expected to cause —
+see "What was and wasn't verified" below) and then hit a **hard, real
+failure** during `25.3.14.14 -> 25.8.29.51`, specifically at the point
+where ch1 and ch2 were already on `25.8.29.51` and ch3 was still on
+`25.3.14.14`:
+
+- `CHECKSUM_DOESNT_MATCH` logged on both upgraded nodes.
+- ch3's replication queue stuck retrying two entries (148 and 147 tries
+  and climbing) with the identical root cause on both:
+  `Code: 79. DB::Exception: Unknown mark file extension: '4'.
+  (INCORRECT_FILE_NAME)`, thrown while ch3 tried to fetch a data part from
+  a peer.
+- The write-then-read-back probe failed on ch3 for the first time in the
+  whole run, and row counts diverged.
+
+Read literally: once a merge happens on a `25.8.29.51` node, it can write
+a part whose mark-file format a `25.3.14.14` binary has no code path to
+even parse — not a fluke, not something more retries fix, only something
+that clears once the lagging node is also upgraded. That's a **materially
+bigger finding than the one raised in review** — this shows up a full LTS
+hop before 26.3, which is the version the review flagged as the one to be
+careful about.
+
+One thing this specific run couldn't tell us: the workflow aborts the
+whole job on a step's first non-zero exit, so it never got to upgrade ch3
+too and see whether that stuck state clears once the hop actually
+finishes. It's possible the real constraint is "don't leave a hop
+half-done for long" rather than "this hop is impossible" — untested so
+far.
+
+**Response, in progress:** `harness/versions.py`'s `LTS_HOPS` has been
+expanded to walk every monthly stable release between `25.3.14.14` and
+`25.8.29.51` (`25.4.13.22`, `25.5.11.15`, `25.6.13.41`, `25.7.8.71` —
+versions/dates from
+[endoflife.date/api/clickhouse.json](https://endoflife.date/api/clickhouse.json))
+instead of jumping straight between the two LTS releases, to bisect which
+single month's release actually introduces the incompatible mark format.
+`.github/workflows/clickhouse_upgrade_test.yml` mirrors this as 8 hops
+instead of 4 (see its own sanity-check step, which asserts the two stay in
+sync). `RECOMMENDED_NOW` has been pulled back to `25.3.14.14` — the one hop
+that's actually completed clean in real CI — until this bisection run
+identifies where the break is. Repeated attempts to find the exact
+changelog entry for this change (to know if there's a compatibility
+setting that avoids it) have not succeeded yet — see "Still open" in the
+review-response section below.
+
+## PR #477 review response
 
 Raised in review on [ooni/devops#477](https://github.com/ooni/devops/pull/477)
 (hellais) — addressed here point by point:
@@ -154,13 +204,12 @@ Raised in review on [ooni/devops#477](https://github.com/ooni/devops/pull/477)
    ["Propagate data types serialization versions to nested data
    types"](https://clickhouse.com/docs/resources/changelogs/oss/2026#263-backward-incompatible-change),
    which the changelog itself flags as able to make **downgrading after
-   upgrading lossy**. That's the one that matters most operationally: if a
-   node upgraded past 26.3 needs to be rolled back, data loss is on the
-   table. Everything from `24.8.6.70` through `25.8.29.51` does not carry
-   that specific warning. This is why `harness/versions.py` now exposes
-   `RECOMMENDED_NOW = "25.8.29.51"` separately from the full `LTS_HOPS`
-   ladder this harness tests — see the module docstring there for the full
-   reasoning.
+   upgrading lossy**. That's still true and still worth stopping for. But
+   as of the real CI run above, it's no longer the *first* thing to worry
+   about on this ladder — see "Real CI findings" above for a hard failure
+   found a full LTS hop earlier. `RECOMMENDED_NOW` in
+   `harness/versions.py` reflects whichever constraint is currently
+   tightest (right now, that's the mark-file issue, not 26.3).
 2. **"Renamed `searchAny`/`searchAll` to `hasAnyTokens`/`hasAllTokens`
    (25.10) — make sure we aren't using these."** Confirmed absent from
    `oonipipeline` (`ooni/data`, the data-pipeline repo this cluster feeds —
@@ -212,42 +261,44 @@ Raised in review on [ooni/devops#477](https://github.com/ooni/devops/pull/477)
 Net effect for now: `LTS_HOPS` (what this harness's `staged` CI job
 actually tests) still walks the full ladder to `26.7.3.19`, because the
 whole point of testing is to build the confidence needed to eventually move
-past 26.3 — a green run there is evidence, not a green light. The
-production recommendation (`RECOMMENDED_NOW`, and the README TL;DR above)
-stops one hop earlier until points 2, 4, and 5 above are closed out.
+past every one of these constraints — a green run is evidence, not a green
+light. The production recommendation (`RECOMMENDED_NOW`, and the README
+TL;DR above) stops at the earliest unresolved issue, which right now is the
+25.3.14.14 -> 25.8.29.51 mark-file finding, not 26.3 — see "Real CI
+findings" above. Points 2, 4, and 5 remain open regardless of how that
+bisection turns out.
 
 ## What was and wasn't verified
 
-This harness has now actually run in GitHub Actions (see
+This harness has now actually run in GitHub Actions twice (see
 `.github/workflows/clickhouse_upgrade_test.yml`, exercised on
 [ooni/devops#477](https://github.com/ooni/devops/pull/477)), which has real
-network access this project's original build/review sandbox didn't. That
-run got through `setup` and the `24.8.6.70 -> 25.3.14.14` upgrade of `ch1`
-cleanly, then flagged `ch2`'s upgrade as failed — which turned out to be a
-**false positive in this harness's own error-detection logic**, not a real
-ClickHouse compatibility problem: forcibly recreating a node's container
-(how this harness simulates an in-place upgrade) drops the other nodes'
-open connections to it, which ClickHouse logs as a `CANNOT_READ_ALL_DATA`
-/ `NETWORK`-class error regardless of version — a harmless, self-healing
-side effect of the container bounce itself. The write-then-read-back probe
-and row-count convergence checks (run immediately after, in that same
-step) had already confirmed replication was working fine. `harness/validate.py`
-now classifies errors as `transient` (expected from any container bounce,
-non-gating) vs `hard` (checksum/format/corruption-class — only these fail a
-step) instead of failing on any occurrence; see the `validate.py` module
-comments for the full before/after error-counter diffing this replaced.
+network access this project's original build/review sandbox didn't:
+
+- **Run 1** got through `setup` and `ch1`'s `24.8.6.70 -> 25.3.14.14`
+  upgrade, then flagged `ch2`'s upgrade as failed — a **false positive in
+  this harness's own error-detection logic**, not a real ClickHouse
+  problem (fixed; see `harness/validate.py`'s transient-vs-hard error
+  classification).
+- **Run 2**, after that fix, got all the way through the full
+  `24.8.6.70 -> 25.3.14.14` hop cleanly (including further transient,
+  non-gating blips, confirming the fix generalizes) and then hit the real
+  `25.3.14.14 -> 25.8.29.51` mark-file incompatibility described in "Real
+  CI findings" above.
 
 Originally verified only inside a sandbox with restricted egress (no Docker
-Hub / S3 access):
+Hub / S3 access), before either real run:
 - `docker-compose.yml` parses and interpolates correctly (`docker compose config`).
 - All ClickHouse XML config files (`config/**/*.xml`) are well-formed.
 - All Python modules compile and the seed-data generator runs and produces
   well-formed `INSERT` statements against the real column lists.
 
-**Still worth doing:** re-run the `staged` and `direct-jump` CI jobs now
-that the false-positive is fixed, and treat their actual (not
-hypothesized) results as ground truth — including for the `direct-jump`
-job, whose failure log hasn't been reviewed yet at the time of this patch.
+**Still worth doing:** re-run `staged-upgrade` with the bisection hops now
+in place and read off which specific version first introduces the
+mark-file break; and separately review the `direct-jump` job's own
+failure log, which hasn't been looked at yet (it's expected to fail —
+that's the point of that job — but it's still worth confirming it fails
+for the *same* reason and not something else).
 
 ## Files
 
