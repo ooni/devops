@@ -18,6 +18,8 @@ on:
           - both
           - staged
           - direct
+          - real-data
+          - all
         default: both
   pull_request:
     paths:
@@ -222,6 +224,128 @@ jobs:
       - name: Tear down cluster
         if: always()
         run: python3 ci_step.py teardown
+
+  # Real-data end-to-end scenario (ooni/data#437 follow-up, ooni/data#160):
+  # does the actual OONI ingestion pipeline -- real measurements, downloaded
+  # and submitted through fastpath/oonipipeline, then queried through the
+  # real api-oonimeasurements service -- still work after each hop of
+  # PRODUCTION_HOPS? Separate from staged-upgrade above, which uses fast
+  # synthetic seed data to check ClickHouse's own replication mechanics
+  # across every bisection waypoint; this one is slower, has a real
+  # external git + network dependency, and walks the actual 4-hop
+  # production runbook rather than every diagnostic waypoint. See
+  # harness/real_data.py and README.md's "real-data-upgrade" section for
+  # the full design (load real data once, re-verify integrity + the real
+  # pytest suite at every hop).
+  #
+  # Deliberately NOT run on pull_request (unlike staged-upgrade /
+  # direct-jump-upgrade above): it checks out an unmerged external branch
+  # (ooni/data's add_end_to_end_tests, ooni/data#160) this repo doesn't
+  # control, plus does real network downloads of OONI measurement data --
+  # a flaky/slow dependency there shouldn't block unrelated PRs to this
+  # repo. Runs on push to main (when these paths change) and on-demand via
+  # workflow_dispatch (scenario: real-data or all) instead.
+  real-data-upgrade:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scenario == 'all' || github.event.inputs.scenario == 'real-data'))
+    runs-on: ubuntu-latest
+    # Real network download of OONI measurement data + oonipipeline/fastpath
+    # processing (once), plus 4 hops x (3 node upgrades + an integrity
+    # re-check + a full pytest run against the real API) -- substantially
+    # slower than staged-upgrade's synthetic-data hops.
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: scripts/clickhouse-upgrade-test
+    steps:
+      - uses: actions/checkout@v4
+
+      # ooni/data#160 (branch add_end_to_end_tests) is still an open,
+      # unmerged PR as of this writing -- see docker-compose.real-data.yml's
+      # header comment for why this pins to the branch instead of main.
+      # Update this ref once #160 merges.
+      - name: Checkout ooni/data (add_end_to_end_tests branch)
+        uses: actions/checkout@v4
+        with:
+          repository: ooni/data
+          ref: add_end_to_end_tests
+          path: external/ooni-data
+
+      - name: Sanity-check hop ladder matches harness/versions.py PRODUCTION_HOPS
+        run: |
+          python3 - <<'EOF'
+          from harness.versions import PRODUCTION_HOPS
+          expected = [
+              "24.8.6.70",
+              "25.3.14.14",
+              "25.8.29.51",
+              "26.3.17.110",
+              "26.7.3.19",
+          ]
+          actual = [v for v, _ in PRODUCTION_HOPS]
+          assert actual == expected, (
+              f"harness/versions.py PRODUCTION_HOPS is now {actual} -- "
+              "update this workflow's steps (and the assertions here) to match"
+          )
+          print("OK: workflow hop ladder matches harness/versions.py PRODUCTION_HOPS")
+          EOF
+
+      - name: Validate docker-compose.yml + docker-compose.real-data.yml
+        run: docker compose -f docker-compose.yml -f docker-compose.real-data.yml config
+
+      - name: Set up cluster at 24.8.6.70 (schema only -- no synthetic seed data)
+        run: python3 ci_step.py setup-real-data --base-version 24.8.6.70 --label setup-real-data
+
+      - name: Load real OONI data once (oonidata sync + oonipipeline + fastpath)
+        run: python3 ci_step.py load-real-data --label load-real-data
+
+      - name: Take golden snapshot (row counts + checksums, all 3 nodes must agree)
+        run: python3 ci_step.py golden-snapshot --label golden-snapshot
+
+      - name: Sanity-check ooni/data's pytest suite passes at 24.8.6.70 before any upgrade
+        run: python3 ci_step.py verify-e2e --label base-verify-e2e
+
+      # --- Real-data hop 1/4: 24.8.6.70 -> 25.3.14.14 ---
+      - name: "Real-data hop 1/4 (-> 25.3.14.14): upgrade all 3 nodes, re-check integrity + pytest suite"
+        run: python3 ci_step.py real-data-hop --version 25.3.14.14 --label rd-hop1
+        continue-on-error: true
+
+      # --- Real-data hop 2/4: 25.3.14.14 -> 25.8.29.51 -- see
+      # harness/versions.py's "self-heals once the lagging node catches up"
+      # section: expect the trailing node to log hard-looking errors until
+      # its own upgrade finishes. real_data_hop_step upgrades all 3 nodes
+      # back-to-back within this single step, matching the operational rule
+      # documented there for this specific hop. ---
+      - name: "Real-data hop 2/4 (-> 25.8.29.51): upgrade all 3 nodes, re-check integrity + pytest suite"
+        run: python3 ci_step.py real-data-hop --version 25.8.29.51 --label rd-hop2
+        continue-on-error: true
+
+      # --- Real-data hop 3/4: 25.8.29.51 -> 26.3.17.110 -- same
+      # self-healing pattern as hop 2, this time the nested-data-type
+      # serialization change. ---
+      - name: "Real-data hop 3/4 (-> 26.3.17.110): upgrade all 3 nodes, re-check integrity + pytest suite"
+        run: python3 ci_step.py real-data-hop --version 26.3.17.110 --label rd-hop3
+        continue-on-error: true
+
+      # --- Real-data hop 4/4: 26.3.17.110 -> 26.7.3.19 (latest stable) ---
+      - name: "Real-data hop 4/4 (-> 26.7.3.19): upgrade all 3 nodes, re-check integrity + pytest suite"
+        run: python3 ci_step.py real-data-hop --version 26.7.3.19 --label rd-hop4
+        continue-on-error: true
+
+      - name: Generate report
+        if: always()
+        run: python3 ci_step.py report
+
+      - name: Upload report + per-step results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clickhouse-real-data-upgrade-report
+          path: scripts/clickhouse-upgrade-test/results/
+          retention-days: 30
+
+      - name: Tear down cluster + real-data stack
+        if: always()
+        run: python3 ci_step.py teardown-real-data
 
   # Naive path: straight from 24.8.6.70 to 26.7.3.19, node by node, skipping
   # every intermediate LTS release. Expected to demonstrate ClickHouse's own
