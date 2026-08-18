@@ -54,7 +54,10 @@ asserting it: it spins up a 3-node cluster shaped exactly like OONI's
 `oonidata_cluster` (1 shard, 3 replicas, embedded ClickHouse Keeper, same
 table schemas), loads it with data, and mechanically upgrades one node at a
 time — first via the direct jump (to show what breaks), then via the staged
-LTS path (to confirm it doesn't).
+LTS path (to confirm it doesn't). A third, separate job additionally
+replays the real OONI data-ingestion pipeline across the same upgrade path
+using actual measurements instead of synthetic data — see "Real-data
+end-to-end scenario" below.
 
 ## Where the numbers come from
 
@@ -341,11 +344,19 @@ Raised in review on [ooni/devops#477](https://github.com/ooni/devops/pull/477)
    this specific truncate-then-swap pattern outright or only under some
    conditions (e.g. only for `TRUNCATE ... ON CLUSTER` / whole databases,
    not a single replicated table via one node).
-4. **"Run the target version against the real API + data pipeline."** Not
-   yet done — this harness currently only exercises replication /
-   on-disk-format compatibility with synthetic data, not `ooni/backend`'s
-   API or `oonipipeline`'s own test suite against a candidate ClickHouse
-   version. Tracked as follow-up work; not addressed by this patch.
+4. **"Run the target version against the real API + data pipeline."**
+   **Addressed** by the new `real-data-upgrade` job — see "Real-data
+   end-to-end scenario" below for the full design. It downloads real OONI
+   measurements, ingests them through the actual `oonidata`/`oonipipeline`
+   pipeline and `fastpath`, and re-runs `ooni/data`'s own pytest suite
+   against the real `api-oonimeasurements` service at every hop of
+   `PRODUCTION_HOPS` — not just ClickHouse's own replication mechanics
+   (which the synthetic scenario above already covers), but the actual
+   ingestion and query paths OONI's data pipeline depends on. One caveat:
+   it exercises `ooni/data`'s test suite and `ooni/backend`'s
+   `api-oonimeasurements` service, not `oonipipeline`'s own test suite
+   directly, and it depends on an unmerged external branch
+   (`ooni/data#160`) — see that section for details.
 5. **Full changelog sweep, 24.9 through 26.7, for every "Backward
    Incompatible Change" entry** (not just the two the reviewer happened to
    quote) — in progress, not complete. What's confirmed so far is captured
@@ -359,8 +370,117 @@ version friction rather than structural blocks (see "Real CI findings,
 continued" above). The production recommendation (`RECOMMENDED_NOW` /
 `PRODUCTION_HOPS`, and the README TL;DR above) now covers the whole
 ladder, with an operational caveat (upgrade the trailing node promptly)
-attached to the two hops that hit a real incompatibility. Points 2, 4,
-and 5 remain open regardless.
+attached to the two hops that hit a real incompatibility. Point 4 is now
+addressed by the `real-data-upgrade` job (see below). Points 2 and 5
+remain open.
+
+## Real-data end-to-end scenario (`real-data-upgrade` job)
+
+A second, separate CI job that answers a different question from the
+`staged`/`direct` scenarios above: not "does ClickHouse's own replication
+survive the upgrade" (synthetic seed data is sufficient for that, and
+fast), but "does OONI's actual data pipeline — real measurements, ingested
+through the real `oonidata`/`oonipipeline`/`fastpath` tools, queried
+through the real `api-oonimeasurements` service — still work correctly
+after each hop of the production runbook, with nothing corrupted or
+changed along the way." Implemented in `harness/real_data.py`, wired into
+the `real-data-upgrade` job in
+`.github/workflows/clickhouse_upgrade_test.yml`.
+
+**Source of the pipeline itself:** [ooni/data#160](https://github.com/ooni/data/pull/160)
+(branch `add_end_to_end_tests`), which adds a `tests/integration/` stack
+(single-node ClickHouse + Postgres + Valkey + fastpath +
+`api-oonimeasurements` + a pytest `verify` container) that downloads real
+OONI measurements and processes them through `oonipipeline`, then tests
+the API against the result. This job adapts that stack onto this
+project's existing 3-node **replicated** cluster instead of a single
+throwaway node — see `docker-compose.real-data.yml`'s header comment for
+every deliberate difference from the upstream compose file (auth, dropped
+`fastpath2`, no host port exposure, etc.).
+
+**Design, per what this cluster actually needs to verify:**
+
+- **Real data is downloaded and ingested exactly once per CI run**, right
+  after standing up a fresh cluster at `BASE_VERSION` (`24.8.6.70`) — not
+  re-downloaded at every hop. Re-ingesting fresh data at each of
+  `PRODUCTION_HOPS`'s 4 checkpoints would multiply this already-slow job's
+  runtime for no real gain: the question this job answers is "does
+  upgrading corrupt or break access to what's already there," not "can
+  fresh data still be ingested at every intermediate version" (a real but
+  different question — see the `TODO` in `harness/real_data.py`'s module
+  docstring for a possible follow-up).
+- Right after that one ingestion, a **golden snapshot** is taken — row
+  count + an order-independent content checksum (`sum(cityHash64(*))`,
+  ClickHouse's own idiom for hashing a whole table without listing columns
+  by hand) per real-data table, on all 3 nodes, requiring they already
+  agree with each other.
+- **After every hop of `PRODUCTION_HOPS`** (all 3 nodes upgraded
+  back-to-back, reusing the exact same `upgrade_node_step()` mechanics the
+  synthetic scenario uses — these are already version/schema-agnostic):
+  1. re-snapshot all 3 nodes and diff against the golden baseline — any
+     difference at all, on any node, in either row count or checksum, is a
+     hard failure, since nothing should be writing new data during an
+     upgrade rehearsal;
+  2. re-run `ooni/data#160`'s own pytest suite against the real
+     `api-oonimeasurements` service, to confirm the genuine query/API path
+     still works — not just that ClickHouse's own replication mechanics
+     survived (already covered by the synthetic scenario's write-then-
+     read-back probe).
+- Uses `PRODUCTION_HOPS` (4 hops), not the 8-hop `LTS_HOPS` bisection
+  ladder — this job verifies the actual recommended production upgrade
+  path, not every diagnostic waypoint used to originally localize the
+  mark-file incompatibility. A workflow-level sanity check (mirroring the
+  `staged-upgrade` job's own `LTS_HOPS` check) fails loudly if
+  `harness/versions.py`'s `PRODUCTION_HOPS` and this job's hardcoded step
+  list ever drift apart.
+
+**Does not replace the synthetic scenario.** `harness/seed_data.py` and
+`scenario_staged_lts()`/`scenario_direct_jump()` are unchanged and still
+run as before — they're fast, self-contained, and sufficient for
+verifying replication/on-disk-format compatibility. This is a slower,
+additional, more realistic check layered on top.
+
+**New schema tables**, added to `sql/001_schema.sql` to match what
+`oonipipeline`'s observations workflow and `fastpath` actually write
+(`fingerprints_dns`, `fingerprints_http`, `obs_web_ctrl`,
+`obs_http_middlebox`, `obs_openvpn`) — see that file's own comments for
+per-table provenance and which ones are cross-checked against a
+known-live schema (`obs_web`) versus derived from `oonipipeline`'s DDL
+generator with manual signedness corrections (that generator emits
+`Int32`/`Int8` unconditionally for `int`/`bool` fields, which is
+known-wrong for at least the ASN and boolean-flag columns it shares with
+the already-verified `obs_web` table — see the file for the full
+reasoning). `EmbeddedRocksDB` (used by a couple of these) has no
+`Replicated` variant in ClickHouse — `ON CLUSTER` replicates the table
+*structure* for it, not row contents; that's a real, documented
+limitation of this engine, not a gap in this test.
+
+**Caveats:**
+
+- `ooni/data#160` is **still an open, unmerged PR** as of this writing.
+  `docker-compose.real-data.yml` and the workflow both pin to its
+  `add_end_to_end_tests` branch specifically (that's the branch with the
+  `oonipipeline` CLI entry point this job needs — `main` doesn't have it
+  yet). **Update the checkout ref once #160 merges.**
+  `oonidata sync`/`oonipipeline run --workflow-name observations` and
+  `fastpath` only populate `fastpath`, `obs_web`, `obs_web_ctrl`, and
+  `obs_http_middlebox` — `citizenlab`, `fingerprints_dns/http`, and
+  `obs_openvpn` need different updater/workflow invocations this job
+  doesn't run, so they're expected to stay empty here and aren't part of
+  the integrity check.
+- **Not run on every pull request**, unlike `staged-upgrade` and
+  `direct-jump-upgrade` above — it checks out an external, unmerged
+  branch this repo doesn't control and does real network downloads of
+  OONI measurement data, so a flaky or slow dependency there shouldn't
+  block unrelated PRs. It runs on push to `main` (when these paths
+  change) and on demand via `workflow_dispatch` (`scenario: real-data` or
+  `all`). Revisit this if `real-data-upgrade` proves reliable enough, or
+  once `ooni/data#160` merges and the external-branch risk goes away.
+- Like the rest of this harness, this could not be executed end-to-end in
+  the sandbox this was built in (no Docker daemon, restricted egress) —
+  verified as far as that allows (Python compiles, YAML/SQL parse
+  structurally) and real validation is deferred to an actual CI run, same
+  as every other CI-dependent change in this project.
 
 ## What was and wasn't verified
 
@@ -410,16 +530,21 @@ not something else).
 ## Files
 
 ```
-docker-compose.yml          3-node cluster definition, per-node image tag override via env
-config/common/              Settings shared by all nodes (remote_servers, zookeeper client, distributed_ddl)
-config/ch{1,2,3}/node.xml   Per-node macros (shard/replica) + embedded Keeper raft config
-sql/001_schema.sql          Production table DDL (ReplicatedReplacingMergeTree, ON CLUSTER)
-harness/seed_data.py        Synthetic data generator (see note above on why it's synthetic)
-harness/ch_http.py          Minimal stdlib-only ClickHouse HTTP client
-harness/compose.py          docker-compose wrapper (bring up/tear down/recreate one node at a time)
-harness/validate.py         Cluster health checks (replication convergence, error scraping, write/read probes)
-harness/scenarios.py        The two upgrade scenarios
-harness/report.py           Results -> Markdown report renderer
-run_test.py                 CLI entry point
-results/                    report.md / report.json land here after a run
+docker-compose.yml            3-node cluster definition, per-node image tag override via env
+docker-compose.real-data.yml  Overlay: real ooni/data pipeline (postgres/valkey/api/downloader/fastpath/verify) on top of ch1/ch2/ch3
+config/common/                Settings shared by all nodes (remote_servers, zookeeper client, distributed_ddl)
+config/ch{1,2,3}/node.xml     Per-node macros (shard/replica) + embedded Keeper raft config
+sql/001_schema.sql            Production table DDL (ReplicatedReplacingMergeTree, ON CLUSTER) + real-data-pipeline tables
+real_data/fastpath/           fastpath config + cache dir for the real-data scenario
+real_data/data/               Downloaded real OONI measurements land here (gitignored, fetched fresh every run)
+harness/seed_data.py          Synthetic data generator (see note above on why it's synthetic)
+harness/real_data.py          Real-data end-to-end scenario (see "Real-data end-to-end scenario" above)
+harness/ch_http.py            Minimal stdlib-only ClickHouse HTTP client
+harness/compose.py            docker-compose wrapper (bring up/tear down/recreate one node at a time, multi-file overlay support)
+harness/validate.py           Cluster health checks (replication convergence, error scraping, write/read probes)
+harness/scenarios.py          The two synthetic-data upgrade scenarios
+harness/report.py             Results -> Markdown report renderer (both scenario shapes)
+ci_step.py                    Per-step CLI used by the GitHub Actions workflow (all three jobs)
+run_test.py                   CLI entry point (synthetic scenarios only; real-data scenario is CI-only via ci_step.py)
+results/                      report.md / report.json / golden snapshot land here after a run
 ```

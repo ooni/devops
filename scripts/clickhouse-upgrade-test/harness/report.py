@@ -98,9 +98,12 @@ def write_report(results: dict, path: Path) -> None:
 
 
 def render_ci_step(step: dict) -> str:
-    """Render one step from ci_step.py's results/steps/*.json -- these use
-    one of three shapes (setup / upgrade-node / verify-ddl); dispatch on
-    which keys are present the same way scenarios.step_ok() does."""
+    """Render one step from ci_step.py's results/steps/*.json. Dispatches on
+    which keys are present the same way scenarios.step_ok() does -- covers
+    both the original three shapes (setup / upgrade-node / verify-ddl) and
+    the real-data scenario's shapes from harness/real_data.py
+    (setup-real-data / load-real-data / golden-snapshot / verify-e2e /
+    real-data-hop)."""
     label = step.get("label", "?")
 
     if "on_cluster_alter_ok" in step:
@@ -110,11 +113,70 @@ def render_ci_step(step: dict) -> str:
         lines.append("")
         return "\n".join(lines)
 
+    if "node_steps" in step:
+        # real_data.real_data_hop_step()'s combined shape: 3 node upgrades +
+        # an integrity re-check + a real pytest run, folded into one step.
+        ok = step.get("ok")
+        lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
+        lines.append(f"Real-data hop to `{step.get('hop_version')}`: all 3 nodes upgraded, then re-checked against the golden snapshot and ooni/data's real pytest suite re-run.")
+        lines.append("")
+        for node_step in step.get("node_steps", []):
+            lines.append(render_ci_step(node_step))
+        integrity = step.get("integrity", {})
+        lines.append(f"- Integrity vs. golden snapshot: **{_fmt_bool(integrity.get('ok'))}**")
+        if not integrity.get("ok"):
+            lines.append(f"  - Diffs: `{integrity.get('diffs') or integrity.get('error')}`")
+        verify = step.get("verify", {})
+        lines.append(f"- ooni/data#160 pytest suite: **{_fmt_bool(verify.get('ok'))}** (exit code `{verify.get('exit_code')}`)")
+        lines.append("")
+        return "\n".join(lines)
+
+    if "downloader_exit_code" in step or "fastpath_exit_code" in step:
+        # real_data.load_real_data_step()
+        ok = step.get("ok")
+        lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
+        lines.append(f"- `downloader` (oonidata sync + oonipipeline observations) exit code: `{step.get('downloader_exit_code')}`")
+        lines.append(f"- `fastpath` exit code: `{step.get('fastpath_exit_code')}`")
+        lines.append(f"- `api-oonimeasurements` became healthy: **{_fmt_bool(step.get('api_healthy'))}**")
+        if not ok and step.get("error"):
+            lines.append(f"- error: {step.get('error')}")
+        lines.append("")
+        return "\n".join(lines)
+
+    if "mismatched_tables" in step:
+        # real_data.take_golden_snapshot_step()
+        ok = step.get("ok")
+        lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
+        if ok:
+            tables = sorted(next(iter(step.get("snapshot_by_node", {}).values()), {}).keys())
+            lines.append(f"Golden snapshot recorded (all 3 nodes agreed) for tables: `{tables}`.")
+        else:
+            lines.append(f"Nodes disagreed before any upgrade started -- mismatched tables: `{step.get('mismatched_tables')}`")
+        lines.append("")
+        return "\n".join(lines)
+
+    if "pytest_output" in step:
+        # real_data.run_e2e_verify_step(), run standalone (not nested inside
+        # a real-data-hop step) -- e.g. the base-version sanity check.
+        ok = step.get("ok")
+        lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
+        lines.append(f"ooni/data#160 pytest suite: {'PASSED' if ok else 'FAILED'} (exit code `{step.get('exit_code')}`)")
+        if not ok:
+            lines.append("")
+            lines.append("```")
+            lines.append((step.get("pytest_output") or "")[-2000:])
+            lines.append("```")
+        lines.append("")
+        return "\n".join(lines)
+
     if "base_version" in step and "node" not in step:
         ok = step.get("ok")
         lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
         if ok:
-            lines.append(f"Fresh 3-node cluster brought up at `{step.get('base_version')}`, schema + seed data loaded and converged.")
+            if step.get("schema_only"):
+                lines.append(f"Fresh 3-node cluster brought up at `{step.get('base_version')}`, schema applied -- no synthetic seed data (real-data scenario; see harness/real_data.py).")
+            else:
+                lines.append(f"Fresh 3-node cluster brought up at `{step.get('base_version')}`, schema + seed data loaded and converged.")
         else:
             lines.append(f"FAILED: {step.get('error')}")
         lines.append("")

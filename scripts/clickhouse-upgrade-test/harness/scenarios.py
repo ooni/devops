@@ -63,13 +63,23 @@ def _strip_sql_comments(sql: str) -> str:
     return "\n".join(kept_lines)
 
 
-def load_schema_and_seed(log=print) -> None:
+def apply_schema(log=print) -> None:
+    """Apply sql/001_schema.sql (ON CLUSTER, so it fans out to all 3 nodes)
+    through a single entry node. Factored out of load_schema_and_seed() so
+    harness/real_data.py can reuse it without also loading the synthetic
+    seed rows -- the real-data scenario needs the same schema but populates
+    it from real OONI data via fastpath instead."""
     nodes = make_nodes()
-    entry = nodes[0]  # ch1 -- schema/seed load happens through one node, ON CLUSTER fans it out
+    entry = nodes[0]  # ch1 -- schema load happens through one node, ON CLUSTER fans it out
     log("[setup] applying schema (ON CLUSTER oonidata_cluster)...")
     schema_sql = _strip_sql_comments((SQL_DIR / "001_schema.sql").read_text())
     for stmt in [s.strip() for s in schema_sql.split(";") if s.strip()]:
         entry.execute(stmt)
+
+
+def load_schema_and_seed(log=print) -> None:
+    apply_schema(log=log)
+    nodes = make_nodes()
 
     log("[setup] generating + loading synthetic seed data (see harness/seed_data.py for why it's synthetic)...")
     seed = build_all_seed_statements()
@@ -221,14 +231,22 @@ def verify_ddl_step(version: str, label: str | None = None, log=print) -> dict:
 
 
 def step_ok(step: dict) -> bool:
-    """Pass/fail check that works across all three step shapes above
-    (setup / upgrade-node / verify-ddl) -- used by ci_step.py to set its
-    process exit code, and by report.py to compute an overall verdict."""
+    """Pass/fail check that works across every step shape produced by this
+    module *and* by harness/real_data.py's real-data scenario (setup /
+    setup-real-data / load-real-data / golden-snapshot / verify-e2e /
+    real-data-hop / upgrade-node / verify-ddl) -- used by ci_step.py to set
+    its process exit code, and by report.py to compute an overall verdict.
+
+    Every shape other than "upgrade-node" (_run_upgrade_step's dict, the
+    only one with a top-level "node" key) records its own top-level "ok"
+    (or, for verify-ddl, "on_cluster_alter_ok") -- so the generic fallback
+    below covers every current and future non-upgrade-node step shape
+    without this function needing to know each one's exact key set."""
     if "on_cluster_alter_ok" in step:
         return bool(step["on_cluster_alter_ok"])
-    if "base_version" in step and "node" not in step:
-        return bool(step.get("ok"))
-    return _hop_ok(step)
+    if "node" in step:
+        return _hop_ok(step)
+    return bool(step.get("ok"))
 
 
 def scenario_staged_lts(log=print) -> dict:
