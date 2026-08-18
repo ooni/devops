@@ -80,6 +80,7 @@ def apply_schema(log=print) -> None:
 def load_schema_and_seed(log=print) -> None:
     apply_schema(log=log)
     nodes = make_nodes()
+    entry = nodes[0]  # ch1 -- same entry node apply_schema() used, for the same reason
 
     log("[setup] generating + loading synthetic seed data (see harness/seed_data.py for why it's synthetic)...")
     seed = build_all_seed_statements()
