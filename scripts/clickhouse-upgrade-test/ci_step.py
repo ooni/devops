@@ -96,7 +96,16 @@ def cmd_report(args) -> int:
             f.write(md)
             f.write("\n")
 
-    return 0  # informational step -- doesn't fail the job on its own
+    # Individual upgrade-node/verify-ddl steps now run with
+    # `continue-on-error: true` (see .github/workflows/clickhouse_upgrade_test.yml)
+    # so that a failure partway through a hop doesn't abort the job before
+    # the remaining nodes in that hop get a chance to upgrade too -- e.g. so
+    # we can observe whether a lagging node's stuck replication queue clears
+    # once it also reaches the new version. That means this step -- which
+    # has no continue-on-error and runs with `if: always()` -- is now the
+    # thing that actually has to fail the job when something stayed broken.
+    any_fail = any(not step_ok(s) for s in steps)
+    return 1 if any_fail else 0
 
 
 def cmd_teardown(args) -> int:

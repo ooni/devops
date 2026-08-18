@@ -95,12 +95,16 @@ jobs:
       # --- Hop 1/8: 24.8.6.70 -> 25.3.14.14 (LTS) ---
       - name: "Hop 1/8 (-> 25.3.14.14): upgrade ch1"
         run: python3 ci_step.py upgrade-node --node ch1 --version 25.3.14.14 --label hop1-ch1
+        continue-on-error: true
       - name: "Hop 1/8 (-> 25.3.14.14): upgrade ch2"
         run: python3 ci_step.py upgrade-node --node ch2 --version 25.3.14.14 --label hop1-ch2
+        continue-on-error: true
       - name: "Hop 1/8 (-> 25.3.14.14): upgrade ch3"
         run: python3 ci_step.py upgrade-node --node ch3 --version 25.3.14.14 --label hop1-ch3
+        continue-on-error: true
       - name: "Hop 1/8 (-> 25.3.14.14): verify ON CLUSTER DDL"
         run: python3 ci_step.py verify-ddl --version 25.3.14.14 --label hop1-verify-ddl
+        continue-on-error: true
 
       # --- Hops 2-5/8: bisection steps through the monthly (non-LTS) stable
       # releases between 25.3 and 25.8, inserted to pin down exactly which
@@ -111,69 +115,97 @@ jobs:
       # of ClickHouse commits instead of the whole 25.3-25.8 span. ---
       - name: "Hop 2/8 (-> 25.4.13.22): upgrade ch1"
         run: python3 ci_step.py upgrade-node --node ch1 --version 25.4.13.22 --label hop2-ch1
+        continue-on-error: true
       - name: "Hop 2/8 (-> 25.4.13.22): upgrade ch2"
         run: python3 ci_step.py upgrade-node --node ch2 --version 25.4.13.22 --label hop2-ch2
+        continue-on-error: true
       - name: "Hop 2/8 (-> 25.4.13.22): upgrade ch3"
         run: python3 ci_step.py upgrade-node --node ch3 --version 25.4.13.22 --label hop2-ch3
+        continue-on-error: true
       - name: "Hop 2/8 (-> 25.4.13.22): verify ON CLUSTER DDL"
         run: python3 ci_step.py verify-ddl --version 25.4.13.22 --label hop2-verify-ddl
+        continue-on-error: true
 
       - name: "Hop 3/8 (-> 25.5.11.15): upgrade ch1"
         run: python3 ci_step.py upgrade-node --node ch1 --version 25.5.11.15 --label hop3-ch1
+        continue-on-error: true
       - name: "Hop 3/8 (-> 25.5.11.15): upgrade ch2"
         run: python3 ci_step.py upgrade-node --node ch2 --version 25.5.11.15 --label hop3-ch2
+        continue-on-error: true
       - name: "Hop 3/8 (-> 25.5.11.15): upgrade ch3"
         run: python3 ci_step.py upgrade-node --node ch3 --version 25.5.11.15 --label hop3-ch3
+        continue-on-error: true
       - name: "Hop 3/8 (-> 25.5.11.15): verify ON CLUSTER DDL"
         run: python3 ci_step.py verify-ddl --version 25.5.11.15 --label hop3-verify-ddl
+        continue-on-error: true
 
       - name: "Hop 4/8 (-> 25.6.13.41): upgrade ch1"
         run: python3 ci_step.py upgrade-node --node ch1 --version 25.6.13.41 --label hop4-ch1
+        continue-on-error: true
       - name: "Hop 4/8 (-> 25.6.13.41): upgrade ch2"
         run: python3 ci_step.py upgrade-node --node ch2 --version 25.6.13.41 --label hop4-ch2
+        continue-on-error: true
       - name: "Hop 4/8 (-> 25.6.13.41): upgrade ch3"
         run: python3 ci_step.py upgrade-node --node ch3 --version 25.6.13.41 --label hop4-ch3
+        continue-on-error: true
       - name: "Hop 4/8 (-> 25.6.13.41): verify ON CLUSTER DDL"
         run: python3 ci_step.py verify-ddl --version 25.6.13.41 --label hop4-verify-ddl
+        continue-on-error: true
 
       - name: "Hop 5/8 (-> 25.7.8.71): upgrade ch1"
         run: python3 ci_step.py upgrade-node --node ch1 --version 25.7.8.71 --label hop5-ch1
+        continue-on-error: true
       - name: "Hop 5/8 (-> 25.7.8.71): upgrade ch2"
         run: python3 ci_step.py upgrade-node --node ch2 --version 25.7.8.71 --label hop5-ch2
+        continue-on-error: true
       - name: "Hop 5/8 (-> 25.7.8.71): upgrade ch3"
         run: python3 ci_step.py upgrade-node --node ch3 --version 25.7.8.71 --label hop5-ch3
+        continue-on-error: true
       - name: "Hop 5/8 (-> 25.7.8.71): verify ON CLUSTER DDL"
         run: python3 ci_step.py verify-ddl --version 25.7.8.71 --label hop5-verify-ddl
+        continue-on-error: true
 
       # --- Hop 6/8: 25.7.8.71 -> 25.8.29.51 (LTS) ---
       - name: "Hop 6/8 (-> 25.8.29.51): upgrade ch1"
         run: python3 ci_step.py upgrade-node --node ch1 --version 25.8.29.51 --label hop6-ch1
+        continue-on-error: true
       - name: "Hop 6/8 (-> 25.8.29.51): upgrade ch2"
         run: python3 ci_step.py upgrade-node --node ch2 --version 25.8.29.51 --label hop6-ch2
+        continue-on-error: true
       - name: "Hop 6/8 (-> 25.8.29.51): upgrade ch3"
         run: python3 ci_step.py upgrade-node --node ch3 --version 25.8.29.51 --label hop6-ch3
+        continue-on-error: true
       - name: "Hop 6/8 (-> 25.8.29.51): verify ON CLUSTER DDL"
         run: python3 ci_step.py verify-ddl --version 25.8.29.51 --label hop6-verify-ddl
+        continue-on-error: true
 
       # --- Hop 7/8: 25.8.29.51 -> 26.3.17.110 (LTS) ---
       - name: "Hop 7/8 (-> 26.3.17.110): upgrade ch1"
         run: python3 ci_step.py upgrade-node --node ch1 --version 26.3.17.110 --label hop7-ch1
+        continue-on-error: true
       - name: "Hop 7/8 (-> 26.3.17.110): upgrade ch2"
         run: python3 ci_step.py upgrade-node --node ch2 --version 26.3.17.110 --label hop7-ch2
+        continue-on-error: true
       - name: "Hop 7/8 (-> 26.3.17.110): upgrade ch3"
         run: python3 ci_step.py upgrade-node --node ch3 --version 26.3.17.110 --label hop7-ch3
+        continue-on-error: true
       - name: "Hop 7/8 (-> 26.3.17.110): verify ON CLUSTER DDL"
         run: python3 ci_step.py verify-ddl --version 26.3.17.110 --label hop7-verify-ddl
+        continue-on-error: true
 
       # --- Hop 8/8: 26.3.17.110 -> 26.7.3.19 (latest stable) ---
       - name: "Hop 8/8 (-> 26.7.3.19): upgrade ch1"
         run: python3 ci_step.py upgrade-node --node ch1 --version 26.7.3.19 --label hop8-ch1
+        continue-on-error: true
       - name: "Hop 8/8 (-> 26.7.3.19): upgrade ch2"
         run: python3 ci_step.py upgrade-node --node ch2 --version 26.7.3.19 --label hop8-ch2
+        continue-on-error: true
       - name: "Hop 8/8 (-> 26.7.3.19): upgrade ch3"
         run: python3 ci_step.py upgrade-node --node ch3 --version 26.7.3.19 --label hop8-ch3
+        continue-on-error: true
       - name: "Hop 8/8 (-> 26.7.3.19): verify ON CLUSTER DDL"
         run: python3 ci_step.py verify-ddl --version 26.7.3.19 --label hop8-verify-ddl
+        continue-on-error: true
 
       - name: Generate report
         if: always()
@@ -215,10 +247,13 @@ jobs:
 
       - name: "Direct jump (-> 26.7.3.19, skips all LTS hops): upgrade ch1"
         run: python3 ci_step.py upgrade-node --node ch1 --version 26.7.3.19 --label direct-ch1
+        continue-on-error: true
       - name: "Direct jump (-> 26.7.3.19, skips all LTS hops): upgrade ch2"
         run: python3 ci_step.py upgrade-node --node ch2 --version 26.7.3.19 --label direct-ch2
+        continue-on-error: true
       - name: "Direct jump (-> 26.7.3.19, skips all LTS hops): upgrade ch3"
         run: python3 ci_step.py upgrade-node --node ch3 --version 26.7.3.19 --label direct-ch3
+        continue-on-error: true
 
       - name: Generate report
         if: always()
