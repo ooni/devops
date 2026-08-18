@@ -166,6 +166,16 @@ HARD_ERROR_NAME_PATTERNS = [
     "%NOT_ENOUGH_SPACE%",
     "%CORRUPTED%",
     "%INCOMPATIBLE%",
+    # Added after ooni/devops#477 CI run 32122682392: the 25.7.8.71 ->
+    # 25.8.29.51 mark-file/part-format incompatibility logs this code on the
+    # lagging replica while it's stuck retrying a GET_PART fetch it can't
+    # parse (missing columns_substreams.txt). It wasn't in this list
+    # originally, so error_snapshot()'s system.errors query never selected
+    # it at all -- the step still correctly failed via row-count convergence
+    # and replication_queue_problems() (a separate, unfiltered check against
+    # system.replication_queue), but the report's "Version-incompatibility
+    # errors logged" line said "none", which undersold the real cause.
+    "%NO_FILE_IN_DATA_PART%",
 ]
 _ALL_WATCHED_PATTERNS = TRANSIENT_ERROR_NAME_PATTERNS + HARD_ERROR_NAME_PATTERNS
 

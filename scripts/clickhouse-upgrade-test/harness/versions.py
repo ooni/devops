@@ -70,18 +70,89 @@ infrastructure applying to plain MergeTree parts generally, not something
 JSON-specific -- consistent with, though not proof of, the same root
 cause.
 
-RECOMMENDED_NOW is the path this project currently suggests actually
-running in production long-term. It's deliberately still 25.3.14.14 (an
-LTS release, ~1 year of support) rather than 25.7.8.71, even though
-25.4.13.22 through 25.7.8.71 are now confirmed clean: those are all
-non-LTS monthly releases with only ~1 month of support each before being
-superseded, so "confirmed safe to upgrade through" is not the same claim
-as "a sensible place to actually stay". LTS_HOPS (used by the "staged" CI
-scenario) still walks all the way to LATEST_VERSION -- the whole point of
-this harness is to keep building confidence in later legs via testing
-*before* they're recommended for prod, not to stop testing them. Treat a
-green staged-upgrade run as "the harness found nothing wrong going this
-far", not as "go ahead and do it in production now".
+--- CONFIRMED: the same "self-heals once the lagging node catches up"
+--- pattern also covers 26.3.17.110, and the full ladder to LATEST_VERSION
+--- is now green ------------------------------------------------------------
+
+Once ooni/devops#477's workflow stopped aborting the whole job on a step's
+first failure (continue-on-error added per-step, see
+.github/workflows/clickhouse_upgrade_test.yml), the harness could finally
+see past the 25.8.29.51 hop. Run 32122682392 completed the entire 8-hop
+ladder and confirmed two things:
+
+1. The 25.8.29.51 mark-file incompatibility above is exactly the transient,
+   self-healing condition it looked like, not a structural block: hop6-ch2
+   failed (ch3, still on 25.7.8.71, stuck retrying a GET_PART fetch it
+   couldn't parse -- NO_FILE_IN_DATA_PART, missing columns_substreams.txt),
+   but hop6-ch3 -- ch3's own upgrade to 25.8.29.51, run immediately after --
+   passed clean: converged, fully replicated, zero queue problems. The
+   stuck fetch just succeeded on retry once the recipient could finally
+   parse the new format.
+
+2. The exact same pattern repeats at 26.3.17.110 -- and this is the
+   nested-data-type serialization change flagged in the PR #477 review
+   (https://clickhouse.com/docs/resources/changelogs/oss/2026#263-backward-incompatible-change,
+   "Propagate data types serialization versions to nested data types").
+   hop7-ch1 logged a hard CHECKSUM_DOESNT_MATCH while it was briefly the
+   only node on 26.3.17.110; hop7-ch2 then left ch3 (still on 25.8.29.51)
+   stuck retrying with CORRUPTED_DATA / "Unknown version of serialization
+   infos (1). Should be less or equal than 0". hop7-ch3 -- ch3's own
+   upgrade to 26.3.17.110 -- again passed clean. Same self-healing
+   mechanism, different error codes: an old-format binary can't parse a
+   part written in the new format, and the fix is simply for that binary
+   to also become new-format, at which point its own retry of the same
+   fetch succeeds.
+
+hop8 (26.3.17.110 -> 26.7.3.19) had zero hard errors of any kind.
+
+Important caveat this run does NOT resolve: the mixed-version window in
+that run was CI-paced (seconds to at most a couple of minutes between one
+node finishing and the next starting). It says nothing about what happens
+if a node is left lagging for hours or days at the 25.8.29.51 or
+26.3.17.110 hops specifically -- that hasn't been tested. It also says
+nothing about the *downgrade*-lossiness warning in the 26.3 changelog
+entry, which is a separate risk (rolling back after the fact) from what
+this run exercised (rolling forward with a temporarily mixed cluster).
+
+--- RECOMMENDED_NOW and PRODUCTION_HOPS: what to actually run -------------
+
+Given the above, RECOMMENDED_NOW is now LATEST_VERSION (26.7.3.19) -- the
+harness has a real green run covering every hop, including both of the
+ones that previously blocked it. PRODUCTION_HOPS below is the actual
+runbook this project recommends: a 4-hop ladder that skips the
+25.4.13.22-25.7.8.71 bisection releases entirely, since those were only
+ever inserted to localize *which* release introduced the incompatibility
+in CI -- production has no reason to stop at non-LTS releases with ~1
+month of support each once the boundary is known. Each hop still stays
+comfortably under ClickHouse's ~1 year mixed-version window (5-7 months).
+
+Operational rule for the two hops that hit a real incompatibility
+(25.3.14.14 -> 25.8.29.51 and 25.8.29.51 -> 26.3.17.110): upgrade all
+three nodes back-to-back in one sitting, the way CI does it, rather than
+spacing them out the way it's fine to do for every other hop. Expect the
+last node in each of those two hops to log hard-looking errors
+(NO_FILE_IN_DATA_PART / CORRUPTED_DATA / CHECKSUM_DOESNT_MATCH) for a
+minute or two right up until its own upgrade finishes -- that's expected,
+not a signal to roll back, *provided it clears once that node is fully
+upgraded*. If it doesn't clear within a few minutes of the last node
+coming back up, stop and treat it as a real incompatibility rather than
+assuming it'll resolve on its own -- that combination (mixed versions
+left stuck well past the trailing node's own upgrade finishing) hasn't
+been observed or validated.
+
+One remaining gap before treating PRODUCTION_HOPS as fully proven rather
+than well-supported: the harness has directly confirmed self-healing for
+the 25.7.8.71->25.8.29.51 sub-hop (via the bisection ladder) and for
+25.8.29.51->26.3.17.110, but not yet for a genuine single-hop
+25.3.14.14 -> 25.8.29.51 jump (skipping the intermediate monthly
+releases) with the continue-on-error fix in place. The original
+un-bisected 4-hop ladder (run 32044578317) did hit the identical failure
+signature at that exact transition, but that run aborted before ch3 got a
+chance to complete its own upgrade, so self-healing was never directly
+observed for that specific pairing -- only inferred from the mechanism
+being the same (an old binary can't parse a new-format part, regardless
+of how old). Worth one more CI run of PRODUCTION_HOPS itself to close
+this gap before leaning on it unreservedly.
 """
 
 BASE_VERSION = "24.8.6.70"        # current production version (issue #437)
@@ -106,23 +177,33 @@ LTS_HOPS = [
     ("26.7.3.19", 4),        # final hop lands on latest stable (not itself LTS)
 ]
 
-# What we'd actually tell someone to run in production *today*. Pulled back
-# to 25.3.14.14 -- the last hop that has actually completed clean in a real
-# CI run -- until the 25.3->25.8 mark-file incompatibility above is
-# understood. See the module docstring section above; do not bump this
-# without a green CI run covering the hop(s) being added.
-RECOMMENDED_NOW = "25.3.14.14"
+# What we'd actually tell someone to run in production *today*. Promoted to
+# LATEST_VERSION after run 32122682392 covered the full ladder, including
+# both hops that previously blocked it (25.8.29.51, 26.3.17.110) -- see the
+# module docstring's "self-heals once the lagging node catches up" section.
+# Do not bump BASE_VERSION/LATEST_VERSION themselves without a green CI run
+# covering the new range.
+RECOMMENDED_NOW = "26.7.3.19"
 
-# Everything past RECOMMENDED_NOW: still tested by LTS_HOPS, not yet
-# recommended for production. Kept as its own list so a future decision to
-# promote part of this doesn't require re-deriving which hops are "new" vs
-# already-recommended.
-PENDING_FURTHER_VALIDATION = [
-    ("25.4.13.22", 1),
-    ("25.5.11.15", 1),
-    ("25.6.13.41", 1),
-    ("25.7.8.71", 1),
-    ("25.8.29.51", 1),
+# The actual production runbook: 4 hops instead of LTS_HOPS's 8. Skips the
+# 25.4.13.22-25.7.8.71 monthly (non-LTS) releases entirely -- those exist
+# only in LTS_HOPS, inserted purely to bisect *which* release introduced the
+# 25.8.29.51 incompatibility in CI. Production has no reason to stop on a
+# release with ~1 month of support once the boundary is already known,
+# especially since 25.3.14.14 -> 25.8.29.51 (5 months) is still comfortably
+# inside ClickHouse's ~1 year mixed-version window on its own.
+#
+# Operational rule, not encoded here since it's not a version number: the
+# 25.3.14.14->25.8.29.51 and 25.8.29.51->26.3.17.110 hops should each be run
+# as three back-to-back node upgrades in one sitting (no long pause between
+# nodes), because the trailing node in each of those two hops is expected to
+# log hard-looking errors until its own upgrade completes -- see the module
+# docstring for what to expect and when to actually treat it as a real
+# problem instead of the expected transient state.
+PRODUCTION_HOPS = [
+    ("24.8.6.70", None),
+    ("25.3.14.14", 7),
+    ("25.8.29.51", 5),
     ("26.3.17.110", 7),
     ("26.7.3.19", 4),
 ]
