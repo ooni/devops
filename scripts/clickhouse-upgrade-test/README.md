@@ -143,7 +143,7 @@ curl -sL https://ooni-data-eu-fra.s3.eu-central-1.amazonaws.com/samples/analysis
 scenario — or just skip the seed step in `harness/scenarios.py:load_schema_and_seed`
 and load these instead).
 
-## Real CI findings: a genuine incompatibility, earlier than expected
+## Real CI findings: a genuine incompatibility, pinned to exactly 25.8.29.51
 
 A real staged-upgrade CI run
 ([ooni/devops#477](https://github.com/ooni/devops/pull/477), run
@@ -164,36 +164,57 @@ where ch1 and ch2 were already on `25.8.29.51` and ch3 was still on
 - The write-then-read-back probe failed on ch3 for the first time in the
   whole run, and row counts diverged.
 
-Read literally: once a merge happens on a `25.8.29.51` node, it can write
-a part whose mark-file format a `25.3.14.14` binary has no code path to
-even parse — not a fluke, not something more retries fix, only something
-that clears once the lagging node is also upgraded. That's a **materially
-bigger finding than the one raised in review** — this shows up a full LTS
-hop before 26.3, which is the version the review flagged as the one to be
-careful about.
+That's a **materially bigger finding than the one raised in review** — it
+shows up a full LTS hop before 26.3, the version the review flagged as the
+one to be careful about.
 
-One thing this specific run couldn't tell us: the workflow aborts the
-whole job on a step's first non-zero exit, so it never got to upgrade ch3
-too and see whether that stuck state clears once the hop actually
-finishes. It's possible the real constraint is "don't leave a hop
-half-done for long" rather than "this hop is impossible" — untested so
-far.
+**Bisected and confirmed** (run
+[32047534149](https://github.com/ooni/devops/actions/runs/32047534149),
+after inserting every monthly release between the two LTS versions —
+`25.4.13.22`, `25.5.11.15`, `25.6.13.41`, `25.7.8.71`, from
+[endoflife.date/api/clickhouse.json](https://endoflife.date/api/clickhouse.json)):
+**`24.8.6.70 -> 25.3.14.14 -> 25.4.13.22 -> 25.5.11.15 -> 25.6.13.41 ->
+25.7.8.71` all upgrade cleanly, node by node, zero hard errors.** The
+failure reappears exactly and only at `25.7.8.71 -> 25.8.29.51` — same
+failure family, a different specific manifestation this time:
+`Code: 226. NO_FILE_IN_DATA_PART: No columns_substreams.txt in part
+all_17_17_1`, fetching a part whose mark file has the new `.cmrk4`
+extension. This rules out a gradual drift across the whole 25.3-25.8 span
+— it's one version boundary, `25.8.29.51`, that changes the on-disk
+compact-part format (new manifest file + new mark-file extension) in a
+way no earlier binary in this range can read.
 
-**Response, in progress:** `harness/versions.py`'s `LTS_HOPS` has been
-expanded to walk every monthly stable release between `25.3.14.14` and
-`25.8.29.51` (`25.4.13.22`, `25.5.11.15`, `25.6.13.41`, `25.7.8.71` —
-versions/dates from
-[endoflife.date/api/clickhouse.json](https://endoflife.date/api/clickhouse.json))
-instead of jumping straight between the two LTS releases, to bisect which
-single month's release actually introduces the incompatible mark format.
-`.github/workflows/clickhouse_upgrade_test.yml` mirrors this as 8 hops
-instead of 4 (see its own sanity-check step, which asserts the two stay in
-sync). `RECOMMENDED_NOW` has been pulled back to `25.3.14.14` — the one hop
-that's actually completed clean in real CI — until this bisection run
-identifies where the break is. Repeated attempts to find the exact
-changelog entry for this change (to know if there's a compatibility
-setting that avoids it) have not succeeded yet — see "Still open" in the
-review-response section below.
+**Corroborating evidence** (not confirmed against the official changelog
+text itself — repeated attempts to fetch the relevant section, listed
+below, all failed): a v25.12 changelog entry found during this
+investigation reads *"Enable advanced shared data for JSON by default...
+after that change downgrade to versions before 25.8 will be not possible,
+because these versions won't be able to read new data parts with JSON
+column."* That's scoped to JSON columns and to downgrading specifically,
+but it names 25.8 as the version this substream-based part-serialization
+infrastructure was introduced in. `citizenlab` (the table that failed
+here) has no JSON column, so this bisection most likely caught that same
+infrastructure applying to plain `MergeTree` parts generally — consistent
+with, though not proof of, a shared root cause.
+
+`harness/versions.py`'s `LTS_HOPS` and
+`.github/workflows/clickhouse_upgrade_test.yml` both keep the 8-hop
+bisection ladder (rather than collapsing back to 4 hops) so this stays
+directly re-testable once ClickHouse's actual guidance for this version
+boundary is understood. `RECOMMENDED_NOW` stays at `25.3.14.14` rather
+than being bumped to `25.7.8.71` even though everything through there is
+now confirmed clean: `25.4.13.22`-`25.7.8.71` are non-LTS monthly
+releases with only ~1 month of support each, so "safe to transit through"
+isn't the same claim as "a sensible place to actually rest" — see
+`harness/versions.py`'s module docstring for the full reasoning.
+
+**One thing this still doesn't tell us:** the workflow aborts the whole
+job on a step's first non-zero exit, so it's never gotten to upgrade the
+lagging node (ch3) and see whether the stuck queue clears the moment the
+hop actually completes, or whether it's a permanent divergence regardless.
+That's the next thing worth testing before concluding whether 25.8.29.51
+is reachable via a *completed* rolling upgrade even if it can't be left
+half-done.
 
 ## PR #477 review response
 
@@ -270,35 +291,41 @@ bisection turns out.
 
 ## What was and wasn't verified
 
-This harness has now actually run in GitHub Actions twice (see
+This harness has now actually run in GitHub Actions three times (see
 `.github/workflows/clickhouse_upgrade_test.yml`, exercised on
 [ooni/devops#477](https://github.com/ooni/devops/pull/477)), which has real
 network access this project's original build/review sandbox didn't:
 
-- **Run 1** got through `setup` and `ch1`'s `24.8.6.70 -> 25.3.14.14`
-  upgrade, then flagged `ch2`'s upgrade as failed — a **false positive in
-  this harness's own error-detection logic**, not a real ClickHouse
-  problem (fixed; see `harness/validate.py`'s transient-vs-hard error
-  classification).
-- **Run 2**, after that fix, got all the way through the full
-  `24.8.6.70 -> 25.3.14.14` hop cleanly (including further transient,
-  non-gating blips, confirming the fix generalizes) and then hit the real
-  `25.3.14.14 -> 25.8.29.51` mark-file incompatibility described in "Real
-  CI findings" above.
+- **Run 1** ([32041884883](https://github.com/ooni/devops/actions/runs/32041884883))
+  got through `setup` and `ch1`'s `24.8.6.70 -> 25.3.14.14` upgrade, then
+  flagged `ch2`'s upgrade as failed — a **false positive in this harness's
+  own error-detection logic**, not a real ClickHouse problem (fixed; see
+  `harness/validate.py`'s transient-vs-hard error classification).
+- **Run 2** ([32044578317](https://github.com/ooni/devops/actions/runs/32044578317)),
+  after that fix, got all the way through the full `24.8.6.70 -> 25.3.14.14`
+  hop cleanly (including further transient, non-gating blips, confirming
+  the fix generalizes) and then hit the real `25.3.14.14 -> 25.8.29.51`
+  mark-file incompatibility described in "Real CI findings" above.
+- **Run 3** ([32047534149](https://github.com/ooni/devops/actions/runs/32047534149)),
+  with the bisection hops in place, confirmed `24.8.6.70` through
+  `25.7.8.71` all upgrade cleanly and pinned the failure to exactly the
+  `25.7.8.71 -> 25.8.29.51` transition — see "Real CI findings" above for
+  the full detail.
 
 Originally verified only inside a sandbox with restricted egress (no Docker
-Hub / S3 access), before either real run:
+Hub / S3 access), before any real run:
 - `docker-compose.yml` parses and interpolates correctly (`docker compose config`).
 - All ClickHouse XML config files (`config/**/*.xml`) are well-formed.
 - All Python modules compile and the seed-data generator runs and produces
   well-formed `INSERT` statements against the real column lists.
 
-**Still worth doing:** re-run `staged-upgrade` with the bisection hops now
-in place and read off which specific version first introduces the
-mark-file break; and separately review the `direct-jump` job's own
-failure log, which hasn't been looked at yet (it's expected to fail —
-that's the point of that job — but it's still worth confirming it fails
-for the *same* reason and not something else).
+**Still worth doing:** let the hop that fails (`hop6-ch2` in the current
+numbering) continue on to upgrade the lagging node too, rather than
+aborting the job immediately, to see whether the stuck replication queue
+clears once the hop actually completes; and separately review the
+`direct-jump` job's own failure log, which hasn't been looked at yet
+(it's expected to fail — that's the point of that job — but it's still
+worth confirming it fails for the *same* reason and not something else).
 
 ## Files
 

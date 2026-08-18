@@ -31,40 +31,57 @@ Since OONI's rollback plan for any bad upgrade is "downgrade the node back",
 crossing 26.3 forecloses that option -- so unlike every other hop here, it
 should not be treated as routine until it's been soaked for a while.
 
---- STATUS: 25.3.14.14 -> 25.8.29.51 is UNDER INVESTIGATION, not recommended
---- yet, per a real (not hypothetical) CI failure ---------------------------
+--- CONFIRMED: the 25.3.14.14 -> 25.8.29.51 incompatibility is pinned to
+--- exactly 25.8.29.51, via bisection in real CI -----------------------------
 
-A real run of the staged-upgrade CI job (ooni/devops#477, run 32044578317)
-hit a hard failure partway through exactly this hop, well before ever
-reaching 26.3: with ch1+ch2 already on 25.8.29.51 and ch3 still on
-25.3.14.14, ch3's replication queue got stuck fetching a part from a peer
-with `Code: 79. DB::Exception: Unknown mark file extension: '4'.
-(INCORRECT_FILE_NAME)` -- i.e. once a merge happens on a 25.8.29.51 node,
-it writes a mark-file format that a 25.3.14.14 node's binary cannot parse
-at all, not something that clears up with more retries. This makes the old
-replica correctly non-gating-transient-immune but genuinely stuck until it,
-too, is upgraded -- and we don't yet know from that run alone whether that
-stuck state clears the moment ch3 catches up, or whether it's evidence this
-specific hop can't be done as a slow rolling upgrade at all.
+A real staged-upgrade CI run (ooni/devops#477, run 32044578317) hit a hard
+failure partway through this hop, well before ever reaching 26.3: with
+ch1+ch2 already on 25.8.29.51 and ch3 still on 25.3.14.14, ch3's
+replication queue got stuck fetching a part with `Code: 79.
+DB::Exception: Unknown mark file extension: '4'. (INCORRECT_FILE_NAME)`.
 
-LTS_HOPS below has been expanded to walk the monthly stable releases
-between 25.3.14.14 and 25.8.29.51 (25.4.13.22, 25.5.11.15, 25.6.13.41,
-25.7.8.71 -- versions and dates from https://endoflife.date/api/clickhouse.json)
-instead of jumping straight from one LTS to the next, specifically to
-bisect which single monthly release first introduces the incompatible mark
-format. Until that's identified (and ideally the exact changelog entry for
-it is found -- attempts to fetch clickhouse.com's changelog for this range
-have so far been unsuccessful, see PR discussion), RECOMMENDED_NOW is
-pulled back to the one hop that has actually run clean end-to-end in real
-CI so far.
+To find out whether that was specific to 25.8.29.51 or something that
+crept in gradually across the whole 25.3->25.8 span, LTS_HOPS below was
+expanded to walk every monthly (non-LTS) stable release in between
+(25.4.13.22, 25.5.11.15, 25.6.13.41, 25.7.8.71 -- versions/dates from
+https://endoflife.date/api/clickhouse.json) and re-run. Result (run
+32047534149): **24.8.6.70 -> 25.3.14.14 -> 25.4.13.22 -> 25.5.11.15 ->
+25.6.13.41 -> 25.7.8.71 all upgrade cleanly, node by node, zero hard
+errors.** The failure re-appears exactly and only at the
+25.7.8.71 -> 25.8.29.51 transition -- same failure family, this time
+`Code: 226. NO_FILE_IN_DATA_PART: No columns_substreams.txt in part
+all_17_17_1` while fetching a part whose mark file has the new `.cmrk4`
+extension. So this is not a gradual drift-of-versions problem; it's a
+single version boundary: 25.8.29.51 changes the on-disk compact-part
+format (adding a columns_substreams.txt manifest + new mark-file
+extension) in a way that no earlier binary in this range can read.
 
-RECOMMENDED_NOW is the path this project currently suggests actually running
-in production. LTS_HOPS (used by the "staged" CI scenario) still walks all
-the way to LATEST_VERSION -- the whole point of this harness is to keep
-building confidence in later legs via testing *before* they're recommended
-for prod, not to stop testing them. Treat a green staged-upgrade run as "the
-harness found nothing wrong going this far", not as "go ahead and do it in
-production now".
+Corroborating (not certain -- this wasn't ourselves confirmed against the
+official changelog text, see PR discussion for the repeated failed
+attempts to fetch it) evidence: a v25.12 changelog entry found earlier
+reads "Enable advanced shared data for JSON by default... after that
+change downgrade to versions before 25.8 will be not possible, because
+these versions won't be able to read new data parts with JSON column."
+That note is scoped to JSON columns and to *downgrading*, but it names
+25.8 as the version where this substream-based part-serialization
+infrastructure was introduced. Our `citizenlab` table has no JSON column
+at all, so what this bisection run hit is most likely that same
+infrastructure applying to plain MergeTree parts generally, not something
+JSON-specific -- consistent with, though not proof of, the same root
+cause.
+
+RECOMMENDED_NOW is the path this project currently suggests actually
+running in production long-term. It's deliberately still 25.3.14.14 (an
+LTS release, ~1 year of support) rather than 25.7.8.71, even though
+25.4.13.22 through 25.7.8.71 are now confirmed clean: those are all
+non-LTS monthly releases with only ~1 month of support each before being
+superseded, so "confirmed safe to upgrade through" is not the same claim
+as "a sensible place to actually stay". LTS_HOPS (used by the "staged" CI
+scenario) still walks all the way to LATEST_VERSION -- the whole point of
+this harness is to keep building confidence in later legs via testing
+*before* they're recommended for prod, not to stop testing them. Treat a
+green staged-upgrade run as "the harness found nothing wrong going this
+far", not as "go ahead and do it in production now".
 """
 
 BASE_VERSION = "24.8.6.70"        # current production version (issue #437)
