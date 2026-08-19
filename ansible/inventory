@@ -37,6 +37,9 @@ ams-ps.ooni.nu
 
 [do_fra]
 wc.th.dev.ooni.io
+wcth0.fra1.prod.ooni.io
+wcth1.fra1.prod.ooni.io
+wcth2.fra1.prod.ooni.io
 
 [aws-proxy]
 clickhouseproxy.dev.ooni.io

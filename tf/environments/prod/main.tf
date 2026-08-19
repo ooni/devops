@@ -442,6 +442,21 @@ module "ooni_th_droplet" {
   dns_zone_ooni_io = local.dns_zone_ooni_io
 }
 
+module "ooni_test_helpers_wc" {
+  source = "../../modules/ooni_th_binary_droplet"
+
+  stage             = local.environment
+  instance_location = "fra1"
+  name              = "ooniwcth${count.index}-fra1"
+  hostname          = "wcth${count.index}.fra1"
+
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
+
+  dns_zone_ooni_io = local.dns_zone_ooni_io
+  count            = 3
+}
+
+
 module "ooniapi_reverseproxy_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 

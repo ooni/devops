@@ -1,0 +1,10 @@
+# The Web Connectivity test helper (oohelperd) is built and released as part of
+# https://github.com/ooni/probe-cli
+oohelperd_version: v3.30.0
+oohelperd_base_url: "https://github.com/ooni/probe-cli/releases/download/{{ oohelperd_version }}"
+# sha256 of {{ oohelperd_base_url }}/oohelperd-linux-amd64
+oohelperd_checksum: "fff38b9366fecae400cb3f616ffa2a37dba211c33ee4e1c1b343bff1c384d48e"
+
+# A test helper request measures the target before it can answer, so it needs
+# way more than the nginx default of 60s
+oohelperd_nginx_proxy_timeout: 900
