@@ -113,6 +113,72 @@ def render_ci_step(step: dict) -> str:
         lines.append("")
         return "\n".join(lines)
 
+    if "write_stats" in step:
+        # harness/availability.py's run_zero_downtime_upgrade() -- one step
+        # spanning the ENTIRE rollout (every hop in PRODUCTION_HOPS[1:]),
+        # with a continuous read/write canary (harness.availability.CanaryWriter)
+        # running in the background throughout, never paused between hops.
+        # This is what actually proves "no downtime, no blocked writes, no
+        # corruption" rather than just "data at rest matches between
+        # checkpoints" (that's what the per-hop integrity/verify checks
+        # nested below still check, same as real_data_hop_step()).
+        ok = step.get("ok")
+        ws = step.get("write_stats", {})
+        missing = step.get("missing_writes") or []
+        lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
+        if step.get("error"):
+            lines.append(f"FAILED before the canary could even start: {step['error']}")
+            lines.append("")
+            return "\n".join(lines)
+        if step.get("reconciliation_error"):
+            lines.append(
+                f"Rollout ran, but the final reconciliation query itself failed "
+                f"({step['reconciliation_error']}) -- data-loss/agreement can't be "
+                "confirmed, so this is treated as a failure rather than a pass."
+            )
+            lines.append("")
+        lines.append(
+            "Continuous read/write canary (round-robin across all 3 nodes, "
+            "immediate failover on a failed attempt) ran for the entire "
+            "rollout below without ever pausing between hops."
+        )
+        lines.append("")
+        lines.append(
+            f"- Write attempts: `{ws.get('total_write_attempts')}`, "
+            f"blocked on every node in the same tick: **{ws.get('write_hard_failures')}**"
+        )
+        lines.append(
+            f"- Read attempts: `{ws.get('total_read_attempts')}`, "
+            f"blocked on every node in the same tick: **{ws.get('read_hard_failures')}**"
+        )
+        lines.append(
+            f"- Every acknowledged write survived to the final cluster state: "
+            f"**{_fmt_bool(not missing)}**"
+            + (f" -- {len(missing)} MISSING (data loss)" if missing else "")
+        )
+        lines.append(f"- Cross-node agreement on the canary table's final contents: **{_fmt_bool(step.get('cross_node_agreement'))}**")
+        if ws.get("max_write_latency_seconds") is not None:
+            lines.append(
+                f"- Max latency on a successful attempt: write `{ws['max_write_latency_seconds']:.2f}s`, "
+                f"read `{ws.get('max_read_latency_seconds') or 0:.2f}s`"
+            )
+        if ws.get("write_hard_failure_samples"):
+            lines.append(f"- Sample blocked-write failures: `{ws['write_hard_failure_samples']}`")
+        if ws.get("read_hard_failure_samples"):
+            lines.append(f"- Sample blocked-read failures: `{ws['read_hard_failure_samples']}`")
+        lines.append("")
+        lines.append(
+            "Per-hop detail (each hop upgrades all 3 nodes, then re-checks "
+            "integrity against the golden snapshot and re-runs ooni/data's "
+            "pytest suite -- same as real_data_hop_step(), but here the "
+            "canary above never stops running underneath it):"
+        )
+        lines.append("")
+        for hop in step.get("hops", []):
+            lines.append(render_ci_step(hop))
+        lines.append("")
+        return "\n".join(lines)
+
     if "node_steps" in step:
         # real_data.real_data_hop_step()'s combined shape: 3 node upgrades +
         # an integrity re-check + a real pytest run, folded into one step.

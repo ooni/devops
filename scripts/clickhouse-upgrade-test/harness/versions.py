@@ -103,16 +103,30 @@ ladder and confirmed two things:
    to also become new-format, at which point its own retry of the same
    fetch succeeds.
 
-hop8 (26.3.17.110 -> 26.7.3.19) had zero hard errors of any kind.
+hop8 (26.3.17.110 -> 26.7.3.19) had zero hard errors of any kind in this
+particular run.
 
-Important caveat this run does NOT resolve: the mixed-version window in
-that run was CI-paced (seconds to at most a couple of minutes between one
+--- UPDATE: hop8 can hit the same self-healing pattern too (run
+--- 32134303759) -- it is not reliably the one clean hop -----------------
+
+A later run, 32134303759, hit the identical self-healing pattern at
+hop8-ch2: a hard CHECKSUM_DOESNT_MATCH ("Different number of files: 3
+compressed (expected 3) and 3 uncompressed ones (expected 2)") while ch3
+was still on 26.3.17.110, clearing immediately once hop8-ch3 (ch3's own
+upgrade to 26.7.3.19) completed. So the "hop8 had zero hard errors"
+finding above was true of that specific run, not a property of the hop
+itself -- treat hop8 the same operational way as hop6/hop7 (expect
+possible trailing-node errors, expect them to clear once that node
+finishes upgrading), not as the one hop guaranteed to be quiet.
+
+Important caveat these runs do NOT resolve: the mixed-version window in
+each was CI-paced (seconds to at most a couple of minutes between one
 node finishing and the next starting). It says nothing about what happens
-if a node is left lagging for hours or days at the 25.8.29.51 or
-26.3.17.110 hops specifically -- that hasn't been tested. It also says
+if a node is left lagging for hours or days at the 25.8.29.51, 26.3.17.110,
+or 26.7.3.19 hops specifically -- that hasn't been tested. It also says
 nothing about the *downgrade*-lossiness warning in the 26.3 changelog
 entry, which is a separate risk (rolling back after the fact) from what
-this run exercised (rolling forward with a temporarily mixed cluster).
+these runs exercised (rolling forward with a temporarily mixed cluster).
 
 --- RECOMMENDED_NOW and PRODUCTION_HOPS: what to actually run -------------
 
@@ -126,19 +140,20 @@ in CI -- production has no reason to stop at non-LTS releases with ~1
 month of support each once the boundary is known. Each hop still stays
 comfortably under ClickHouse's ~1 year mixed-version window (5-7 months).
 
-Operational rule for the two hops that hit a real incompatibility
-(25.3.14.14 -> 25.8.29.51 and 25.8.29.51 -> 26.3.17.110): upgrade all
-three nodes back-to-back in one sitting, the way CI does it, rather than
-spacing them out the way it's fine to do for every other hop. Expect the
-last node in each of those two hops to log hard-looking errors
-(NO_FILE_IN_DATA_PART / CORRUPTED_DATA / CHECKSUM_DOESNT_MATCH) for a
-minute or two right up until its own upgrade finishes -- that's expected,
-not a signal to roll back, *provided it clears once that node is fully
-upgraded*. If it doesn't clear within a few minutes of the last node
-coming back up, stop and treat it as a real incompatibility rather than
-assuming it'll resolve on its own -- that combination (mixed versions
-left stuck well past the trailing node's own upgrade finishing) hasn't
-been observed or validated.
+Operational rule for the three hops that have each hit a real
+incompatibility at least once (25.3.14.14 -> 25.8.29.51, 25.8.29.51 ->
+26.3.17.110, and 26.3.17.110 -> 26.7.3.19 -- see the hop8 update above):
+upgrade all three nodes back-to-back in one sitting, the way CI does it,
+rather than spacing them out the way it's fine to do for every other hop.
+Expect the last node in any of those three hops to log hard-looking
+errors (NO_FILE_IN_DATA_PART / CORRUPTED_DATA / CHECKSUM_DOESNT_MATCH)
+for a minute or two right up until its own upgrade finishes -- that's
+expected, not a signal to roll back, *provided it clears once that node
+is fully upgraded*. If it doesn't clear within a few minutes of the last
+node coming back up, stop and treat it as a real incompatibility rather
+than assuming it'll resolve on its own -- that combination (mixed
+versions left stuck well past the trailing node's own upgrade finishing)
+hasn't been observed or validated.
 
 One remaining gap before treating PRODUCTION_HOPS as fully proven rather
 than well-supported: the harness has directly confirmed self-healing for
@@ -194,10 +209,12 @@ RECOMMENDED_NOW = "26.7.3.19"
 # inside ClickHouse's ~1 year mixed-version window on its own.
 #
 # Operational rule, not encoded here since it's not a version number: the
-# 25.3.14.14->25.8.29.51 and 25.8.29.51->26.3.17.110 hops should each be run
-# as three back-to-back node upgrades in one sitting (no long pause between
-# nodes), because the trailing node in each of those two hops is expected to
-# log hard-looking errors until its own upgrade completes -- see the module
+# 25.3.14.14->25.8.29.51, 25.8.29.51->26.3.17.110, and 26.3.17.110->26.7.3.19
+# hops should each be run as three back-to-back node upgrades in one sitting
+# (no long pause between nodes), because the trailing node in any of those
+# three hops is expected to (not guaranteed to, per the hop8 update in the
+# module docstring -- it's been observed on some runs and not others) log
+# hard-looking errors until its own upgrade completes -- see the module
 # docstring for what to expect and when to actually treat it as a real
 # problem instead of the expected transient state.
 PRODUCTION_HOPS = [

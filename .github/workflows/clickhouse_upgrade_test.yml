@@ -250,8 +250,11 @@ jobs:
     runs-on: ubuntu-latest
     # Real network download of OONI measurement data + oonipipeline/fastpath
     # processing (once), plus 4 hops x (3 node upgrades + an integrity
-    # re-check + a full pytest run against the real API) -- substantially
-    # slower than staged-upgrade's synthetic-data hops.
+    # re-check + a full pytest run against the real API), all run inside one
+    # zero-downtime-upgrade step now (see harness/availability.py) so a
+    # single background canary thread can keep issuing reads/writes across
+    # every hop without pausing -- substantially slower than
+    # staged-upgrade's synthetic-data hops.
     timeout-minutes: 120
     defaults:
       run:
@@ -304,31 +307,27 @@ jobs:
       - name: Sanity-check ooni/data's pytest suite passes at 24.8.6.70 before any upgrade
         run: python3 ci_step.py verify-e2e --label base-verify-e2e
 
-      # --- Real-data hop 1/4: 24.8.6.70 -> 25.3.14.14 ---
-      - name: "Real-data hop 1/4 (-> 25.3.14.14): upgrade all 3 nodes, re-check integrity + pytest suite"
-        run: python3 ci_step.py real-data-hop --version 25.3.14.14 --label rd-hop1
-        continue-on-error: true
-
-      # --- Real-data hop 2/4: 25.3.14.14 -> 25.8.29.51 -- see
+      # --- All 4 remaining PRODUCTION_HOPS hops, back-to-back, with a
+      # continuous read/write canary running underneath the whole time --
+      # see harness/availability.py. This replaces the four separate
+      # real-data-hop steps that used to run here (24.8.6.70 -> 25.3.14.14
+      # -> 25.8.29.51 -> 26.3.17.110 -> 26.7.3.19, each its own step): the
+      # per-hop integrity/pytest checks those did are still done here, once
+      # per hop, but they can no longer be split across separate GitHub
+      # Actions steps, because the whole point is a single background
+      # canary thread that keeps issuing reads/writes across ALL of them
+      # without ever stopping -- splitting into per-hop steps would mean
+      # restarting (and re-justifying the continuity of) the canary between
+      # every hop, which defeats the purpose. Per-hop failures still don't
+      # abort this step early (same as before): each node upgrade inside
+      # run_zero_downtime_upgrade() is caught and recorded rather than
+      # raised, so e.g. hop2/hop3's expected trailing-node errors (see
       # harness/versions.py's "self-heals once the lagging node catches up"
-      # section: expect the trailing node to log hard-looking errors until
-      # its own upgrade finishes. real_data_hop_step upgrades all 3 nodes
-      # back-to-back within this single step, matching the operational rule
-      # documented there for this specific hop. ---
-      - name: "Real-data hop 2/4 (-> 25.8.29.51): upgrade all 3 nodes, re-check integrity + pytest suite"
-        run: python3 ci_step.py real-data-hop --version 25.8.29.51 --label rd-hop2
-        continue-on-error: true
-
-      # --- Real-data hop 3/4: 25.8.29.51 -> 26.3.17.110 -- same
-      # self-healing pattern as hop 2, this time the nested-data-type
-      # serialization change. ---
-      - name: "Real-data hop 3/4 (-> 26.3.17.110): upgrade all 3 nodes, re-check integrity + pytest suite"
-        run: python3 ci_step.py real-data-hop --version 26.3.17.110 --label rd-hop3
-        continue-on-error: true
-
-      # --- Real-data hop 4/4: 26.3.17.110 -> 26.7.3.19 (latest stable) ---
-      - name: "Real-data hop 4/4 (-> 26.7.3.19): upgrade all 3 nodes, re-check integrity + pytest suite"
-        run: python3 ci_step.py real-data-hop --version 26.7.3.19 --label rd-hop4
+      # section) don't stop the remaining hops or the canary from running to
+      # completion -- only the final report step's exit code actually fails
+      # the job if something never cleared.
+      - name: "Zero-downtime upgrade proof: all 4 remaining PRODUCTION_HOPS hops, continuous read/write canary throughout"
+        run: python3 ci_step.py zero-downtime-upgrade --label zero-downtime-upgrade
         continue-on-error: true
 
       - name: Generate report

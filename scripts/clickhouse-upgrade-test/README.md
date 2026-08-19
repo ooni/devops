@@ -21,20 +21,24 @@ scheduled-downtime, all-nodes-at-once upgrade?**
   [32122682392](https://github.com/ooni/devops/actions/runs/32122682392)
   completed the full ladder: do a rolling, node-by-node upgrade all the
   way to `26.7.3.19`, in 4 hops, landing on each LTS release in turn.**
-  Two of those hops (`25.3.14.14 -> 25.8.29.51` and
-  `25.8.29.51 -> 26.3.17.110`) hit real, reproducible ClickHouse
-  incompatibilities in CI — but both turned out to be transient and
-  self-healing once the lagging node's own upgrade completes, not
-  structural blocks. See "Real CI findings" below for what that means
-  operationally before doing either of those two hops in production.
+  Three of those hops (`25.3.14.14 -> 25.8.29.51`, `25.8.29.51 ->
+  26.3.17.110`, and `26.3.17.110 -> 26.7.3.19`) have each hit real,
+  reproducible ClickHouse incompatibilities in CI at least once — but every
+  occurrence turned out to be transient and self-healing once the lagging
+  node's own upgrade completes, not a structural block. See "Real CI
+  findings" below for what that means operationally before doing any of
+  these three hops in production.
 
   ```
   24.8.6.70  →  25.3.14.14  →  25.8.29.51  →  26.3.17.110  →  26.7.3.19
-   (current)      LTS        LTS (*)          LTS (*)          (latest)
+   (current)      LTS        LTS (*)          LTS (*)         (latest) (*)
 
-  (*) upgrade all 3 nodes back-to-back in one sitting for these two hops --
-      the trailing node is expected to log hard-looking errors for a
+  (*) upgrade all 3 nodes back-to-back in one sitting for these three hops
+      -- the trailing node is expected to log hard-looking errors for a
       minute or two until its own upgrade finishes. See "Real CI findings".
+      (The last hop has only been observed to hit this once, in a later
+      run, vs. every run for the other two -- see "Real CI findings" for
+      why it's still grouped here rather than treated as clean.)
   ```
 
   No full-cluster downtime is needed — the risk was never downtime, it
@@ -247,7 +251,8 @@ then completed the entire 8-hop ladder and found:
   *"Unknown version of serialization infos (1). Should be less or equal
   than 0"* — 17 tries. **`hop7-ch3`** — ch3's own upgrade to
   `26.3.17.110` — again passed clean.
-- **`hop8`** (`26.3.17.110 -> 26.7.3.19`) had zero hard errors anywhere.
+- **`hop8`** (`26.3.17.110 -> 26.7.3.19`) had zero hard errors anywhere in
+  this particular run.
 
 So both incompatibilities are the same underlying mechanism: an
 old-format binary can't parse a part written in a new on-disk format, and
@@ -255,26 +260,41 @@ the fix is simply for that binary to become new-format too, at which
 point its own retry of the identical fetch succeeds. Neither is a
 structural block on reaching `26.7.3.19`.
 
+**Update:** a later run,
+[32134303759](https://github.com/ooni/devops/actions/runs/32134303759),
+hit the *same* self-healing pattern at `hop8` too — `hop8-ch2` logged a
+hard `CHECKSUM_DOESNT_MATCH` ("Different number of files: 3 compressed
+(expected 3) and 3 uncompressed ones (expected 2)") while ch3 was still
+on `26.3.17.110`, and `hop8-ch3` (ch3's own upgrade to `26.7.3.19`) again
+passed clean immediately after. So `hop8` is not reliably clean the way
+the bullet above (from the first run that reached it) suggested — it can
+also hit the same transient, self-healing mixed-version friction as
+`hop6`/`hop7`, just not on every run. Treat all three of `hop6`, `hop7`,
+and `hop8` as "expect this, and expect it to clear once the trailing node
+finishes," per the operational rule below, rather than treating `hop8` as
+the one hop guaranteed to be quiet.
+
 **What this doesn't tell us**, and shouldn't be assumed: the mixed-version
-window in that run was CI-paced — seconds to at most a couple of minutes
-between one node finishing and the next starting. Whether the same
-self-healing holds if a node is left lagging for hours or days at either
-of these two hops specifically hasn't been tested. Nor does this touch
-the separate *downgrade*-lossiness warning in the 26.3 changelog entry —
-that's about rolling back after the fact, a different risk from the
-forward-rolling mixed-version friction this run exercised.
+window in these runs was CI-paced — seconds to at most a couple of
+minutes between one node finishing and the next starting. Whether the
+same self-healing holds if a node is left lagging for hours or days at
+any of these three hops specifically hasn't been tested. Nor does this
+touch the separate *downgrade*-lossiness warning in the 26.3 changelog
+entry — that's about rolling back after the fact, a different risk from
+the forward-rolling mixed-version friction these runs exercised.
 
 Given this, `RECOMMENDED_NOW` in `harness/versions.py` is now
 `26.7.3.19`, and `PRODUCTION_HOPS` is the 4-hop runbook this project
 recommends: skip the monthly bisection releases (they were CI-diagnostic
-only), land on each LTS in turn, and for the two hops that hit a real
-incompatibility (`25.3.14.14 -> 25.8.29.51`, `25.8.29.51 -> 26.3.17.110`)
-upgrade all three nodes back-to-back in one sitting rather than spacing
-them out — expect the trailing node to log hard-looking errors for a
-minute or two right up until its own upgrade finishes, and treat that as
-expected only if it actually clears once that node is fully upgraded. If
-it's still stuck minutes after the last node comes back up, stop and
-treat it as a real problem rather than assuming it'll resolve.
+only), land on each LTS in turn, and for the three hops that have hit a
+real incompatibility at least once (`25.3.14.14 -> 25.8.29.51`,
+`25.8.29.51 -> 26.3.17.110`, and `26.3.17.110 -> 26.7.3.19`) upgrade all
+three nodes back-to-back in one sitting rather than spacing them out —
+expect the trailing node to log hard-looking errors for a minute or two
+right up until its own upgrade finishes, and treat that as expected only
+if it actually clears once that node is fully upgraded. If it's still
+stuck minutes after the last node comes back up, stop and treat it as a
+real problem rather than assuming it'll resolve.
 
 One gap before calling `PRODUCTION_HOPS` fully proven: self-healing has
 been directly observed for the `25.7.8.71 -> 25.8.29.51` sub-hop (via the
@@ -363,16 +383,18 @@ Raised in review on [ooni/devops#477](https://github.com/ooni/devops/pull/477)
    in points 1-3 above.
 
 Net effect: `LTS_HOPS` (what this harness's `staged` CI job actually
-tests) walks the full ladder to `26.7.3.19`, and as of run 32122682392 it
-does so clean — both the mark-file finding and the 26.3 nested-type
-serialization change turned out to be transient, self-healing mixed-
+tests) walks the full ladder to `26.7.3.19`. As of run 32122682392 it
+completed clean, with both the mark-file finding and the 26.3 nested-type
+serialization change turning out to be transient, self-healing mixed-
 version friction rather than structural blocks (see "Real CI findings,
-continued" above). The production recommendation (`RECOMMENDED_NOW` /
+continued" above); a later run (32134303759) showed the same friction can
+also surface at the final hop (`26.3.17.110 -> 26.7.3.19`), self-healing
+the same way. The production recommendation (`RECOMMENDED_NOW` /
 `PRODUCTION_HOPS`, and the README TL;DR above) now covers the whole
 ladder, with an operational caveat (upgrade the trailing node promptly)
-attached to the two hops that hit a real incompatibility. Point 4 is now
-addressed by the `real-data-upgrade` job (see below). Points 2 and 5
-remain open.
+attached to the three hops that have hit a real incompatibility at least
+once. Point 4 is now addressed by the `real-data-upgrade` job (see
+below). Points 2 and 5 remain open.
 
 ## Real-data end-to-end scenario (`real-data-upgrade` job)
 
@@ -426,6 +448,36 @@ every deliberate difference from the upstream compose file (auth, dropped
      still works — not just that ClickHouse's own replication mechanics
      survived (already covered by the synthetic scenario's write-then-
      read-back probe).
+- **A continuous read/write canary now runs for the entire rollout, not
+  just at hop boundaries** (`harness/availability.py`, the
+  `zero-downtime-upgrade` step/job). Both checks above are point-in-time —
+  they compare data-at-rest between checkpoints, but say nothing about
+  what happens to a read or write attempted *during* the brief window
+  when a node is mid-bounce, which is exactly the question "does the
+  upgrade cause any downtime or blocked writes" is actually asking. A
+  background thread (`CanaryWriter`) issues one read and one write every
+  ~0.5s for the whole rollout, round-robining across all 3 nodes with
+  immediate failover to the next node on failure — mirroring how
+  production's own `clickhouse_proxy` role would route around a bounced
+  node, not asserting every individual node is reachable at every instant
+  (one node *will* be briefly unreachable during its own bounce; that's
+  unavoidable in a rolling upgrade and not itself a failure). Pass
+  condition, all of which must hold across the entire 4-hop run: zero
+  read or write attempts blocked on every node in the same tick (the "no
+  downtime, no blocked writes" claim); every write the canary saw
+  acknowledged is still present in the cluster's final state once the
+  rollout finishes and a short settling grace period elapses (catches
+  silent data loss the golden-snapshot diff can't, since that diff only
+  tracks the originally-ingested rows, not the canary's own writes); and
+  all 3 nodes agree on the canary table's final contents. This replaces
+  the four separate `real-data-hop` steps that used to run in the
+  workflow (`rd-hop1`..`rd-hop4`, one per `PRODUCTION_HOPS` hop) with one
+  `zero-downtime-upgrade` step spanning all 4 hops — the whole point is a
+  single canary thread that never stops between hops, so it can't be
+  split back across separate steps without losing that continuity.
+  `real_data.real_data_hop_step()` / `ci_step.py real-data-hop` are
+  unchanged and still available as a standalone primitive (e.g. for a
+  future scenario that wants one hop in isolation, without the canary).
 - Uses `PRODUCTION_HOPS` (4 hops), not the 8-hop `LTS_HOPS` bisection
   ladder — this job verifies the actual recommended production upgrade
   path, not every diagnostic waypoint used to originally localize the

@@ -32,6 +32,7 @@ a different flow (load real data once, then hop):
     python3 ci_step.py golden-snapshot --label golden-snapshot
     python3 ci_step.py verify-e2e --label base-verify-e2e
     python3 ci_step.py real-data-hop --version 25.3.14.14 --label rd-hop1
+    python3 ci_step.py zero-downtime-upgrade --label zero-downtime-upgrade
     python3 ci_step.py report
     python3 ci_step.py teardown-real-data
 
@@ -48,7 +49,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from harness import compose, real_data, report
+from harness import availability
 from harness.scenarios import setup_step, step_ok, upgrade_node_step, verify_ddl_step
+from harness.versions import PRODUCTION_HOPS
 
 PROJECT_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = PROJECT_DIR / "results"
@@ -183,6 +186,20 @@ def cmd_teardown_real_data(args) -> int:
     return 0
 
 
+def cmd_zero_downtime_upgrade(args) -> int:
+    # PRODUCTION_HOPS[1:] -- skip the BASE_VERSION entry (24.8.6.70, None),
+    # since that's the version setup-real-data already brought the cluster
+    # up on; the canary starts running from the current (base) version and
+    # the first real hop upgrades away from it, exactly like real-data-hop
+    # is invoked once per remaining PRODUCTION_HOPS entry today.
+    result = availability.run_zero_downtime_upgrade(PRODUCTION_HOPS[1:], label=args.label)
+    _save_step(args.label, result)
+    ok = step_ok(result)
+    print(f"[{args.label}] {'OK' if ok else 'PROBLEM DETECTED'}")
+    print(json.dumps({k: v for k, v in result.items() if k != "hops"}, indent=2, default=str))
+    return 0 if ok else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -230,6 +247,18 @@ def main() -> int:
     p_rd_hop.add_argument("--version", required=True, help="ClickHouse image tag to upgrade all 3 nodes to")
     p_rd_hop.add_argument("--label", required=True, help="Step label, e.g. rd-hop1")
     p_rd_hop.set_defaults(func=cmd_real_data_hop)
+
+    p_zdt = sub.add_parser(
+        "zero-downtime-upgrade",
+        help=(
+            "Run every remaining PRODUCTION_HOPS hop back-to-back in one process, with a "
+            "continuous read/write canary (round-robin + failover across all 3 nodes) running "
+            "the whole time -- proves no full-cluster downtime, no blocked writes, and no lost "
+            "or corrupted data across the entire rollout, not just at per-hop checkpoints"
+        ),
+    )
+    p_zdt.add_argument("--label", default="zero-downtime-upgrade")
+    p_zdt.set_defaults(func=cmd_zero_downtime_upgrade)
 
     p_teardown_rd = sub.add_parser("teardown-real-data", help="docker compose -f docker-compose.yml -f docker-compose.real-data.yml down -v")
     p_teardown_rd.set_defaults(func=cmd_teardown_real_data)
