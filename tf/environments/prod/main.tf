@@ -442,12 +442,6 @@ module "ooni_th_droplet" {
   dns_zone_ooni_io = local.dns_zone_ooni_io
 }
 
-resource "digitalocean_ssh_key" "oonidevops" {
-  name       = "oonidevops"
-  public_key = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
-}
-
-
 module "ooni_test_helpers_wc" {
   source = "../../modules/ooni_th_binary_droplet"
 
