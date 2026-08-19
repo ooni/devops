@@ -1,5 +1,5 @@
 ---
-- name: Deploy test helpers
+- name: Deploy the Web Connectivity test helper
   hosts:
     - wc.th.dev.ooni.io
   become: true
@@ -12,3 +12,7 @@
     - role: nginx
     - role: dehydrated
     - role: prometheus_node_exporter
+      vars:
+        use_https: true
+        https_port: 9001
+    - role: oohelperd
