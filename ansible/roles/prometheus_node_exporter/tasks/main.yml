@@ -23,4 +23,30 @@
     - config
   when: use_nginx
 
+- name: Allow traffic on the node exporter http_port from the monitoring host only
+  become: true
+  tags: [prometheus_node_exporter, monitoring, node_exporter, nftables]
+  ansible.builtin.blockinfile:
+    path: "/etc/ooni/nftables/tcp/{{ http_port }}.nft"
+    create: yes
+    mode: "0644"
+    block: |
+      add rule inet filter input ip saddr {{ monitoring_server_ip }} tcp dport {{ http_port }} counter accept comment "node exporter metrics"
+  when: use_nginx and not use_https
+  notify:
+    - reload nftables
+
+- name: Allow traffic on the node exporter https_port from the monitoring host only
+  become: true
+  tags: [prometheus_node_exporter, monitoring, node_exporter, nftables]
+  ansible.builtin.blockinfile:
+    path: "/etc/ooni/nftables/tcp/{{ http_port }}.nft"
+    create: yes
+    mode: "0644"
+    block: |
+      add rule inet filter input ip saddr {{ monitoring_server_ip }} tcp dport {{ https_port }} counter accept comment "node exporter metrics"
+  when: use_nginx and use_https
+  notify:
+    - reload nftables
+
 - include_tasks: install.yml
