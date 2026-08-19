@@ -93,3 +93,6 @@
     # 
     # See: https://github.com/ooni/devops/pull/235#discussion_r2053664605
     - reload nginx and restart dehydrated
+
+- name: Flush all handlers
+  meta: flush_handlers
