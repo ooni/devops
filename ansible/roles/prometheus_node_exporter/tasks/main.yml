@@ -1,25 +1,10 @@
-- ansible.builtin.include_role:
-    name: nginx
-  tags:
-    - nginx
-    - node_exporter
-  when: use_nginx
-
-- ansible.builtin.include_role:
-    name: dehydrated
-  tags:
-    - oonidata
-    - dehydrated
-  vars:
-    ssl_domains: "{{ hostvars[inventory_hostname].ssl_domains | default([inventory_hostname]) }}"
-  when: use_https
-
 - name: create ooni configuration directory
   ansible.builtin.file:
     path: "/etc/ooni/"
     state: directory
     owner: root
   tags:
+    - prometheus_node_exporter
     - monitoring
     - node_exporter
     - config
@@ -32,6 +17,7 @@
   notify:
     - Restart nginx
   tags:
+    - prometheus_node_exporter
     - monitoring
     - node_exporter
     - config

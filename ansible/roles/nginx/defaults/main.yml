@@ -1,1 +1,10 @@
 nginx_user: nginx
+
+# "nginxinc_role" (default, unchanged): install via the nginxinc.nginx galaxy
+# role, as today.
+# "official_repo": install directly from nginx.org's own apt repo, following
+# https://nginx.org/en/linux_packages.html#Debian, with a pinned signing-key
+# fingerprint check. Opt in per-playbook; the nginxinc_role default is left
+# alone for existing callers since switching apt repos changes what nginx
+# package/version they get on their next run.
+nginx_install_method: nginxinc_role

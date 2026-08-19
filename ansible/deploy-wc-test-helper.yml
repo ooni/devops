@@ -1,0 +1,14 @@
+---
+- name: Deploy test helpers
+  hosts:
+    - wc.th.dev.ooni.io
+  become: true
+  vars:
+    ssl_domains:
+      - "{{ inventory_hostname }}"
+    nginx_install_method: official_repo
+  roles:
+    - role: bootstrap
+    - role: nginx
+    - role: dehydrated
+    - role: prometheus_node_exporter

@@ -8,6 +8,7 @@
         admin_group_name: adm
     - role: base-backend
     - role: nftables
+    - role: nginx
     - role: dehydrated
       tags: dehydrated
       expand: yes

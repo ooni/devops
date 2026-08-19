@@ -106,14 +106,3 @@
     - jupyterhub
     - config
 
-- ansible.builtin.include_role:
-    name: nginx
-  tags:
-    - oonidata
-    - nginx
-
-- ansible.builtin.include_role:
-    name: dehydrated
-  tags:
-    - oonidata
-    - dehydrated

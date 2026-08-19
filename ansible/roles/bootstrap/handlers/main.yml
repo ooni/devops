@@ -9,7 +9,7 @@
     state: restarted
 
 - name: Test systemd-resolved
-  ansible.builtin.shell: resolvectl query go.dnscheck.tools --cache=no
+  ansible.builtin.shell: resolvectl query dnscheck.tools --cache=no
 
 - name: Restart systemd-journald
   ansible.builtin.systemd_service:

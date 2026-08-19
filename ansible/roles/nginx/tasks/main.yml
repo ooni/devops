@@ -12,10 +12,84 @@
   tags:
     - nginx
     - nftables
+    - network
 
-- name: install nginx
+- name: install nginx via the nginxinc.nginx galaxy role
   include_role:
     name: nginxinc.nginx
+  tags:
+    - nginx
+    - packages
+  when: nginx_install_method == 'nginxinc_role'
+
+# Follows https://nginx.org/en/linux_packages.html#Debian directly instead
+# of a third-party role.
+- name: Install nginx from nginx.org's official apt repository
+  when: nginx_install_method == 'official_repo'
+  tags:
+    - nginx
+    - packages
+  block:
+    - name: Install nginx's prerequisites
+      ansible.builtin.apt:
+        name:
+          - curl
+          - gnupg2
+          - ca-certificates
+        state: present
+        update_cache: true
+
+    - name: Download nginx's official signing key
+      ansible.builtin.get_url:
+        url: https://nginx.org/keys/nginx_signing.key
+        dest: /tmp/nginx_signing.key
+        mode: "0644"
+
+    - name: Dearmor nginx's signing key into the apt keyring
+      ansible.builtin.command: gpg --dearmor --yes --output /usr/share/keyrings/nginx-archive-keyring.gpg /tmp/nginx_signing.key
+      args:
+        creates: /usr/share/keyrings/nginx-archive-keyring.gpg
+
+    - name: Read the fingerprint of the downloaded key
+      ansible.builtin.command: gpg --with-colons --show-keys /usr/share/keyrings/nginx-archive-keyring.gpg
+      register: nginx_key_check
+      changed_when: false
+
+    # Pin against nginx.org's gpg key fingerprint:
+    # 573B FD6B 3D8F BC64 1079 A6AB ABF5 BD82 7BD9 BF62, documented at
+    # (https://nginx.org/en/linux_packages.html)
+    - name: Verify the downloaded key's fingerprint matches nginx.org's published one
+      ansible.builtin.assert:
+        that:
+          - nginx_key_check.stdout is
+            search('^fpr:::::::::573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62:$', multiline=true)
+        fail_msg: >-
+          nginx-archive-keyring.gpg's fingerprint does not match the
+          expected 573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62 -- refusing to
+          trust it.
+        success_msg: "nginx-archive-keyring.gpg's fingerprint matches the expected value."
+
+    - name: Add the nginx.org apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/debian {{ ansible_distribution_release }} nginx"
+        filename: nginx
+        state: present
+
+    - name: Pin nginx.org packages above Debian's own nginx package
+      ansible.builtin.copy:
+        dest: /etc/apt/preferences.d/99nginx
+        content: |
+          Package: *
+          Pin: origin nginx.org
+          Pin: release o=nginx
+          Pin-Priority: 900
+        mode: "0644"
+
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
 
 # https://ssl-config.mozilla.org/#server=nginx&version=1.14.2&config=intermediate&openssl=1.1.1d&guideline=5.4
 # Guide https://wiki.mozilla.org/Security/Server_Side_TLS#Pre-defined_DHE_groups
@@ -28,6 +102,7 @@
     - ssl_modern.conf
   tags:
     - nginx
+    - config
 
 - name: remove `default` vhost
   file: path={{item}} state=absent
@@ -38,6 +113,7 @@
     - /etc/nginx/sites-enabled/default
   tags:
     - nginx
+    - config
 
 - name: Create nginx sites directory
   ansible.builtin.file:
@@ -45,9 +121,11 @@
     state: directory
   tags:
     - nginx
+    - config
 
 - name: set nginx.conf
   template: src=nginx.conf dest=/etc/nginx/nginx.conf mode=0444
   notify: reload nginx
   tags:
     - nginx
+    - config

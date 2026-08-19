@@ -6,13 +6,13 @@
   become: true
   roles:
     - role: bootstrap
+    - role: nginx
+      tags: nginx
     - role: dehydrated
       vars:
         ssl_domains:
           - "{{ inventory_hostname }}"
         tls_cert_dir: /var/lib/dehydrated/certs
-    - role: nginx
-      tags: nginx
     - role: monitoring_proxy
       vars:
         monitoring_proxy_public_fqdn: "{{ inventory_hostname }}"
