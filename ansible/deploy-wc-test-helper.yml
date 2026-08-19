@@ -2,6 +2,9 @@
 - name: Deploy the Web Connectivity test helper
   hosts:
     - wc.th.dev.ooni.io
+    - wcth0.fra1.prod.ooni.io
+    - wcth1.fra1.prod.ooni.io
+    - wcth2.fra1.prod.ooni.io
   become: true
   vars:
     ssl_domains:
