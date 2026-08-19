@@ -445,15 +445,15 @@ module "ooni_th_droplet" {
 module "ooni_test_helpers_wc" {
   source = "../../modules/ooni_th_binary_droplet"
 
-  stage    = local.environment
+  stage             = local.environment
   instance_location = "fra1"
-  name     = "ooniwcth"
-  hostname = "wcth${count.index}.fra1"
+  name              = "ooniwcth"
+  hostname          = "wcth${count.index}.fra1"
 
   ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
-  count = 3
+  count            = 3
 }
 
 
