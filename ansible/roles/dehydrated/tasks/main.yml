@@ -82,17 +82,21 @@
     state: started
     enabled: yes
   notify:
-    # creates:
-    # /var/lib/dehydrated/certs/<name>/chain.pem cert.pem privkey.pem fullchain.pem
-
-    # Note that we need to restart dehydrated ensuring that nginx reloads before dehydrated restarts.
-    # When we first run dehydrated with the tasks above it creates an nginx rule that is required
-    # to pass the ACME challenge. 
-    # If nginx doesn't picks this rule before dehydrated runs again, the ACME challenge will fail
-    # crashing the playbook
-    # 
-    # See: https://github.com/ooni/devops/pull/235#discussion_r2053664605
-    - reload nginx and restart dehydrated
+    - restart nginx
 
 - name: Flush all handlers
+  tags: [dehydrated, certs]
   meta: flush_handlers
+
+- name: Ensure nginx is running
+  tags: [dehydrated, certs]
+  ansible.builtin.systemd_service:
+    state: started
+    name: nginx
+
+- name: Force the restarting of the dehydrated service
+  tags: [dehydrated, certs]
+  ansible.builtin.systemd_service:
+    state: restarted
+    daemon_reload: true
+    name: dehydrated
