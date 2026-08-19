@@ -447,7 +447,7 @@ module "ooni_test_helpers_wc" {
 
   stage             = local.environment
   instance_location = "fra1"
-  name              = "ooniwcth"
+  name              = "ooniwcth${count.index}-fra1"
   hostname          = "wcth${count.index}.fra1"
 
   ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
