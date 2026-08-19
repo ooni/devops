@@ -1,8 +1,6 @@
 dom0_hosts:
   - ams-slack-1.ooni.org
   - doams1-countly.ooni.nu
-  - mia-echoth.ooni.nu
-  - mia-httpth.ooni.nu
 
 blackbox_jobs:
   # TODO add these records to the ALB config
@@ -47,18 +45,6 @@ blackbox_jobs:
       - "https://ps.ooni.io/bouncer/net-tests"
       # cloudfront
       - "https://d3kr4emv7f56qa.cloudfront.net/bouncer/net-tests"
-
-  # IP addresses are used for test-helpers in monitoring configuration for some
-  # historical reason hopefully remembered by @hellais.
-  - name: "ooni tcp echo"
-    module: "ooni_tcp_echo_ok"
-    targets:
-      - "{{ lookup('dig', 'c.echo.th.ooni.io/A') }}:80"
-
-  - name: "ooni http return json headers"
-    module: "ooni_http_return_json_headers_ok"
-    targets:
-      - "http://{{ lookup('dig', 'a.http.th.ooni.io/A') }}:80"
 
   - name: "ooni explorer homepage"
     module: "http_2xx"
