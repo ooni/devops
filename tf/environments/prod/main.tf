@@ -442,6 +442,27 @@ module "ooni_th_droplet" {
   dns_zone_ooni_io = local.dns_zone_ooni_io
 }
 
+resource "digitalocean_ssh_key" "oonidevops" {
+  name       = "oonidevops"
+  public_key = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
+}
+
+
+module "ooni_test_helpers_wc" {
+  source = "../../modules/ooni_th_binary_droplet"
+
+  stage    = local.environment
+  instance_location = "fra1"
+  name     = "ooniwcth"
+  hostname = "wcth${count.index}.fra1"
+
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
+
+  dns_zone_ooni_io = local.dns_zone_ooni_io
+  count = 3
+}
+
+
 module "ooniapi_reverseproxy_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
