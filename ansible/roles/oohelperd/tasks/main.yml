@@ -1,0 +1,93 @@
+---
+- name: Flush all handlers now
+  ansible.builtin.meta: flush_handlers
+
+- name: Create the oohelperd user
+  tags: [oohelperd]
+  ansible.builtin.user:
+    name: oohelperd
+    shell: /usr/sbin/nologin
+    create_home: no
+    system: yes
+
+- name: Download the oohelperd binary
+  tags: [oohelperd]
+  ansible.builtin.get_url:
+    url: "{{ oohelperd_base_url }}/oohelperd-linux-amd64"
+    dest: /usr/local/bin/oohelperd
+    checksum: "sha256:{{ oohelperd_checksum }}"
+    mode: "0755"
+    owner: root
+  register: oohelperd_binary
+
+- name: Create the ooni configuration directory
+  tags: [oohelperd, config]
+  ansible.builtin.file:
+    path: /etc/ooni
+    state: directory
+    owner: root
+    mode: "0755"
+
+# Read by systemd as root, hence not readable by the oohelperd user itself
+- name: Write the oohelperd environment file
+  tags: [oohelperd, secrets]
+  no_log: true
+  ansible.builtin.template:
+    src: oohelperd.env
+    dest: /etc/ooni/oohelperd.env
+    owner: root
+    group: root
+    mode: "0600"
+  register: oohelperd_env
+
+- name: Create the oohelperd.service file
+  tags: [oohelperd]
+  ansible.builtin.template:
+    src: oohelperd.service
+    dest: /etc/systemd/system/oohelperd.service
+    mode: "0644"
+    owner: root
+  register: oohelperd_unit
+
+- name: reload systemd
+  tags: [oohelperd]
+  ansible.builtin.systemd_service:
+    daemon_reload: yes
+  when: oohelperd_unit.changed
+
+- name: Start oohelperd
+  tags: [oohelperd]
+  ansible.builtin.systemd_service:
+    name: oohelperd.service
+    state: started
+    enabled: yes
+
+- name: Restart oohelperd if its binary, unit file or environment changed
+  tags: [oohelperd]
+  ansible.builtin.systemd_service:
+    name: oohelperd.service
+    state: restarted
+  when: oohelperd_binary.changed or oohelperd_unit.changed or oohelperd_env.changed
+
+# Expose the test helper to the probes
+- name: Add the oohelperd nginx vhost
+  tags: [oohelperd, nginx, config]
+  ansible.builtin.template:
+    src: nginx-oohelperd.j2
+    dest: /etc/nginx/sites-enabled/02-oohelperd
+    mode: "0644"
+    owner: root
+  notify:
+    - reload nginx
+
+- name: Verify oohelperd is answering requests
+  tags: [oohelperd]
+  # GET / is oohelperd's health check, it answers "Hello OONItarian!"
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8080/
+    return_content: true
+  register: oohelperd_check
+  when: not ansible_check_mode
+  until: "'OONItarian' in oohelperd_check.content"
+  retries: 5
+  delay: 2

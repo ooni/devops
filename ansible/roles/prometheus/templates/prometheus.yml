@@ -83,7 +83,7 @@ scrape_configs:
         - https://data1.htz-fsn.prod.ooni.nu/metrics/node_exporter
         - https://data2.htz-fsn.prod.ooni.nu/metrics/node_exporter
         - https://data3.htz-fsn.prod.ooni.nu/metrics/node_exporter
-        - https://notebook.ooni.org/metrics/node_exporter
+        - https://notebook1.htz-fsn.prod.ooni.nu/metrics/node_exporter
         - http://0.do.th.prod.ooni.io:9001/metrics
         - http://1.do.th.prod.ooni.io:9001/metrics
         - http://2.do.th.prod.ooni.io:9001/metrics
@@ -154,7 +154,7 @@ scrape_configs:
         - data1.htz-fsn.prod.ooni.nu
         - data2.htz-fsn.prod.ooni.nu
         - data3.htz-fsn.prod.ooni.nu
-        - notebook.ooni.org
+        - notebook1.htz-fsn.prod.ooni.nu
 
   - job_name: 'raw-netdata'
     scrape_interval: 5s
@@ -208,6 +208,9 @@ scrape_configs:
         - 0.do.th.prod.ooni.io
         - 1.do.th.prod.ooni.io
         - 2.do.th.prod.ooni.io
+        - wcth0.fra1.prod.ooni.io
+        - wcth1.fra1.prod.ooni.io
+        - wcth2.fra1.prod.ooni.io
   - job_name: 'ooni-web'
     scrape_interval: 5m
     scheme: https
