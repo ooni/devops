@@ -28,7 +28,7 @@ server {
     # nginx >= 1.25.1, which is what nginx.org ships
     http2 on;
 
-    server_name {{ inventory_hostname }};
+    server_name {{ ssl_domains | join (' ') }};
     include /etc/nginx/ssl_modern.conf;
 
     ssl_certificate /var/lib/dehydrated/certs/{{ inventory_hostname }}/fullchain.pem;
