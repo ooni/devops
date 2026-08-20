@@ -51,6 +51,26 @@ blackbox_jobs:
     targets:
       - "https://explorer.ooni.org/"
 
+  # IP addresses are used for these test-helpers since that's what is handed
+  # out to probes by check-in. Keep them in sync with
+  # `generate_test_helpers_conf()` in ooni/backend
+  # ooniapi/services/ooniprobe/src/ooniprobe/routers/v1/probe_services.py
+  - name: "ooni tcp echo"
+    module: "ooni_tcp_echo_ok"
+    ignore_instance_down: true # covered by the more specific TestHelperDown alert
+    labels:
+      domain: "echo.th.prod.ooni.io"
+    targets:
+      - "134.209.237.204:80" # echo.th.prod.ooni.io, tcp-echo test helper
+
+  - name: "ooni http return json headers"
+    module: "ooni_http_return_json_headers_ok"
+    ignore_instance_down: true # covered by the more specific TestHelperDown alert
+    labels:
+      domain: "json.th.prod.ooni.io"
+    targets:
+      - "http://206.81.31.205:80" # json.th.prod.ooni.io
+
   # API #
 
   - name: "ooni API measurements"
