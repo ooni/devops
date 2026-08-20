@@ -8,8 +8,6 @@
   become: true
   vars:
     nginx_install_method: official_repo
-    ssl_domains:
-      - "{{ inventory_hostname }}"
   roles:
     - role: bootstrap
     - role: nginx
