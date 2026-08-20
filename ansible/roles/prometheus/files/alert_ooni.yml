@@ -27,4 +27,10 @@ groups:
       summary: 'Mirror {{ $labels.instance }} lags by {{ $value | humanizeDuration }}'
       description: '{{ if eq $labels.instance "ooni.torproject.org:443" }}Run `make update-site`.{{ end }}'
 
+  - alert: TestHelperDown
+    expr: up{domain!=""} != 1
+    for: 5m
+    annotations:
+      summary: 'test helper down: {{ $labels.instance }} ({{ $labels.domain }})'
+
 ...

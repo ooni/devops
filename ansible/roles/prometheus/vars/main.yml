@@ -1,8 +1,6 @@
 dom0_hosts:
   - ams-slack-1.ooni.org
   - doams1-countly.ooni.nu
-  - mia-echoth.ooni.nu
-  - mia-httpth.ooni.nu
 
 blackbox_jobs:
   # TODO add these records to the ALB config
@@ -51,22 +49,27 @@ blackbox_jobs:
       # cloudfront
       - "https://d3kr4emv7f56qa.cloudfront.net/bouncer/net-tests"
 
-  # IP addresses are used for test-helpers in monitoring configuration for some
-  # historical reason hopefully remembered by @hellais.
-  - name: "ooni tcp echo"
-    module: "ooni_tcp_echo_ok"
-    targets:
-      - "{{ lookup('dig', 'c.echo.th.ooni.io/A') }}:80"
-
-  - name: "ooni http return json headers"
-    module: "ooni_http_return_json_headers_ok"
-    targets:
-      - "http://{{ lookup('dig', 'a.http.th.ooni.io/A') }}:80"
-
   - name: "ooni explorer homepage"
     module: "http_2xx"
     targets:
       - "https://explorer.ooni.org/"
+
+  # We use IP monitoring since this is what is served to users through check-in.
+  - name: "ooni tcp echo"
+    module: "ooni_tcp_echo_ok"
+    ignore_instance_down: true # covered by the more specific TestHelperDown alert
+    labels:
+      domain: "echo.th.prod.ooni.io"
+    targets:
+      - "{{ lookup('dig', 'echo.th.prod.ooni.io/A') }}:80"
+
+  - name: "ooni http return json headers"
+    module: "ooni_http_return_json_headers_ok"
+    ignore_instance_down: true # covered by the more specific TestHelperDown alert
+    labels:
+      domain: "json.th.prod.ooni.io"
+    targets:
+      - "http://{{ lookup('dig', 'json.th.prod.ooni.io/A') }}:80"
 
   # API #
 
