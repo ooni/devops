@@ -8,3 +8,7 @@ oohelperd_checksum: "fff38b9366fecae400cb3f616ffa2a37dba211c33ee4e1c1b343bff1c38
 # A test helper request measures the target before it can answer, so it needs
 # way more than the nginx default of 60s
 oohelperd_nginx_proxy_timeout: 900
+# It's important that when you generate certificate using dehydrated, the first
+# domain in the list matches inventory_hostname so that the lookup for the
+# certificate that was generated using dehydrated matches
+nginx_server_name: "{{ inventory_hostname }}"

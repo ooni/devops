@@ -9,7 +9,7 @@ proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=thcache:100M
 server {
     listen 80;
     listen [::]:80;
-    server_name {{ inventory_hostname }};
+    server_name {{ nginx_server_name }};
 
     # This server block is more specific than the catch-all one installed by
     # the dehydrated role, so it must serve the ACME challenge itself
@@ -28,7 +28,7 @@ server {
     # nginx >= 1.25.1, which is what nginx.org ships
     http2 on;
 
-    server_name {{ ssl_domains | join (' ') }};
+    server_name {{ nginx_server_name }};
     include /etc/nginx/ssl_modern.conf;
 
     ssl_certificate /var/lib/dehydrated/certs/{{ inventory_hostname }}/fullchain.pem;
