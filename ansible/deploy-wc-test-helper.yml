@@ -7,8 +7,6 @@
     - wcth2.fra1.prod.ooni.io
   become: true
   vars:
-    ssl_domains:
-      - "{{ inventory_hostname }}"
     nginx_install_method: official_repo
   roles:
     - role: bootstrap
