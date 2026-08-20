@@ -456,6 +456,15 @@ module "ooni_test_helpers_wc" {
   count            = 3
 }
 
+resource "aws_route53_record" "ooni_wc_th" {
+  zone_id = local.dns_root_zone_ooni_org
+  name    = "wcth${count.index}.fra1.ooni.org"
+  type    = "A"
+  ttl     = 60
+
+  count   = 3
+  records = [module.ooni_test_helpers_wc[count.index].droplet_ipv4_address]
+}
 
 module "ooniapi_reverseproxy_deployer" {
   source = "../../modules/ooniapi_service_deployer"
