@@ -245,3 +245,5 @@ ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `zkp_request`;
 ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `age_range`;
 ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `msm_range`;
 ALTER TABLE ooni.fastpath MODIFY COLUMN `is_verified` LowCardinality(String) DEFAULT 'u';
+
+ALTER TABLE ooni.fastpath ADD COLUMN IF NOT EXISTS `wc_x_flags` Nullable(UInt16);
