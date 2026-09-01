@@ -7,6 +7,7 @@ locals {
   short_prefix = "oo${substr(var.service_name, 0, 3)}"
 }
 
+
 resource "aws_iam_role" "oonith_service_task" {
   name = "${local.name}-task-role"
 
@@ -163,7 +164,7 @@ resource "aws_alb_target_group" "oonith_service_direct" {
 # }
 
 resource "aws_alb" "oonith_service" {
-  name            = local.name
+  name_prefix     = "ooth"
   subnets         = var.public_subnet_ids
   security_groups = var.oonith_service_security_groups
 
@@ -187,15 +188,64 @@ resource "aws_alb_listener" "oonith_service_http" {
   tags = var.tags
 }
 
+module "oonith_nginx_cache" {
+  source = "../nginx_reverseproxy"
+
+  vpc_id        = var.vpc_id
+  subnet_ids    = var.public_subnet_ids
+  key_name      = var.key_name
+  instance_type = "t2.micro"
+  tags          = var.tags
+
+  name                     = "oonith-nginx-cache"
+  proxy_pass_url           = "http://${aws_alb.oonith_service.dns_name}/"
+  nginx_extra_path_config  = <<EOT
+      proxy_cache thcache;
+      proxy_cache_min_uses 1;
+      proxy_cache_lock on;
+      proxy_cache_lock_timeout 30;
+      proxy_cache_lock_age 30;
+      proxy_cache_use_stale error timeout invalid_header updating;
+      # Cache POST without headers set by the test helper!
+      proxy_cache_methods POST;
+      proxy_cache_key "\$request_uri|\$request_body";
+      proxy_cache_valid 200 10m;
+      proxy_cache_valid any 0;
+      add_header X-Cache-Status \$upstream_cache_status;
+      EOT
+  nginx_extra_nginx_config = "proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=thcache:100M max_size=5g inactive=24h use_temp_path=off;"
+}
+
+resource "aws_alb" "front_end" {
+  name_prefix     = "front"
+  subnets         = var.public_subnet_ids
+  security_groups = var.oonith_service_security_groups
+
+  tags = var.tags
+}
+
+resource "aws_alb_listener" "front_end_http" {
+  load_balancer_arn = aws_alb.front_end.id
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    target_group_arn = module.oonith_nginx_cache.alb_target_group_id
+    type             = "forward"
+  }
+
+  tags = var.tags
+}
+
 resource "aws_alb_listener" "front_end_https" {
-  load_balancer_arn = aws_alb.oonith_service.id
+  load_balancer_arn = aws_alb.front_end.id
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-2016-08"
   certificate_arn   = aws_acm_certificate.oonith_service.arn
 
   default_action {
-    target_group_arn = aws_alb_target_group.oonith_service_direct.id
+    target_group_arn = module.oonith_nginx_cache.alb_target_group_id
     type             = "forward"
   }
 
@@ -208,8 +258,8 @@ resource "aws_route53_record" "oonith_service" {
   type    = "A"
 
   alias {
-    name                   = aws_alb.oonith_service.dns_name
-    zone_id                = aws_alb.oonith_service.zone_id
+    name                   = aws_alb.front_end.dns_name
+    zone_id                = aws_alb.front_end.zone_id
     evaluate_target_health = true
   }
 }
@@ -262,8 +312,8 @@ resource "aws_route53_record" "oonith_service_alias" {
   type    = "A"
 
   alias {
-    name                   = aws_alb.oonith_service.dns_name
-    zone_id                = aws_alb.oonith_service.zone_id
+    name                   = aws_alb.front_end.dns_name
+    zone_id                = aws_alb.front_end.zone_id
     evaluate_target_health = true
   }
 }
