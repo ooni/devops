@@ -1,13 +1,12 @@
 ---
 - name: Deploy notebook host
-  hosts: notebook.ooni.org
+  hosts: notebook1.htz-fsn.prod.ooni.nu
   become: true
   tags:
     - notebook
   vars:
     notebook_domain: "notebook.ooni.org"
-    ssl_domains:
-      - "{{ inventory_hostname }}"
+    ssl_domains: "{{ hostvars[inventory_hostname].ssl_domains | default([inventory_hostname]) }}"
   roles:
     - nginx
     - dehydrated
