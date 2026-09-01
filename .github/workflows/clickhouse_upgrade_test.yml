@@ -1,0 +1,395 @@
+# Runs the ClickHouse cluster upgrade test (scripts/clickhouse-upgrade-test/)
+# against a throwaway 3-node cluster shaped like production's oonidata_cluster.
+#
+# Each hop / node-upgrade is its own job step (via ci_step.py) rather than one
+# opaque "run the whole thing" step, so a failure localizes to exactly which
+# version transition broke, with its own checkmark and log in the GitHub UI.
+#
+# See scripts/clickhouse-upgrade-test/README.md and sql/001_schema.sql for
+# the full writeup of why the upgrade path is staged through LTS releases
+# instead of jumping straight to latest.
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Which upgrade path(s) to run"
+        type: choice
+        options:
+          - both
+          - staged
+          - direct
+          - real-data
+          - all
+        default: both
+  pull_request:
+    paths:
+      - "scripts/clickhouse-upgrade-test/**"
+      - "ansible/group_vars/clickhouse/vars.yml"
+      - ".github/workflows/clickhouse_upgrade_test.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/clickhouse-upgrade-test/**"
+      - "ansible/group_vars/clickhouse/vars.yml"
+
+jobs:
+  # Recommended path: 24.8.6.70 -> 25.3.14.14 -> 25.8.29.51 -> 26.3.17.110 ->
+  # 26.7.3.19, one LTS hop at a time, one node at a time within each hop.
+  # This is the upgrade path OONI should actually follow.
+  staged-upgrade:
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.scenario == 'both' || github.event.inputs.scenario == 'staged'
+    runs-on: ubuntu-latest
+    # Bumped from 60 -> 90: the bisection hops (see harness/versions.py) add
+    # 4 more full hops (16 more steps + 4 new image pulls), so the old
+    # budget got tighter even in the all-pass case.
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: scripts/clickhouse-upgrade-test
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fails loudly if harness/versions.py is edited without updating the
+      # hardcoded step list below (or vice versa) -- the two have no other
+      # link between them, so silent drift would otherwise just quietly test
+      # the wrong path.
+      - name: Sanity-check version ladder matches harness/versions.py
+        run: |
+          python3 - <<'EOF'
+          from harness.versions import BASE_VERSION, LATEST_VERSION, LTS_HOPS
+          # 25.4.13.22 .. 25.7.8.71 are bisection steps inserted between the
+          # 25.3 and 25.8 LTS releases -- see harness/versions.py's module
+          # docstring for why (a real mark-file-format incompatibility hit
+          # partway through that hop in ooni/devops#477 CI run 32044578317).
+          expected_hops = [
+              "25.3.14.14",
+              "25.4.13.22",
+              "25.5.11.15",
+              "25.6.13.41",
+              "25.7.8.71",
+              "25.8.29.51",
+              "26.3.17.110",
+              "26.7.3.19",
+          ]
+          actual_hops = [v for v, _ in LTS_HOPS[1:]]
+          assert BASE_VERSION == "24.8.6.70", (
+              f"harness/versions.py BASE_VERSION is now {BASE_VERSION!r} -- "
+              "update this workflow's steps (and the assertions here) to match"
+          )
+          assert LATEST_VERSION == "26.7.3.19", (
+              f"harness/versions.py LATEST_VERSION is now {LATEST_VERSION!r} -- "
+              "update this workflow's steps (and the assertions here) to match"
+          )
+          assert actual_hops == expected_hops, (
+              f"harness/versions.py LTS_HOPS is now {actual_hops} -- "
+              "update this workflow's steps (and the assertions here) to match"
+          )
+          print("OK: workflow version ladder matches harness/versions.py")
+          EOF
+
+      - name: Validate docker-compose.yml
+        run: docker compose config
+
+      - name: Set up cluster at 24.8.6.70 (current production version) and load schema + seed data
+        run: python3 ci_step.py setup --base-version 24.8.6.70 --label setup
+
+      # --- Hop 1/8: 24.8.6.70 -> 25.3.14.14 (LTS) ---
+      - name: "Hop 1/8 (-> 25.3.14.14): upgrade ch1"
+        run: python3 ci_step.py upgrade-node --node ch1 --version 25.3.14.14 --label hop1-ch1
+        continue-on-error: true
+      - name: "Hop 1/8 (-> 25.3.14.14): upgrade ch2"
+        run: python3 ci_step.py upgrade-node --node ch2 --version 25.3.14.14 --label hop1-ch2
+        continue-on-error: true
+      - name: "Hop 1/8 (-> 25.3.14.14): upgrade ch3"
+        run: python3 ci_step.py upgrade-node --node ch3 --version 25.3.14.14 --label hop1-ch3
+        continue-on-error: true
+      - name: "Hop 1/8 (-> 25.3.14.14): verify ON CLUSTER DDL"
+        run: python3 ci_step.py verify-ddl --version 25.3.14.14 --label hop1-verify-ddl
+        continue-on-error: true
+
+      # --- Hops 2-5/8: bisection steps through the monthly (non-LTS) stable
+      # releases between 25.3 and 25.8, inserted to pin down exactly which
+      # release introduces the "Unknown mark file extension" incompatibility
+      # hit in ooni/devops#477 CI run 32044578317 (see harness/versions.py's
+      # module docstring for the full writeup and root cause). Whichever of
+      # these is the first to fail localizes the change to one month's worth
+      # of ClickHouse commits instead of the whole 25.3-25.8 span. ---
+      - name: "Hop 2/8 (-> 25.4.13.22): upgrade ch1"
+        run: python3 ci_step.py upgrade-node --node ch1 --version 25.4.13.22 --label hop2-ch1
+        continue-on-error: true
+      - name: "Hop 2/8 (-> 25.4.13.22): upgrade ch2"
+        run: python3 ci_step.py upgrade-node --node ch2 --version 25.4.13.22 --label hop2-ch2
+        continue-on-error: true
+      - name: "Hop 2/8 (-> 25.4.13.22): upgrade ch3"
+        run: python3 ci_step.py upgrade-node --node ch3 --version 25.4.13.22 --label hop2-ch3
+        continue-on-error: true
+      - name: "Hop 2/8 (-> 25.4.13.22): verify ON CLUSTER DDL"
+        run: python3 ci_step.py verify-ddl --version 25.4.13.22 --label hop2-verify-ddl
+        continue-on-error: true
+
+      - name: "Hop 3/8 (-> 25.5.11.15): upgrade ch1"
+        run: python3 ci_step.py upgrade-node --node ch1 --version 25.5.11.15 --label hop3-ch1
+        continue-on-error: true
+      - name: "Hop 3/8 (-> 25.5.11.15): upgrade ch2"
+        run: python3 ci_step.py upgrade-node --node ch2 --version 25.5.11.15 --label hop3-ch2
+        continue-on-error: true
+      - name: "Hop 3/8 (-> 25.5.11.15): upgrade ch3"
+        run: python3 ci_step.py upgrade-node --node ch3 --version 25.5.11.15 --label hop3-ch3
+        continue-on-error: true
+      - name: "Hop 3/8 (-> 25.5.11.15): verify ON CLUSTER DDL"
+        run: python3 ci_step.py verify-ddl --version 25.5.11.15 --label hop3-verify-ddl
+        continue-on-error: true
+
+      - name: "Hop 4/8 (-> 25.6.13.41): upgrade ch1"
+        run: python3 ci_step.py upgrade-node --node ch1 --version 25.6.13.41 --label hop4-ch1
+        continue-on-error: true
+      - name: "Hop 4/8 (-> 25.6.13.41): upgrade ch2"
+        run: python3 ci_step.py upgrade-node --node ch2 --version 25.6.13.41 --label hop4-ch2
+        continue-on-error: true
+      - name: "Hop 4/8 (-> 25.6.13.41): upgrade ch3"
+        run: python3 ci_step.py upgrade-node --node ch3 --version 25.6.13.41 --label hop4-ch3
+        continue-on-error: true
+      - name: "Hop 4/8 (-> 25.6.13.41): verify ON CLUSTER DDL"
+        run: python3 ci_step.py verify-ddl --version 25.6.13.41 --label hop4-verify-ddl
+        continue-on-error: true
+
+      - name: "Hop 5/8 (-> 25.7.8.71): upgrade ch1"
+        run: python3 ci_step.py upgrade-node --node ch1 --version 25.7.8.71 --label hop5-ch1
+        continue-on-error: true
+      - name: "Hop 5/8 (-> 25.7.8.71): upgrade ch2"
+        run: python3 ci_step.py upgrade-node --node ch2 --version 25.7.8.71 --label hop5-ch2
+        continue-on-error: true
+      - name: "Hop 5/8 (-> 25.7.8.71): upgrade ch3"
+        run: python3 ci_step.py upgrade-node --node ch3 --version 25.7.8.71 --label hop5-ch3
+        continue-on-error: true
+      - name: "Hop 5/8 (-> 25.7.8.71): verify ON CLUSTER DDL"
+        run: python3 ci_step.py verify-ddl --version 25.7.8.71 --label hop5-verify-ddl
+        continue-on-error: true
+
+      # --- Hop 6/8: 25.7.8.71 -> 25.8.29.51 (LTS) ---
+      - name: "Hop 6/8 (-> 25.8.29.51): upgrade ch1"
+        run: python3 ci_step.py upgrade-node --node ch1 --version 25.8.29.51 --label hop6-ch1
+        continue-on-error: true
+      - name: "Hop 6/8 (-> 25.8.29.51): upgrade ch2"
+        run: python3 ci_step.py upgrade-node --node ch2 --version 25.8.29.51 --label hop6-ch2
+        continue-on-error: true
+      - name: "Hop 6/8 (-> 25.8.29.51): upgrade ch3"
+        run: python3 ci_step.py upgrade-node --node ch3 --version 25.8.29.51 --label hop6-ch3
+        continue-on-error: true
+      - name: "Hop 6/8 (-> 25.8.29.51): verify ON CLUSTER DDL"
+        run: python3 ci_step.py verify-ddl --version 25.8.29.51 --label hop6-verify-ddl
+        continue-on-error: true
+
+      # --- Hop 7/8: 25.8.29.51 -> 26.3.17.110 (LTS) ---
+      - name: "Hop 7/8 (-> 26.3.17.110): upgrade ch1"
+        run: python3 ci_step.py upgrade-node --node ch1 --version 26.3.17.110 --label hop7-ch1
+        continue-on-error: true
+      - name: "Hop 7/8 (-> 26.3.17.110): upgrade ch2"
+        run: python3 ci_step.py upgrade-node --node ch2 --version 26.3.17.110 --label hop7-ch2
+        continue-on-error: true
+      - name: "Hop 7/8 (-> 26.3.17.110): upgrade ch3"
+        run: python3 ci_step.py upgrade-node --node ch3 --version 26.3.17.110 --label hop7-ch3
+        continue-on-error: true
+      - name: "Hop 7/8 (-> 26.3.17.110): verify ON CLUSTER DDL"
+        run: python3 ci_step.py verify-ddl --version 26.3.17.110 --label hop7-verify-ddl
+        continue-on-error: true
+
+      # --- Hop 8/8: 26.3.17.110 -> 26.7.3.19 (latest stable) ---
+      - name: "Hop 8/8 (-> 26.7.3.19): upgrade ch1"
+        run: python3 ci_step.py upgrade-node --node ch1 --version 26.7.3.19 --label hop8-ch1
+        continue-on-error: true
+      - name: "Hop 8/8 (-> 26.7.3.19): upgrade ch2"
+        run: python3 ci_step.py upgrade-node --node ch2 --version 26.7.3.19 --label hop8-ch2
+        continue-on-error: true
+      - name: "Hop 8/8 (-> 26.7.3.19): upgrade ch3"
+        run: python3 ci_step.py upgrade-node --node ch3 --version 26.7.3.19 --label hop8-ch3
+        continue-on-error: true
+      - name: "Hop 8/8 (-> 26.7.3.19): verify ON CLUSTER DDL"
+        run: python3 ci_step.py verify-ddl --version 26.7.3.19 --label hop8-verify-ddl
+        continue-on-error: true
+
+      - name: Generate report
+        if: always()
+        run: python3 ci_step.py report
+
+      - name: Upload report + per-step results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clickhouse-staged-upgrade-report
+          path: scripts/clickhouse-upgrade-test/results/
+          retention-days: 30
+
+      - name: Tear down cluster
+        if: always()
+        run: python3 ci_step.py teardown
+
+  # Real-data end-to-end scenario (ooni/data#437 follow-up, ooni/data#160):
+  # does the actual OONI ingestion pipeline -- real measurements, downloaded
+  # and submitted through fastpath/oonipipeline, then queried through the
+  # real api-oonimeasurements service -- still work after each hop of
+  # PRODUCTION_HOPS? Separate from staged-upgrade above, which uses fast
+  # synthetic seed data to check ClickHouse's own replication mechanics
+  # across every bisection waypoint; this one is slower, has a real
+  # external git + network dependency, and walks the actual 4-hop
+  # production runbook rather than every diagnostic waypoint. See
+  # harness/real_data.py and README.md's "real-data-upgrade" section for
+  # the full design (load real data once, re-verify integrity + the real
+  # pytest suite at every hop).
+  #
+  # Deliberately NOT run on pull_request (unlike staged-upgrade /
+  # direct-jump-upgrade above): it checks out an unmerged external branch
+  # (ooni/data's add_end_to_end_tests, ooni/data#160) this repo doesn't
+  # control, plus does real network downloads of OONI measurement data --
+  # a flaky/slow dependency there shouldn't block unrelated PRs to this
+  # repo. Runs on push to main (when these paths change) and on-demand via
+  # workflow_dispatch (scenario: real-data or all) instead.
+  real-data-upgrade:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.scenario == 'all' || github.event.inputs.scenario == 'real-data'))
+    runs-on: ubuntu-latest
+    # Real network download of OONI measurement data + oonipipeline/fastpath
+    # processing (once), plus 4 hops x (3 node upgrades + an integrity
+    # re-check + a full pytest run against the real API), all run inside one
+    # zero-downtime-upgrade step now (see harness/availability.py) so a
+    # single background canary thread can keep issuing reads/writes across
+    # every hop without pausing -- substantially slower than
+    # staged-upgrade's synthetic-data hops.
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: scripts/clickhouse-upgrade-test
+    steps:
+      - uses: actions/checkout@v4
+
+      # ooni/data#160 (branch add_end_to_end_tests) is still an open,
+      # unmerged PR as of this writing -- see docker-compose.real-data.yml's
+      # header comment for why this pins to the branch instead of main.
+      # Update this ref once #160 merges.
+      - name: Checkout ooni/data (add_end_to_end_tests branch)
+        uses: actions/checkout@v4
+        with:
+          repository: ooni/data
+          ref: add_end_to_end_tests
+          path: external/ooni-data
+
+      - name: Sanity-check hop ladder matches harness/versions.py PRODUCTION_HOPS
+        run: |
+          python3 - <<'EOF'
+          from harness.versions import PRODUCTION_HOPS
+          expected = [
+              "24.8.6.70",
+              "25.3.14.14",
+              "25.8.29.51",
+              "26.3.17.110",
+              "26.7.3.19",
+          ]
+          actual = [v for v, _ in PRODUCTION_HOPS]
+          assert actual == expected, (
+              f"harness/versions.py PRODUCTION_HOPS is now {actual} -- "
+              "update this workflow's steps (and the assertions here) to match"
+          )
+          print("OK: workflow hop ladder matches harness/versions.py PRODUCTION_HOPS")
+          EOF
+
+      - name: Validate docker-compose.yml + docker-compose.real-data.yml
+        run: docker compose -f docker-compose.yml -f docker-compose.real-data.yml config
+
+      - name: Set up cluster at 24.8.6.70 (schema only -- no synthetic seed data)
+        run: python3 ci_step.py setup-real-data --base-version 24.8.6.70 --label setup-real-data
+
+      - name: Load real OONI data once (oonidata sync + oonipipeline + fastpath)
+        run: python3 ci_step.py load-real-data --label load-real-data
+
+      - name: Take golden snapshot (row counts + checksums, all 3 nodes must agree)
+        run: python3 ci_step.py golden-snapshot --label golden-snapshot
+
+      - name: Sanity-check ooni/data's pytest suite passes at 24.8.6.70 before any upgrade
+        run: python3 ci_step.py verify-e2e --label base-verify-e2e
+
+      # --- All 4 remaining PRODUCTION_HOPS hops, back-to-back, with a
+      # continuous read/write canary running underneath the whole time --
+      # see harness/availability.py. This replaces the four separate
+      # real-data-hop steps that used to run here (24.8.6.70 -> 25.3.14.14
+      # -> 25.8.29.51 -> 26.3.17.110 -> 26.7.3.19, each its own step): the
+      # per-hop integrity/pytest checks those did are still done here, once
+      # per hop, but they can no longer be split across separate GitHub
+      # Actions steps, because the whole point is a single background
+      # canary thread that keeps issuing reads/writes across ALL of them
+      # without ever stopping -- splitting into per-hop steps would mean
+      # restarting (and re-justifying the continuity of) the canary between
+      # every hop, which defeats the purpose. Per-hop failures still don't
+      # abort this step early (same as before): each node upgrade inside
+      # run_zero_downtime_upgrade() is caught and recorded rather than
+      # raised, so e.g. hop2/hop3's expected trailing-node errors (see
+      # harness/versions.py's "self-heals once the lagging node catches up"
+      # section) don't stop the remaining hops or the canary from running to
+      # completion -- only the final report step's exit code actually fails
+      # the job if something never cleared.
+      - name: "Zero-downtime upgrade proof: all 4 remaining PRODUCTION_HOPS hops, continuous read/write canary throughout"
+        run: python3 ci_step.py zero-downtime-upgrade --label zero-downtime-upgrade
+        continue-on-error: true
+
+      - name: Generate report
+        if: always()
+        run: python3 ci_step.py report
+
+      - name: Upload report + per-step results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clickhouse-real-data-upgrade-report
+          path: scripts/clickhouse-upgrade-test/results/
+          retention-days: 30
+
+      - name: Tear down cluster + real-data stack
+        if: always()
+        run: python3 ci_step.py teardown-real-data
+
+  # Naive path: straight from 24.8.6.70 to 26.7.3.19, node by node, skipping
+  # every intermediate LTS release. Expected to demonstrate ClickHouse's own
+  # documented ~1 year mixed-version compatibility limit, so this job is
+  # allowed to fail without failing the whole workflow (continue-on-error) --
+  # it's diagnostic/documentary, not a gate.
+  direct-jump-upgrade:
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.scenario == 'both' || github.event.inputs.scenario == 'direct'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: scripts/clickhouse-upgrade-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config
+
+      - name: Set up cluster at 24.8.6.70 (current production version) and load schema + seed data
+        run: python3 ci_step.py setup --base-version 24.8.6.70 --label setup
+
+      - name: "Direct jump (-> 26.7.3.19, skips all LTS hops): upgrade ch1"
+        run: python3 ci_step.py upgrade-node --node ch1 --version 26.7.3.19 --label direct-ch1
+        continue-on-error: true
+      - name: "Direct jump (-> 26.7.3.19, skips all LTS hops): upgrade ch2"
+        run: python3 ci_step.py upgrade-node --node ch2 --version 26.7.3.19 --label direct-ch2
+        continue-on-error: true
+      - name: "Direct jump (-> 26.7.3.19, skips all LTS hops): upgrade ch3"
+        run: python3 ci_step.py upgrade-node --node ch3 --version 26.7.3.19 --label direct-ch3
+        continue-on-error: true
+
+      - name: Generate report
+        if: always()
+        run: python3 ci_step.py report
+
+      - name: Upload report + per-step results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clickhouse-direct-jump-report
+          path: scripts/clickhouse-upgrade-test/results/
+          retention-days: 30
+
+      - name: Tear down cluster
+        if: always()
+        run: python3 ci_step.py teardown

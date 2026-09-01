@@ -1,0 +1,4 @@
+# Downloaded real OONI measurements (oonidata sync's --output-dir) --
+# fetched fresh every CI run, never committed.
+*
+!.gitignore
