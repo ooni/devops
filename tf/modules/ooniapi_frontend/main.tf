@@ -579,3 +579,115 @@ resource "aws_lb_listener_rule" "ooniapi_testlists_rule" {
     }
   }
 }
+
+resource "aws_lb_listener_rule" "ooniapi_private_api_rule_1" {
+  # hotfix: to allow us to deploy the frontend without the measurements service
+  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 145
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
+  }
+  condition {
+    path_pattern {
+      values = [
+        "/api/_/asn_by_month",
+        "/api/_/countries_by_month",
+        "/api/_/test_names",
+        "/api/_/countries",
+        "/api/_/check_report_id",
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_private_api_rule_2" {
+  # hotfix: to allow us to deploy the frontend without the measurements service
+  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 146
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
+  }
+  condition {
+    path_pattern {
+      values = [
+        "/api/_/website_networks",
+        "/api/_/vanilla_tor_stats",
+        "/api/_/network_stats",
+        "/api/_/global_overview",
+        "/api/_/global_overview_by_month",
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_private_api_rule_3" {
+  # hotfix: to allow us to deploy the frontend without the measurements service
+  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 147
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
+  }
+  condition {
+    path_pattern {
+      values = [
+        "/api/_/circumvention_stats_by_country",
+        "/api/_/circumvention_runtime_stats",
+        "/api/_/asnmeta",
+        "/api/_/networks",
+        "/api/_/domains",
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_private_api_rule_4" {
+  # hotfix: to allow us to deploy the frontend without the measurements service
+  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 148
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
+  }
+  condition {
+    path_pattern {
+      values = [
+        "/api/_/country_overview",
+        "/api/_/website_stats",
+        "/api/_/website_urls",
+        "/api/_/domain_metadata",
+        "/api/_/im_networks",
+      ]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_private_api_rule_5" {
+  # hotfix: to allow us to deploy the frontend without the measurements service
+  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 149
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
+  }
+  condition {
+    path_pattern {
+      values = [
+        "/api/_/im_stats",
+        "/api/_/test_coverage",
+      ]
+    }
+  }
+}
