@@ -966,6 +966,56 @@ module "ooniapi_ooniprobe" {
   )
 }
 
+# Legacy ooniprobe service, used  to serve older probes. Identified by the
+# X-Protocol-Version header that specifies the anonymous credentials protocol
+# version.
+module "ooniapi_ooniprobe_legacy" {
+  source = "../../modules/ooniapi_service"
+
+  vpc_id = module.network.vpc_id
+
+  service_name             = "ooniprobe-legacy"
+  default_docker_image_url = "ooni/api-ooniprobe:20260824-f2dac67a"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+  task_memory              = 1024
+
+  task_secrets = {
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
+    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_write_url.arn
+    ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
+  }
+
+  task_environment = {
+    # hardcoded IP for fastpath2.prod.prod.ooni.io
+    FASTPATH_URL          = "http://10.0.0.32:8472"
+    FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
+    FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    COLLECTOR_ID          = 4 # be sure this is different from dev
+    CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
+    TOR_TARGETS           = "tor_targets.json"
+    PSIPHON_CONFIG        = "psiphon_config.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
+  }
+
+  ooniapi_service_security_groups = [
+    module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling       = false
+  service_desired_count = 1
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-ooniprobe-legacy" }
+  )
+}
+
 ### Fastpath
 module "ooni_fastpath" {
   source = "../../modules/ooni_fastpath"
@@ -1534,6 +1584,7 @@ module "ooniapi_frontend" {
   ooniapi_oonirun_target_group_arn          = module.ooniapi_oonirun.alb_target_group_id
   ooniapi_ooniauth_target_group_arn         = module.ooniapi_ooniauth.alb_target_group_id
   ooniapi_ooniprobe_target_group_arn        = module.ooniapi_ooniprobe.alb_target_group_id
+  ooniapi_ooniprobe_legacy_target_group_arn = module.ooniapi_ooniprobe_legacy.alb_target_group_id
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
   ooniapi_testlists_target_group_arn        = module.ooniapi_testlists.alb_target_group_id
