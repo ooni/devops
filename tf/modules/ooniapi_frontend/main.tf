@@ -377,22 +377,79 @@ resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
   }
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3" {
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3_legacy_version" {
   listener_arn = aws_alb_listener.ooniapi_listener_https.arn
   priority     = 122
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_ooniprobe_legacy_target_group_arn
+  }
+
+  condition {
+    path_pattern {
+      values = [
+        "/api/v1/manifest*",
+        "/api/v1/submit_measurement*",
+        "/api/v1/sign_credential*"
+      ]
+    }
+  }
+
+  condition {
+    http_header {
+      http_header_name = "X-Protocol-Version"
+      values           = ["0.1.0"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3_current_version" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 124
 
   action {
     type             = "forward"
     target_group_arn = var.ooniapi_ooniprobe_target_group_arn
   }
 
-  # anonymous credentials
   condition {
     path_pattern {
       values = [
         "/api/v1/manifest*",
-        "/api/v1/sign_credential*",
-        "/api/v1/submit_measurement*"
+        "/api/v1/submit_measurement*",
+        "/api/v1/sign_credential*"
+      ]
+    }
+  }
+
+  # matches any value, but only when the header is present
+  condition {
+    http_header {
+      http_header_name = "X-Protocol-Version"
+      values           = ["*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3_no_version" {
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 126
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_ooniprobe_legacy_target_group_arn
+  }
+
+  # No X-Protocol-Version header at all: rules 122/124 above already
+  # matched every request that does carry the header, so anything left
+  # here is header-less and should go to the legacy service.
+  condition {
+    path_pattern {
+      values = [
+        "/api/v1/manifest*",
+        "/api/v1/submit_measurement*",
+        "/api/v1/sign_credential*"
       ]
     }
   }
