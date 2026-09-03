@@ -658,7 +658,7 @@ module "ooniapi_ooniprobe_legacy" {
   source = "../../modules/ooniapi_service"
 
   # First run should be set on first run to bootstrap the task definition
-  first_run = true
+  # first_run = true
 
   task_memory = 256
 
