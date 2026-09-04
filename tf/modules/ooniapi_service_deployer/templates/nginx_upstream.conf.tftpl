@@ -1,0 +1,4 @@
+upstream ${service_name} {
+    server 127.0.0.1:${host_port_a} __STATE_A__;
+    server 127.0.0.1:${host_port_b} __STATE_B__;
+}
