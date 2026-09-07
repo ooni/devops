@@ -4,3 +4,4 @@ bucket_name: "ooni-data-eu-fra-test"
 # COLLECTOR ID SHOULD BE DIFFERENT BETWEEN EACH FASTPATH INSTANCE
 collector_id: "3"
 env: "dev"
+fastpath_image: "ooni/fastpath:20260903-7c51eb5d"
