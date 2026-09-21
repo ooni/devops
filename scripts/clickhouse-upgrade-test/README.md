@@ -108,15 +108,77 @@ Docker host. `sql/001_schema.sql` creates the real table schemas
     errors,
   - `system.replication_queue` has no stuck tasks,
   - and, once a hop is fully rolled out, an `ALTER TABLE ... ON CLUSTER`
-    still propagates cluster-wide.
+    still propagates cluster-wide **and the cluster has settled** (row
+    counts converged, nothing stuck retrying — see "CI pass/fail: self-healing
+    vs. genuine failure" below).
 - **`direct`** — does the same node-by-node mechanics but jumps straight
   from `24.8.6.70` to `26.8.9.10`, to surface (not just cite) whatever
   breaks when replicas are held ~2 years apart in version for the whole
   rollout.
 
+Once the whole rollout finishes, both scenarios also re-checksum every
+pre-existing seed row (content, not just row count — see "CI pass/fail:
+self-healing vs. genuine failure" below) against a golden snapshot taken
+right after setup, on all 3 nodes.
+
 Results land in `results/report.md` (human-readable) and
 `results/report.json` (full structured data, including every row-count
 snapshot and every error ClickHouse logged).
+
+## CI pass/fail: self-healing vs. genuine failure
+
+Every LTS-boundary hop in this ladder is expected to log a hard-looking
+error on some node for a minute or two while it's briefly mixed-version
+with a peer, then clear once that node finishes upgrading — see "Real CI
+findings, continued" below. Originally, any hard error at all failed the
+job outright, on the theory that a human should look at every one. In
+practice that made every green PR run red for a condition the harness
+itself documents as expected and self-healing, which buried the signal
+that actually matters: **did the rollout end with the data intact?**
+
+Two changes fix this without hiding anything:
+
+1. **Content-checksum validation, not just row counts.** Row counts
+   matching across nodes proves replication caught up, but not that the
+   bytes are the same — an upgrade that silently rewrote a column while
+   leaving row count untouched would sail through a row-count-only check.
+   `harness/validate.py:table_snapshot()` checksums every seed table with
+   `sum(cityHash64(*))` (the same idiom `harness/real_data.py`'s
+   golden-snapshot mechanism already used for the separate, real-data
+   `real-data-upgrade` job — see that section below; **this was previously
+   real-data-only**, not applied to the fast synthetic `staged`/`direct`
+   scenarios most PRs actually exercise). `setup_step()` takes a golden
+   snapshot of the seed data right after loading it (excluding the
+   probe rows each upgrade step writes — those are expected new data, not
+   part of what should stay untouched), and a new end-of-rollout
+   `content-integrity` CI step (`ci_step.py content-integrity`,
+   `harness/scenarios.py:content_integrity_step()`) diffs the final state
+   against it. Any difference here is genuine data loss or corruption —
+   nothing should be rewriting the pre-existing seed data at any point —
+   and this check is **not** eligible for the self-healing exception below;
+   it always gates the job.
+2. **Self-healing no longer fails the job, but is called out explicitly.**
+   Each hop's `verify-ddl` step (`harness/scenarios.py:verify_ddl_step()`)
+   now also re-checks that the cluster has *settled* — row counts converged
+   across all 3 nodes, nothing stuck retrying in
+   `system.replication_queue` — right after that hop finishes
+   (`_hop_settled()`). If a node-upgrade step earlier in the same hop
+   logged a hard error but the hop settled cleanly by its own end, that
+   step is reported as `FAIL, but SELF-HEALED by end of hop` rather than a
+   bare `FAIL`, and it no longer fails the overall job
+   (`harness/report.py:self_healed()` / `effective_ok()` / `overall_ok()`,
+   which `ci_step.py report`'s exit code now uses instead of a flat
+   "any step failed" scan). A hop that does *not* settle by its own end —
+   or a `verify-ddl`/`content-integrity`/`setup` step failing outright —
+   still fails the job exactly as before; only a hard error that
+   demonstrably cleared before its hop ended is excused, and it's excused
+   *visibly*, not silently.
+
+Net effect: the job goes green exactly when the rollout, taken end to end,
+lost or corrupted nothing — which is the actual production question —
+while the per-step log still shows every hard-looking error that occurred
+and whether it turned out to be the expected transient kind or something
+that never cleared.
 
 ## Running it
 

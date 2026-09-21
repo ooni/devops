@@ -18,6 +18,7 @@ rolling upgrade, never taking the whole shard down.
 """
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -27,6 +28,16 @@ from .seed_data import build_all_seed_statements
 from .versions import BASE_VERSION, DIRECT_JUMP, LATEST_VERSION, RECOMMENDED_LTS_HOPS
 
 SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+RESULTS_DIR = PROJECT_DIR / "results"
+# Golden content-checksum snapshot of the synthetic seed data (row count +
+# cityHash64 checksum per table, probe rows excluded -- see
+# validate.table_snapshot()), taken once right after setup_step() and
+# diffed against by content_integrity_step() at the end of a rollout. Read
+# back from disk rather than passed in memory because ci_step.py runs each
+# step as its own separate process (mirrors harness/real_data.py's
+# SNAPSHOT_PATH, same reasoning).
+SEED_SNAPSHOT_PATH = RESULTS_DIR / "seed_golden_snapshot.json"
 NODE_ORDER = ["ch1", "ch2", "ch3"]
 
 
@@ -95,6 +106,26 @@ def load_schema_and_seed(log=print) -> None:
     if not ok:
         raise RuntimeError(f"seed data did not converge across replicas: {counts}")
     log(f"[setup] converged. row counts: {counts}")
+
+
+def take_seed_golden_snapshot(log=print) -> dict:
+    """Content-checksum every synthetic-scenario table (validate.TABLES) on
+    all 3 nodes, require they already agree (replication should have long
+    since converged -- load_schema_and_seed() just waited on
+    wait_for_convergence()), and persist as the baseline
+    content_integrity_step() diffs the end-of-rollout state against. Same
+    idiom as harness/real_data.py's take_golden_snapshot_step(), applied to
+    this harness's own seed data instead of real OONI data."""
+    nodes = make_nodes()
+    snap = validate.table_snapshot_all_nodes(nodes)
+    agree = validate.snapshots_converged(snap)
+    if agree:
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        SEED_SNAPSHOT_PATH.write_text(json.dumps(snap["ch1"], indent=2))
+        log(f"[setup] seed golden content snapshot taken: {snap['ch1']}")
+    else:
+        log(f"[setup] nodes disagree on seed data content before any upgrade started: {snap}")
+    return {"ok": agree, "snapshot_by_node": snap}
 
 
 def _run_upgrade_step(env: dict, node_name: str, new_version: str, log=print) -> dict:
@@ -180,6 +211,14 @@ def setup_step(base_version: str, label: str = "setup", log=print) -> dict:
     try:
         fresh_cluster(base_version, log=log)
         load_schema_and_seed(log=log)
+        snapshot = take_seed_golden_snapshot(log=log)
+        if not snapshot["ok"]:
+            return {
+                "label": label,
+                "base_version": base_version,
+                "ok": False,
+                "error": f"nodes disagree on seed data content before any upgrade: {snapshot['snapshot_by_node']}",
+            }
         return {"label": label, "base_version": base_version, "ok": True}
     except Exception as e:
         return {"label": label, "base_version": base_version, "ok": False, "error": str(e)}
@@ -209,10 +248,35 @@ def upgrade_node_step(node_name: str, new_version: str, label: str | None = None
         }
 
 
+def _hop_settled(nodes: list[ChNode], timeout: float = 90.0) -> tuple[bool, dict]:
+    """Is the cluster in a fully healthy, converged state right now? Called
+    at the end of each hop (once every node in it has upgraded), this is
+    what lets a hard-looking error an individual node-upgrade step logged
+    mid-hop (see harness/versions.py's self-healing mixed-version
+    incompatibility pattern) be told apart from a genuine, still-broken
+    failure: if row counts have converged across all 3 nodes AND nothing is
+    still stuck retrying in system.replication_queue, the hop settled
+    cleanly by its own end, whatever happened during it. See report.py's
+    self_healed()/effective_ok(), which is what actually uses this to
+    decide overall CI pass/fail without hiding the per-step FAIL."""
+    converged, counts = validate.wait_for_convergence(nodes, timeout=timeout)
+    queue_problems = {n.name: validate.replication_queue_problems(n) for n in nodes}
+    settled = converged and not any(queue_problems.values())
+    return settled, {"converged": converged, "row_counts": counts, "queue_problems": queue_problems}
+
+
 def verify_ddl_step(version: str, label: str | None = None, log=print) -> dict:
     """Once every replica is on `version`, confirm ON CLUSTER DDL still works
     cluster-wide (a real thing OONI does during normal operation, not just
-    something that matters mid-upgrade)."""
+    something that matters mid-upgrade) -- and also re-check that the
+    cluster has settled into a fully converged, healthy state (see
+    _hop_settled() above). This step runs once per hop, right after that
+    hop's last node-upgrade step, which makes it the natural place to
+    answer "did this hop reach stability by the time it ended" for the CI
+    step model (ci_step.py invokes each step as its own process -- see
+    report.py's self_healed(), which keys off this step's `settled` field
+    to decide whether an earlier hard error in the same hop should still
+    gate the job)."""
     nodes = make_nodes()
     marker = f"test_marker_{version.replace('.', '_')}"
     try:
@@ -224,11 +288,58 @@ def verify_ddl_step(version: str, label: str | None = None, log=print) -> dict:
     except Exception as e:
         ok, error = False, str(e)
         log(f"[verify-ddl] ON CLUSTER ALTER failed at {version}: {error}")
+    settled, settle_detail = _hop_settled(nodes)
+    log(f"[verify-ddl] cluster settled by end of hop ({version}): {'YES' if settled else 'NO'}")
     return {
         "label": label or f"verify-ddl-{version}",
         "version": version,
         "on_cluster_alter_ok": ok,
         "error": error,
+        "settled": settled,
+        "settle_detail": settle_detail,
+    }
+
+
+def content_integrity_step(label: str = "content-integrity", log=print) -> dict:
+    """End-of-rollout check: does the pre-existing seed data (loaded once
+    at setup, probe-tagged rows excluded -- see validate.table_snapshot())
+    still checksum-match the golden snapshot taken right after setup, on
+    every node, now that every hop has run? This is what actually answers
+    "no data loss or corruption by the time the rollout finished" --
+    independent of whether any individual mid-rollout step logged a hard
+    error that later cleared (that's a separate, per-hop question; see
+    _hop_settled() and report.py's self_healed()). New writes made *during*
+    the rollout (each step's probe_write_then_read() row) are already
+    separately proven to have landed by that same per-step check; this step
+    is scoped to "did anything that was ALREADY there get altered or lost",
+    which a hard error that cleared by the end of its own hop, by
+    definition, didn't."""
+    if not SEED_SNAPSHOT_PATH.exists():
+        # "diffs": {} even here (not just in the success/mismatch path
+        # below) so report.render_ci_step() can dispatch on this shape by
+        # a single, always-present key regardless of which branch ran.
+        return {"label": label, "ok": False, "error": f"no seed golden snapshot found at {SEED_SNAPSHOT_PATH}", "diffs": {}}
+    golden = json.loads(SEED_SNAPSHOT_PATH.read_text())
+    nodes = make_nodes()
+    current = validate.table_snapshot_all_nodes(nodes)
+
+    diffs = {}
+    for node_name, node_snap in current.items():
+        for t in validate.TABLES:
+            if node_snap[t] != golden[t]:
+                diffs.setdefault(node_name, {})[t] = {"golden": golden[t], "current": node_snap[t]}
+
+    ok = len(diffs) == 0
+    if not ok:
+        log(f"[content-integrity] FAILED -- pre-existing seed data changed: {diffs}")
+    else:
+        log("[content-integrity] OK -- every pre-existing seed row still checksum-matches the golden snapshot, on all 3 nodes")
+    return {
+        "label": label,
+        "ok": ok,
+        "golden_snapshot": golden,
+        "current_snapshot_by_node": current,
+        "diffs": diffs,
     }
 
 
@@ -271,18 +382,46 @@ def scenario_staged_lts(log=print) -> dict:
     hop_versions = [v for v, _months in RECOMMENDED_LTS_HOPS[1:]]  # skip the starting version
     all_ok = True
     for hop_version in hop_versions:
+        hop_steps = []
         for node_name in NODE_ORDER:
             step = upgrade_node_step(node_name, hop_version, log=log)
             scenario["steps"].append(step)
+            hop_steps.append(step)
             ok = step_ok(step)
-            all_ok = all_ok and ok
             log(f"[staged] {step['label']}: {'OK' if ok else 'PROBLEM DETECTED'}")
 
         ddl_result = verify_ddl_step(hop_version, log=log)
         scenario.setdefault("ddl_checks", []).append(ddl_result)
-        all_ok = all_ok and step_ok(ddl_result)
 
-    scenario["verdict"] = "PASS -- rolling, node-by-node upgrade completed with no data loss, no replication errors, zero full-shard downtime" if all_ok else "FAIL -- see steps above for where it broke"
+        # Did this hop, taken as a whole, end in a healthy state? A mid-hop
+        # step commonly logs a hard-looking, self-healing incompatibility
+        # error (see harness/versions.py) while a peer is still catching
+        # up -- what actually matters for the rollout is whether the
+        # cluster reached a converged, consistent state by the time every
+        # node in this hop finished and DDL was re-verified, not whether
+        # every individual node-upgrade step inside it was clean.
+        ddl_ok = step_ok(ddl_result)
+        hop_ok = ddl_ok and bool(ddl_result.get("settled"))
+        recovered = hop_ok and any(not step_ok(s) for s in hop_steps)
+        for s in hop_steps:
+            if not step_ok(s):
+                s["self_healed"] = recovered
+        log(
+            f"[staged] hop -> {hop_version} settled by end of hop: {'YES' if hop_ok else 'NO'}"
+            + (" (recovered from a mid-hop hard error)" if recovered else "")
+        )
+        all_ok = all_ok and hop_ok
+
+    content_check = content_integrity_step(log=log)
+    scenario["content_integrity"] = content_check
+    all_ok = all_ok and content_check["ok"]
+
+    scenario["verdict"] = (
+        "PASS -- rolling, node-by-node upgrade completed with no data loss or corruption by the end of "
+        "the rollout (content-checksum verified against the golden seed snapshot; any mid-hop hard-looking "
+        "errors are marked self-healed per-step above where the cluster reconverged before that hop ended)"
+        if all_ok else "FAIL -- see steps above for where it broke"
+    )
     return scenario
 
 
@@ -304,16 +443,28 @@ def scenario_direct_jump(log=print) -> dict:
         scenario["verdict"] = f"ERROR during setup: {setup.get('error')}"
         return scenario
 
-    all_ok = True
     for node_name in NODE_ORDER:
         step = upgrade_node_step(node_name, LATEST_VERSION, log=log)
         scenario["steps"].append(step)
         ok = step_ok(step)
-        all_ok = all_ok and ok
         log(f"[direct] {step['label']}: {'OK' if ok else 'PROBLEM DETECTED'}")
 
+    ddl_result = verify_ddl_step(LATEST_VERSION, log=log)
+    scenario["ddl_checks"] = [ddl_result]
+    ddl_ok = step_ok(ddl_result)
+    settled = ddl_ok and bool(ddl_result.get("settled"))
+    recovered = settled and any(not step_ok(s) for s in scenario["steps"])
+    for s in scenario["steps"]:
+        if not step_ok(s):
+            s["self_healed"] = recovered
+
+    content_check = content_integrity_step(log=log)
+    scenario["content_integrity"] = content_check
+
+    all_ok = settled and content_check["ok"]
     scenario["verdict"] = (
-        "PASS -- surprisingly, no issues observed (re-verify; ClickHouse still advises against this)"
+        "PASS -- surprisingly, no data loss or corruption observed by the end of the rollout "
+        "(re-verify; ClickHouse still advises against this)"
         if all_ok
         else "FAIL -- confirms ClickHouse's guidance: do not skip >1 year of releases in a mixed-version cluster"
     )

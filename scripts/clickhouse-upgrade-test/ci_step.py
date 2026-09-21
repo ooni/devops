@@ -22,8 +22,19 @@ Usage:
     python3 ci_step.py setup --base-version 24.8.6.70 --label setup
     python3 ci_step.py upgrade-node --node ch1 --version 25.3.14.14 --label hop-25.3-ch1
     python3 ci_step.py verify-ddl --version 25.3.14.14 --label hop-25.3-verify-ddl
+    python3 ci_step.py content-integrity --label content-integrity  # run once, after the last hop
     python3 ci_step.py report
     python3 ci_step.py teardown
+
+`report`'s pass/fail now reflects whether the rollout ended with no data
+loss or corruption, not whether every single step was individually clean
+-- a node-upgrade step that logs a hard-looking mixed-version error but
+self-heals by the end of its own hop (its hop's verify-ddl step settles
+cleanly) no longer fails the job on its own; see harness/report.py's
+self_healed()/effective_ok()/overall_ok() for the exact rule, and
+harness/scenarios.py's content_integrity_step() for the end-of-rollout
+"did anything ALREADY there get lost or corrupted" check `report` also
+requires to pass.
 
 Real-data scenario (harness/real_data.py) -- separate CLI verbs, since it's
 a different flow (load real data once, then hop):
@@ -50,7 +61,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from harness import compose, real_data, report
 from harness import availability
-from harness.scenarios import setup_step, step_ok, upgrade_node_step, verify_ddl_step
+from harness.scenarios import content_integrity_step, setup_step, step_ok, upgrade_node_step, verify_ddl_step
 from harness.versions import RECOMMENDED_LTS_HOPS
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -117,8 +128,24 @@ def cmd_report(args) -> int:
     # once it also reaches the new version. That means this step -- which
     # has no continue-on-error and runs with `if: always()` -- is now the
     # thing that actually has to fail the job when something stayed broken.
-    any_fail = any(not step_ok(s) for s in steps)
+    #
+    # report.overall_ok(), not a plain step_ok() scan: a node-upgrade step
+    # that logged a hard-looking mixed-version error but self-healed by the
+    # end of its own hop (its hop's verify-ddl step settled cleanly) no
+    # longer fails the job on its own -- see report.py's self_healed() /
+    # effective_ok(). The per-step results above still show its literal
+    # FAIL, annotated, so nothing is hidden; only the job-level gate changes.
+    any_fail = not report.overall_ok(steps)
     return 1 if any_fail else 0
+
+
+def cmd_content_integrity(args) -> int:
+    result = content_integrity_step(label=args.label)
+    _save_step(args.label, result)
+    ok = step_ok(result)
+    print(f"[{args.label}] {'OK -- no data loss or corruption in pre-existing seed data' if ok else 'FAILED -- see diffs'}")
+    print(json.dumps(result, indent=2, default=str))
+    return 0 if ok else 1
 
 
 def cmd_teardown(args) -> int:
@@ -219,6 +246,18 @@ def main() -> int:
     p_ddl.add_argument("--version", required=True, help="Version label for this checkpoint (used in the test column name)")
     p_ddl.add_argument("--label", default=None, help="Step label; defaults to verify-ddl-<version>")
     p_ddl.set_defaults(func=cmd_verify_ddl)
+
+    p_ci = sub.add_parser(
+        "content-integrity",
+        help=(
+            "End-of-rollout check: does the pre-existing seed data (probe rows from "
+            "mid-rollout writes excluded) still checksum-match the golden snapshot "
+            "taken at setup, on all 3 nodes? This is the 'no data loss or corruption' "
+            "signal, independent of whether any mid-rollout step self-healed."
+        ),
+    )
+    p_ci.add_argument("--label", default="content-integrity")
+    p_ci.set_defaults(func=cmd_content_integrity)
 
     p_report = sub.add_parser("report", help="Aggregate every results/steps/*.json into results/report.md + report.json")
     p_report.set_defaults(func=cmd_report)

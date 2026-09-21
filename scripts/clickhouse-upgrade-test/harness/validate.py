@@ -78,6 +78,69 @@ def counts_converged(counts_by_node: dict[str, dict[str, int | None]]) -> bool:
     return True
 
 
+# --- content-level (not just row-count) integrity -------------------------
+#
+# Row counts matching across nodes proves replication caught up, but not
+# that the bytes are actually the same -- e.g. an upgrade that silently
+# rewrote a column's serialized values while leaving row count untouched
+# would sail through counts_converged(). harness/real_data.py's
+# golden-snapshot mechanism already checksums real-data tables the same
+# way for the separate real-data-upgrade job; table_snapshot() below is
+# the same idiom (`sum(cityHash64(*))`, ClickHouse's own way to checksum a
+# whole table without listing columns by hand -- variadic + order-
+# independent, so a MergeTree re-merge triggered by an upgrade can't cause
+# a false mismatch just because row order changed) applied to this
+# harness's synthetic TABLES, for the fast staged/direct scenarios that
+# previously only ever checked row counts.
+#
+# citizenlab gets exactly one new row per upgrade step from
+# probe_write_then_read() below (domain `probe-<uuid>.example.test`) --
+# those are *expected* new writes made *during* the rollout, already
+# separately proven to replicate by that same probe's own read-back check.
+# They're excluded here so this checksum stays scoped to "did the
+# pre-existing seed data survive untouched", which is the question a
+# golden-snapshot-vs-final diff actually needs to answer; the probe
+# rows would otherwise make every snapshot after the first hop look like
+# a "mismatch" against the initial one for a completely expected reason.
+_PROBE_DOMAIN_FILTER = " WHERE domain NOT LIKE 'probe-%.example.test'"
+
+
+def table_snapshot(node: ChNode) -> dict[str, dict]:
+    """Row count + content checksum per table, citizenlab's probe-tagged
+    rows excluded (see module comment above)."""
+    out = {}
+    for t in TABLES:
+        where = _PROBE_DOMAIN_FILTER if t == "citizenlab" else ""
+        try:
+            row = node.query_rows(
+                f"SELECT count() AS cnt, sum(cityHash64(*)) AS checksum FROM ooni.{t}{where}"
+            )[0]
+            out[t] = {"row_count": int(row["cnt"]), "checksum": str(row["checksum"])}
+        except Exception as e:
+            out[t] = {"row_count": None, "checksum": None, "error": str(e)}
+    return out
+
+
+def table_snapshot_all_nodes(nodes: list[ChNode]) -> dict[str, dict]:
+    return {n.name: table_snapshot(n) for n in nodes}
+
+
+def snapshots_converged(snapshot_by_node: dict[str, dict]) -> bool:
+    """True if every table has the same (row_count, checksum) on every
+    node -- the content-level equivalent of counts_converged()."""
+    node_names = list(snapshot_by_node.keys())
+    if not node_names:
+        return False
+    for t in TABLES:
+        values = {
+            (snapshot_by_node[n][t].get("row_count"), snapshot_by_node[n][t].get("checksum"))
+            for n in node_names
+        }
+        if len(values) != 1 or (None, None) in values:
+            return False
+    return True
+
+
 def wait_for_convergence(nodes: list[ChNode], timeout: float = 120.0, interval: float = 3.0):
     """Poll row counts on all nodes until they match (replication caught up)."""
     deadline = time.time() + timeout
