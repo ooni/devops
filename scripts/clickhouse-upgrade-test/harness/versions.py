@@ -28,16 +28,17 @@ anything other than an LTS. LATEST_VERSION, RECOMMENDED_NOW, and the
 final RECOMMENDED_LTS_HOPS / AGGRESSIVE_SKIP_HOPS entries are updated below to
 land on 26.8.9.10 instead.
 
-**This means the final hop is untested.** Every finding in this docstring
-about 26.3.17.110 -> 26.7.3.19 (the old "hop8") is real and stands as
-written, but it's evidence about that specific transition, not about
-26.3.17.110 -> 26.8.9.10 -- a different target that may or may not carry
-the identical self-healing incompatibility, and that may have picked up
-others from whatever shipped across 26.4 through 26.8 that hasn't been
-looked at. Treat the retargeted final hop as unproven, not as "the same
-thing we already validated," until a real CI run covers it -- see
-"RETARGETED, continued" near the end of this docstring for what that
-means for RECOMMENDED_LTS_HOPS's proof status.
+**Update (2026-09-21): the final hop is now directly confirmed**, not
+just expected by analogy -- run 96404459255 (the first real CI run
+against this retargeted ladder) hit the same self-healing
+CHECKSUM_DOESNT_MATCH pattern at 26.3.17.110 -> 26.8.9.10 and watched it
+clear once the trailing node finished, same as the other two LTS
+boundaries. See "RETARGETED, continued" near the end of this docstring
+for the full result. (Every finding in this docstring about the old
+26.3.17.110 -> 26.7.3.19 "hop8" transition is still real and stands as
+written -- it's just evidence about a transition this ladder no longer
+takes, superseded by the direct confirmation of the transition that
+replaced it.)
 
 ClickHouse documents a ~1 year mixed-version compatibility window for
 replicated clusters (https://clickhouse.com/docs/operations/update): nodes
@@ -181,14 +182,12 @@ known. Each hop still stays comfortably under ClickHouse's ~1 year
 mixed-version window (5-7 months, including the retargeted final hop --
 26.3.17.110 to 26.8.9.10 is ~5 months).
 
-Operational rule for the hops that have each hit a real incompatibility
-at least once -- 25.3.14.14 -> 25.8.29.51 and 25.8.29.51 -> 26.3.17.110,
-both directly confirmed (see above), plus 26.3.17.110 -> 26.8.9.10 by
-inference from the pattern repeating at every LTS boundary tested so far,
-though not yet directly confirmed itself (see "RETARGETED, continued"
-below): upgrade all three nodes back-to-back in one sitting, the way CI
-does it, rather than spacing them out the way it's fine to do for every
-other hop.
+Operational rule for the three hops that have each hit a real
+incompatibility at least once -- 25.3.14.14 -> 25.8.29.51,
+25.8.29.51 -> 26.3.17.110, and 26.3.17.110 -> 26.8.9.10, all three now
+directly confirmed (see above and "RETARGETED, continued" below):
+upgrade all three nodes back-to-back in one sitting, the way CI does it,
+rather than spacing them out the way it's fine to do for every other hop.
 Expect the last node in any of those three hops to log hard-looking
 errors (NO_FILE_IN_DATA_PART / CORRUPTED_DATA / CHECKSUM_DOESNT_MATCH)
 for a minute or two right up until its own upgrade finishes -- that's
@@ -213,22 +212,53 @@ being the same (an old binary can't parse a new-format part, regardless
 of how old). This is exactly what moving the staged-upgrade CI job onto
 RECOMMENDED_LTS_HOPS (below) closes -- see that section.
 
---- RETARGETED, continued: what "fully proven" now requires -------------
+--- RETARGETED, continued: the new final hop is now directly confirmed ---
 
 The retarget from 26.7.3.19 to 26.8.9.10 (see the top of this docstring)
-reopens the equivalent gap for the *final* hop. Before this change,
-RECOMMENDED_LTS_HOPS's terminal transition (26.3.17.110 -> 26.7.3.19) had two
-direct data points (runs 32122682392 and 32134303759, both clean or
-self-healing) plus the 2026-09-21 reconfirmation (run 963814682581).
-26.3.17.110 -> 26.8.9.10 has zero -- it has never been run, in any form,
-bisected or otherwise. The pattern holding at every other LTS boundary
-tested so far (25.8.29.51, 26.3.17.110) is a reasonable basis for
-*expecting* it to also hold here, not for treating it as confirmed.
-Run staged-upgrade (and ideally aggressive-skip-upgrade, which now also
-lands on 26.8.9.10 -- see AGGRESSIVE_SKIP_HOPS below) at least once after
-this change lands, and update this section with the result, before
-describing RECOMMENDED_LTS_HOPS as fully proven the way the 26.7.3.19-terminated
-version of it briefly was.
+reopened the equivalent gap for the *final* hop: before this change,
+RECOMMENDED_LTS_HOPS's terminal transition (26.3.17.110 -> 26.7.3.19) had
+direct data points (runs 32122682392, 32134303759, and the 2026-09-21
+reconfirmation 963814682581), while 26.3.17.110 -> 26.8.9.10 had zero.
+
+**That gap is now closed.** The first real CI run against this retargeted
+ladder (2026-09-21, ooni/devops#477, run 96404459255, PR #477 merge ref
+da07bc0 -- the commit that applied this retarget) exercised all four
+RECOMMENDED_LTS_HOPS hops and confirmed the same self-healing pattern
+holds at every one of them, including the new final hop:
+
+- hop2 (25.3.14.14 -> 25.8.29.51): hop2-ch2 hit CHECKSUM_DOESNT_MATCH --
+  notably this run, unlike earlier ones, logged it on ch1 and ch2 (the two
+  already-upgraded nodes) as well as ch3 (588 occurrences, 5 stuck
+  replication-queue tasks on ch3), not just the trailing node. hop2-ch3
+  (ch3's own upgrade) passed clean immediately after -- same self-healing
+  outcome, just a wider blast radius on the intermediate step than
+  previously observed. Worth noting as a data point, not treating as a
+  new failure mode: the mechanism (old binary can't parse new-format
+  parts) doesn't care which node is asking.
+- hop3 (25.8.29.51 -> 26.3.17.110): hop3-ch2 hit the now-familiar
+  CORRUPTED_DATA / "Unknown version of serialization infos (1)" on ch3 (1
+  stuck task); hop3-ch3 passed clean. Identical to every prior run of this
+  hop.
+- **hop4 (26.3.17.110 -> 26.8.9.10, the retargeted hop this section was
+  tracking): hop4-ch1 hit CHECKSUM_DOESNT_MATCH ("Different number of
+  files: 3 compressed (expected 3) and 3 uncompressed ones (expected
+  2)"), logged on ch1 itself (the node that had just upgraded, fetching
+  from a peer still on 26.3.17.110 -- the reverse direction from the
+  trailing-node pattern seen at hop2/hop3, but the same underlying
+  old/new-format mismatch). hop4-ch2, hop4-ch3, and hop4-verify-ddl all
+  passed clean immediately after.** This is the direct confirmation this
+  section was waiting on: the self-healing pattern holds for
+  26.3.17.110 -> 26.8.9.10, not just by analogy with the other three
+  boundaries but by an actual run.
+
+RECOMMENDED_LTS_HOPS can now be described as fully proven the same way the
+26.7.3.19-terminated version of it was, with the same operational caveat
+as always attached (see the rule above): upgrade all three nodes
+back-to-back, expect and wait out trailing-node-or-adjacent-node errors,
+treat anything still stuck minutes after the last node finishes as real.
+`aggressive-skip-upgrade`'s second hop (25.8.29.51 -> 26.8.9.10) is a
+different, bigger transition and remains untested -- see
+AGGRESSIVE_SKIP_HOPS below, unaffected by this update.
 
 --- REDUCING THE CI LADDER: LTS_HOPS's bisection releases have done their
 --- job; the staged-upgrade CI job now runs RECOMMENDED_LTS_HOPS instead -------

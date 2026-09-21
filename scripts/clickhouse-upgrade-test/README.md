@@ -27,33 +27,26 @@ scheduled-downtime, all-nodes-at-once upgrade?**
   an option.
 - **Recommendation, based on CI run
   [32122682392](https://github.com/ooni/devops/actions/runs/32122682392)
-  completing the full ladder to the (now-superseded) `26.7.3.19`, plus
-  reconfirmations since: do a rolling, node-by-node upgrade all the way to
-  `26.8.9.10`, in 4 hops, landing on each LTS release in turn.** Three of
-  those hops (`25.3.14.14 -> 25.8.29.51`, `25.8.29.51 -> 26.3.17.110`, and
-  `26.3.17.110 -> 26.8.9.10`) are each expected to hit a real, reproducible
-  ClickHouse incompatibility that's transient and self-healing once the
-  lagging node's own upgrade completes, not a structural block — **but
-  only the first two have been directly observed** (repeatedly, in real
-  CI). The third is new: `26.3.17.110 -> 26.7.3.19` was directly observed
-  and self-healed too, but `26.3.17.110 -> 26.8.9.10` specifically has not
-  yet been run in any form. See "Real CI findings" and "Retargeting to the
-  current LTS" below for what that means operationally before doing any of
-  these three hops in production.
+  (and reconfirmations since, including
+  [96404459255](https://github.com/ooni/devops/actions/runs/96404459255)
+  against the retargeted ladder): do a rolling, node-by-node upgrade all
+  the way to `26.8.9.10`, in 4 hops, landing on each LTS release in
+  turn.** All three of those hops (`25.3.14.14 -> 25.8.29.51`,
+  `25.8.29.51 -> 26.3.17.110`, and `26.3.17.110 -> 26.8.9.10`) have now
+  each directly hit a real, reproducible ClickHouse incompatibility in CI
+  at least once — but every occurrence turned out to be transient and
+  self-healing once the lagging node's own upgrade completes, not a
+  structural block. See "Real CI findings" below for what that means
+  operationally before doing any of these three hops in production.
 
   ```
   24.8.6.70  →  25.3.14.14  →  25.8.29.51  →  26.3.17.110  →  26.8.9.10
-   (current)      LTS        LTS (*)          LTS (*)         LTS (*, untested)
+   (current)      LTS        LTS (*)          LTS (*)         LTS (*)
 
   (*) upgrade all 3 nodes back-to-back in one sitting for these three hops
-      -- the trailing node is expected to log hard-looking errors for a
-      minute or two until its own upgrade finishes. See "Real CI findings".
-      (The last hop has only been observed to hit this, on the equivalent
-      pre-retarget transition, once in a later run vs. every run for the
-      other two -- and the current 26.3.17.110 -> 26.8.9.10 hop hasn't been
-      run at all yet. See "Real CI findings" and "Retargeting to the
-      current LTS" for why it's still grouped here rather than treated as
-      either clean or confirmed.)
+      -- the trailing (or, per run 96404459255's hop2 and hop4, sometimes
+      an already-upgraded) node is expected to log hard-looking errors for
+      a minute or two until the rollout finishes. See "Real CI findings".
   ```
 
   No full-cluster downtime is needed — the risk was never downtime, it
@@ -388,18 +381,10 @@ non-LTS stop on an otherwise all-LTS ladder, so `LATEST_VERSION`,
   [963814682581](https://github.com/ooni/devops/actions/runs/963814682581))
   does **not** transfer to the new final hop, `26.3.17.110 -> 26.8.9.10`.
   It's evidence about a specific transition that no longer exists in this
-  ladder, not about the one that replaced it. Whatever shipped across
-  26.4 through 26.8 hasn't been looked at for backward-incompatible
-  on-disk changes the way 25.8 and 26.3 specifically were.
-- **The new final hop is untested**, full stop — not "probably fine by
-  analogy," not "covered by the same self-healing mechanism we've seen
-  three times already." That pattern is a reasonable basis for
-  *expecting* the same behavior, not for treating it as confirmed. Run
-  `staged-upgrade` (and ideally `aggressive-skip-upgrade`, which also now
-  lands on `26.8.9.10`) at least once after this change lands, and update
-  this section with the result before calling `RECOMMENDED_LTS_HOPS` fully
-  proven again the way the `26.7.3.19`-terminated version of it briefly
-  was.
+  ladder, not about the one that replaced it directly.
+- **Update: the new final hop is now directly confirmed, not just
+  expected by analogy.** See "The new final hop, confirmed" below for
+  the result of the first real CI run against this retargeted ladder.
 
 This also means the CI run that prompted this retarget
 ([963814682581](https://github.com/ooni/devops/actions/runs/963814682581),
@@ -408,6 +393,50 @@ anything new about ClickHouse's behavior — hops 1-5 clean, hop6/hop7/hop8
 hit the identical, already-catalogued self-healing pattern one more time.
 What it prompted was re-checking whether `26.7.3.19` was still the right
 number to be chasing, not a new incompatibility to chase down.
+
+### The new final hop, confirmed (run 96404459255)
+
+The first real CI run against this retargeted ladder ran on
+2026-09-21 ([ooni/devops#477](https://github.com/ooni/devops/pull/477),
+run [96404459255](https://github.com/ooni/devops/actions/runs/96404459255),
+PR merge ref `da07bc0` — the commit that applied this retarget and the CI
+ladder reduction together) and exercised all four `RECOMMENDED_LTS_HOPS`
+hops on the new 4-hop `staged-upgrade` job:
+
+- **`hop2` (`25.3.14.14 -> 25.8.29.51`)**: `hop2-ch2` hit
+  `CHECKSUM_DOESNT_MATCH` — notably this run logged it on `ch1` and `ch2`
+  (the two already-upgraded nodes) as well as `ch3` (588 occurrences, 5
+  stuck replication-queue tasks on `ch3`), a wider blast radius than
+  earlier runs saw at this hop. `hop2-ch3` (`ch3`'s own upgrade) passed
+  clean immediately after — same self-healing outcome as every prior run,
+  just more nodes logged the transient error along the way.
+- **`hop3` (`25.8.29.51 -> 26.3.17.110`)**: `hop3-ch2` hit the familiar
+  `CORRUPTED_DATA` / *"Unknown version of serialization infos (1)"* on
+  `ch3`; `hop3-ch3` passed clean. Identical to every prior run of this hop.
+- **`hop4` (`26.3.17.110 -> 26.8.9.10`, the retargeted hop)**: `hop4-ch1`
+  hit `CHECKSUM_DOESNT_MATCH` ("Different number of files: 3 compressed
+  (expected 3) and 3 uncompressed ones (expected 2)"), logged on `ch1`
+  itself (the node that had just upgraded, fetching from a peer still on
+  `26.3.17.110` — the reverse direction from the trailing-node pattern at
+  `hop2`/`hop3`, but the same underlying old/new-format mismatch).
+  `hop4-ch2`, `hop4-ch3`, and `hop4-verify-ddl` all passed clean
+  immediately after. This directly confirms the self-healing pattern
+  holds for `26.3.17.110 -> 26.8.9.10`, closing the gap this section was
+  tracking.
+
+`direct-jump-upgrade` also ran (as always, diagnostic/non-gating) and
+failed at `direct-ch2` as expected — the whole point of that job is
+demonstrating the ~24-month direct jump breaks, so this isn't a new
+finding.
+
+`RECOMMENDED_LTS_HOPS` can now be described as fully proven the same way
+the `26.7.3.19`-terminated version of it briefly was, with the same
+operational caveat attached to all three LTS-boundary hops (upgrade all
+three nodes back-to-back, expect and wait out hard-looking errors on
+whichever node logs them, treat anything still stuck minutes after the
+last node finishes as real). `aggressive-skip-upgrade`'s second hop
+(`25.8.29.51 -> 26.8.9.10`) is a different, bigger transition and remains
+untested — see "Trialing an even more aggressive ladder" below.
 
 ## Trialing an even more aggressive ladder (experimental, not a production recommendation)
 
@@ -438,13 +467,17 @@ options too, so it only ever runs when explicitly requested.
 within ClickHouse's documented ceiling, but it combines two
 independently-observed incompatibility boundaries (`25.8.29.51`'s mark-file
 format change, `26.3.17.110`'s nested-type serialization change) into two
-bigger hops that had never actually been run before this job existed --
-and its second hop, `25.8.29.51 -> 26.8.9.10`, now also carries the same
-"untested against the current LTS" gap described in "Retargeting to the
-current LTS" above, stacked on top of "never been run at all." The job
-exists purely to gather evidence — a green run is a useful data point,
-not a green light to promote this over `RECOMMENDED_LTS_HOPS`. A red run is
-useful too: it would say the "< 2 LTS versions" clause doesn't hold up in
+bigger hops that have never actually been run -- this job hasn't been
+exercised in CI yet (it's `workflow_dispatch`-only, so it doesn't run on
+routine PR/push events like run
+[96404459255](https://github.com/ooni/devops/actions/runs/96404459255)
+was). Landing on `26.3.17.110` and `26.8.9.10` individually is now
+well-confirmed (see "The new final hop, confirmed" above), but skipping a
+whole LTS as a waypoint in one hop is a materially different transition
+that confirmation doesn't cover. The job exists purely to gather evidence
+— a green run is a useful data point, not a green light to promote this
+over `RECOMMENDED_LTS_HOPS`. A red run is useful too: it would say the
+"< 2 LTS versions" clause doesn't hold up in
 practice for this cluster, which is worth knowing regardless.
 
 ## PR #477 review response
