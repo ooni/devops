@@ -115,7 +115,7 @@ def render_ci_step(step: dict) -> str:
 
     if "write_stats" in step:
         # harness/availability.py's run_zero_downtime_upgrade() -- one step
-        # spanning the ENTIRE rollout (every hop in PRODUCTION_HOPS[1:]),
+        # spanning the ENTIRE rollout (every hop in RECOMMENDED_LTS_HOPS[1:]),
         # with a continuous read/write canary (harness.availability.CanaryWriter)
         # running in the background throughout, never paused between hops.
         # This is what actually proves "no downtime, no blocked writes, no

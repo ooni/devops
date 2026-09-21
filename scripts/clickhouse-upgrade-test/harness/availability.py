@@ -14,7 +14,7 @@ blocked writes" is a claim about exactly that window, not about data at
 rest.
 
 How this proves it: a background canary thread continuously reads and
-writes against the cluster for the WHOLE rollout (all 4 PRODUCTION_HOPS
+writes against the cluster for the WHOLE rollout (all 4 RECOMMENDED_LTS_HOPS
 hops, all 12 node upgrades), started before the first node bounce and
 stopped only after the last one settles. Every attempt round-robins
 across ch1/ch2/ch3 with immediate failover to the next node on failure --

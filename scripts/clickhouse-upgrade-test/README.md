@@ -10,35 +10,50 @@ scheduled-downtime, all-nodes-at-once upgrade?**
 - Production is on **24.8.6.70** (LTS, Aug 2024) — confirmed from
   `ooni/devops` `ansible/group_vars/clickhouse/vars.yml` (`clickhouse_version: 24.8.6.70`),
   matching what issue #437 reports.
-- Latest stable as of 2026-08-10 is **26.7.3.19** (released 2026-07-22).
-- That's about **23 months apart**. ClickHouse's own docs
+- Latest LTS as of 2026-09-21 is **26.8.9.10** (branch released 2026-08-27;
+  confirmed via [endoflife.date/api/clickhouse.json](https://endoflife.date/api/clickhouse.json)
+  and [github.com/ClickHouse/ClickHouse/releases](https://github.com/ClickHouse/ClickHouse/releases)).
+  **Retargeted from an earlier `26.7.3.19`** (the original 2026-08-10
+  research's "latest stable" pick) once it became clear 26.7 was never
+  itself an LTS release, just the newest monthly build at the time — every
+  other hop in this ladder lands on an LTS, and production's own resting
+  version should too. See "Retargeting to the current LTS" below for what
+  that change does and doesn't carry over from earlier findings.
+- That's about **24 months apart**. ClickHouse's own docs
   ([clickhouse.com/docs/operations/update](https://clickhouse.com/docs/operations/update))
   say replicas of the same shard should not run versions more than
   **~1 year apart** — beyond that window the docs warn the cluster "may not
   work", queries can fail with arbitrary errors, and downgrading stops being
   an option.
-- **Recommendation, updated after CI run
+- **Recommendation, based on CI run
   [32122682392](https://github.com/ooni/devops/actions/runs/32122682392)
-  completed the full ladder: do a rolling, node-by-node upgrade all the
-  way to `26.7.3.19`, in 4 hops, landing on each LTS release in turn.**
-  Three of those hops (`25.3.14.14 -> 25.8.29.51`, `25.8.29.51 ->
-  26.3.17.110`, and `26.3.17.110 -> 26.7.3.19`) have each hit real,
-  reproducible ClickHouse incompatibilities in CI at least once — but every
-  occurrence turned out to be transient and self-healing once the lagging
-  node's own upgrade completes, not a structural block. See "Real CI
-  findings" below for what that means operationally before doing any of
+  completing the full ladder to the (now-superseded) `26.7.3.19`, plus
+  reconfirmations since: do a rolling, node-by-node upgrade all the way to
+  `26.8.9.10`, in 4 hops, landing on each LTS release in turn.** Three of
+  those hops (`25.3.14.14 -> 25.8.29.51`, `25.8.29.51 -> 26.3.17.110`, and
+  `26.3.17.110 -> 26.8.9.10`) are each expected to hit a real, reproducible
+  ClickHouse incompatibility that's transient and self-healing once the
+  lagging node's own upgrade completes, not a structural block — **but
+  only the first two have been directly observed** (repeatedly, in real
+  CI). The third is new: `26.3.17.110 -> 26.7.3.19` was directly observed
+  and self-healed too, but `26.3.17.110 -> 26.8.9.10` specifically has not
+  yet been run in any form. See "Real CI findings" and "Retargeting to the
+  current LTS" below for what that means operationally before doing any of
   these three hops in production.
 
   ```
-  24.8.6.70  →  25.3.14.14  →  25.8.29.51  →  26.3.17.110  →  26.7.3.19
-   (current)      LTS        LTS (*)          LTS (*)         (latest) (*)
+  24.8.6.70  →  25.3.14.14  →  25.8.29.51  →  26.3.17.110  →  26.8.9.10
+   (current)      LTS        LTS (*)          LTS (*)         LTS (*, untested)
 
   (*) upgrade all 3 nodes back-to-back in one sitting for these three hops
       -- the trailing node is expected to log hard-looking errors for a
       minute or two until its own upgrade finishes. See "Real CI findings".
-      (The last hop has only been observed to hit this once, in a later
-      run, vs. every run for the other two -- see "Real CI findings" for
-      why it's still grouped here rather than treated as clean.)
+      (The last hop has only been observed to hit this, on the equivalent
+      pre-retarget transition, once in a later run vs. every run for the
+      other two -- and the current 26.3.17.110 -> 26.8.9.10 hop hasn't been
+      run at all yet. See "Real CI findings" and "Retargeting to the
+      current LTS" for why it's still grouped here rather than treated as
+      either clean or confirmed.)
   ```
 
   No full-cluster downtime is needed — the risk was never downtime, it
@@ -47,11 +62,12 @@ scheduled-downtime, all-nodes-at-once upgrade?**
   half-done.
 
   The monthly (non-LTS) releases between `25.3.14.14` and `25.8.29.51`
-  (`25.4.13.22`, `25.5.11.15`, `25.6.13.41`, `25.7.8.71`) only exist in
-  this project's CI ladder (`harness/versions.py`'s `LTS_HOPS`), inserted
-  to bisect *which* release introduced the incompatibility. Production
-  has no reason to stop on any of them — see `harness/versions.py`'s
-  `PRODUCTION_HOPS` for the 4-hop version of this ladder.
+  (`25.4.13.22`, `25.5.11.15`, `25.6.13.41`, `25.7.8.71`) only ever existed
+  to bisect *which* release introduced the incompatibility
+  (`harness/versions.py`'s `LTS_HOPS`, historical -- see "Reducing the CI
+  ladder" below; no longer run in CI). Production has no reason to stop on
+  any of them — the `staged-upgrade` CI job itself now runs the 4-hop
+  `RECOMMENDED_LTS_HOPS` ladder directly.
 
 This repo contains a dockerized test that *exercises* this rather than just
 asserting it: it spins up a 3-node cluster shaped exactly like OONI's
@@ -72,7 +88,7 @@ end-to-end scenario" below.
 | Production table schemas (`fastpath`, `citizenlab`, `jsonl`, `analysis_web_measurement`, `event_detector_changepoints`, `faulty_measurements`) | `ooni/devops` `scripts/cluster-migration/schema.sql` |
 | `obs_web` column list | `ooni/backend` `ooniapi/services/oonimeasurements/tests/fixtures/initdb/clickhouse.sql` |
 | Other table column lists (test/CI copies) | `ooni/backend` `ooniapi/services/oonimeasurements/tests/migrations/0_clickhouse_init_tables.sql` |
-| Latest stable / LTS version history | [clickhouse.com/docs/whats-new/changelog](https://clickhouse.com/docs/whats-new/changelog), [endoflife.date/clickhouse](https://endoflife.date/clickhouse) |
+| Latest stable / LTS version history | [clickhouse.com/docs/whats-new/changelog](https://clickhouse.com/docs/whats-new/changelog), [endoflife.date/api/clickhouse.json](https://endoflife.date/api/clickhouse.json), [github.com/ClickHouse/ClickHouse/releases](https://github.com/ClickHouse/ClickHouse/releases) |
 | Mixed-version / rolling-upgrade guidance | [clickhouse.com/docs/operations/update](https://clickhouse.com/docs/operations/update) |
 
 ## What the test actually does
@@ -101,7 +117,7 @@ Docker host. `sql/001_schema.sql` creates the real table schemas
   - and, once a hop is fully rolled out, an `ALTER TABLE ... ON CLUSTER`
     still propagates cluster-wide.
 - **`direct`** — does the same node-by-node mechanics but jumps straight
-  from `24.8.6.70` to `26.7.3.19`, to surface (not just cite) whatever
+  from `24.8.6.70` to `26.8.9.10`, to surface (not just cite) whatever
   breaks when replicas are held ~2 years apart in version for the whole
   rollout.
 
@@ -218,11 +234,14 @@ here) has no JSON column, so this bisection most likely caught that same
 infrastructure applying to plain `MergeTree` parts generally — consistent
 with, though not proof of, a shared root cause.
 
-`harness/versions.py`'s `LTS_HOPS` and
-`.github/workflows/clickhouse_upgrade_test.yml` both keep the 8-hop
-bisection ladder (rather than collapsing back to 4 hops) so this stays
-directly re-testable. Production, however, doesn't need to walk the
-monthly releases — see `PRODUCTION_HOPS` below.
+At the time this was found, `harness/versions.py`'s `LTS_HOPS` and
+`.github/workflows/clickhouse_upgrade_test.yml` both kept the 8-hop
+bisection ladder (rather than collapsing back to 4 hops) so this stayed
+directly re-testable while the investigation was ongoing. That job has
+since moved to the 4-hop `RECOMMENDED_LTS_HOPS` ladder — see "Reducing the CI
+ladder" below for why that's safe to do now that the bisection has served
+its purpose. Production, in any case, never needed to walk the monthly
+releases — see `RECOMMENDED_LTS_HOPS` below.
 
 ## Real CI findings, continued: both incompatibilities self-heal once the lagging node catches up
 
@@ -251,14 +270,17 @@ then completed the entire 8-hop ladder and found:
   *"Unknown version of serialization infos (1). Should be less or equal
   than 0"* — 17 tries. **`hop7-ch3`** — ch3's own upgrade to
   `26.3.17.110` — again passed clean.
-- **`hop8`** (`26.3.17.110 -> 26.7.3.19`) had zero hard errors anywhere in
+- **`hop8`** (`26.3.17.110 -> 26.7.3.19` -- the pre-retarget final hop, see
+  "Retargeting to the current LTS" below) had zero hard errors anywhere in
   this particular run.
 
 So both incompatibilities are the same underlying mechanism: an
 old-format binary can't parse a part written in a new on-disk format, and
 the fix is simply for that binary to become new-format too, at which
 point its own retry of the identical fetch succeeds. Neither is a
-structural block on reaching `26.7.3.19`.
+structural block on reaching `26.7.3.19` -- see "Retargeting to the
+current LTS" below for whether that finding carries over to the current
+target, `26.8.9.10`.
 
 **Update:** a later run,
 [32134303759](https://github.com/ooni/devops/actions/runs/32134303759),
@@ -283,20 +305,20 @@ touch the separate *downgrade*-lossiness warning in the 26.3 changelog
 entry — that's about rolling back after the fact, a different risk from
 the forward-rolling mixed-version friction these runs exercised.
 
-Given this, `RECOMMENDED_NOW` in `harness/versions.py` is now
-`26.7.3.19`, and `PRODUCTION_HOPS` is the 4-hop runbook this project
-recommends: skip the monthly bisection releases (they were CI-diagnostic
-only), land on each LTS in turn, and for the three hops that have hit a
-real incompatibility at least once (`25.3.14.14 -> 25.8.29.51`,
-`25.8.29.51 -> 26.3.17.110`, and `26.3.17.110 -> 26.7.3.19`) upgrade all
-three nodes back-to-back in one sitting rather than spacing them out —
-expect the trailing node to log hard-looking errors for a minute or two
-right up until its own upgrade finishes, and treat that as expected only
-if it actually clears once that node is fully upgraded. If it's still
-stuck minutes after the last node comes back up, stop and treat it as a
-real problem rather than assuming it'll resolve.
+At the time (run 32122682392), this made `RECOMMENDED_NOW` in
+`harness/versions.py` `26.7.3.19`, with `RECOMMENDED_LTS_HOPS` as the 4-hop
+runbook this project recommended: skip the monthly bisection releases
+(they were CI-diagnostic only), land on each LTS in turn, and for the
+three hops that had hit a real incompatibility at least once upgrade all
+three nodes back-to-back in one sitting rather than spacing them out.
+Both `RECOMMENDED_NOW` and `RECOMMENDED_LTS_HOPS`'s final entry have since
+moved to `26.8.9.10` (see "Retargeting to the current LTS" below) — the
+operational rule itself (back-to-back node upgrades, expect and wait out
+trailing-node errors, treat a stuck cluster past a few minutes as real)
+is unchanged and still applies to all three hops, now `25.3.14.14 ->
+25.8.29.51`, `25.8.29.51 -> 26.3.17.110`, and `26.3.17.110 -> 26.8.9.10`.
 
-One gap before calling `PRODUCTION_HOPS` fully proven: self-healing has
+One gap before calling `RECOMMENDED_LTS_HOPS` fully proven: self-healing has
 been directly observed for the `25.7.8.71 -> 25.8.29.51` sub-hop (via the
 bisection ladder) and for `25.8.29.51 -> 26.3.17.110`, but not yet for a
 genuine single-hop `25.3.14.14 -> 25.8.29.51` jump (skipping the
@@ -304,8 +326,126 @@ intermediate monthly releases). The original un-bisected 4-hop ladder
 (run 32044578317) hit the identical failure signature at that exact
 transition, but aborted before ch3 got a chance to complete its own
 upgrade — so self-healing there is inferred from the shared mechanism,
-not directly confirmed. Worth one more CI run of `PRODUCTION_HOPS` itself
-to close this gap.
+not directly confirmed. This is exactly what moving the `staged-upgrade`
+CI job onto `RECOMMENDED_LTS_HOPS` (below) closes — see that section. The
+retarget to `26.8.9.10` opens the equivalent gap at the *other* end of
+the ladder — see "Retargeting to the current LTS" below.
+
+## Reducing the CI ladder: 8 hops → 4
+
+The monthly bisection releases (`25.4.13.22`, `25.5.11.15`, `25.6.13.41`,
+`25.7.8.71`) existed for exactly one purpose — localizing which release
+introduced the mark-file incompatibility described above. That question is
+answered (`25.7.8.71 -> 25.8.29.51`, see "Real CI findings"), so re-running
+every one of those diagnostic waypoints on every PR was no longer buying
+anything.
+
+`staged-upgrade` in `.github/workflows/clickhouse_upgrade_test.yml` now
+runs `harness/versions.py`'s `RECOMMENDED_LTS_HOPS` directly — 4 hops
+(`25.3.14.14`, `25.8.29.51`, `26.3.17.110`, `26.8.9.10`) instead of
+`LTS_HOPS`'s 8-hop bisection ladder — and its `timeout-minutes` was reduced
+from 90 to 60 to match. This also closes the gap called out just above:
+every `staged-upgrade` run from now on directly exercises the genuine,
+un-bisected `25.3.14.14 -> 25.8.29.51` jump (rather than only the bisected
+sub-hop), so self-healing at that transition gets re-confirmed on every run
+instead of needing a separate one-off run to close the gap. Note the hop
+numbering shifts along with the step count: the old 8-hop ladder's
+`hop6`/`hop7`/`hop8` (cited by name in "Real CI findings, continued" and
+"What was and wasn't verified" above) are this ladder's `hop2`/`hop3`/`hop4`
+— same version transitions, same findings, just renumbered.
+
+`LTS_HOPS` itself is unchanged and still defined in `harness/versions.py`
+— kept only so the bisection methodology and the run IDs cited above stay
+inspectable, not because anything still runs it. `scenario_staged_lts()`
+(`harness/scenarios.py`) and its CI job both now use `RECOMMENDED_LTS_HOPS`.
+
+## Retargeting to the current LTS: 26.7.3.19 → 26.8.9.10
+
+Every finding above through "Real CI findings, continued" was gathered
+against `26.7.3.19` as the final target, because that was "latest stable"
+when this project started (2026-08-10). It was never itself an LTS
+release, though — just the newest monthly build at the time — and every
+other hop in this ladder lands on an LTS. ClickHouse has since cut a new
+LTS, **26.8** (branch released 2026-08-27, latest patch `26.8.9.10` as of
+2026-09-21 — confirmed via
+[endoflife.date/api/clickhouse.json](https://endoflife.date/api/clickhouse.json)
+and
+[github.com/ClickHouse/ClickHouse/releases](https://github.com/ClickHouse/ClickHouse/releases),
+not just this project's earlier training-data-adjacent assumptions).
+OONI doesn't want production's own final resting version to be the one
+non-LTS stop on an otherwise all-LTS ladder, so `LATEST_VERSION`,
+`RECOMMENDED_NOW`, and the final entries of `RECOMMENDED_LTS_HOPS` and
+`AGGRESSIVE_SKIP_HOPS` all move to `26.8.9.10`.
+
+**What this does and doesn't carry over:**
+
+- The 25.8.29.51 and 26.3.17.110 findings are untouched — those hops
+  don't involve the final target version at all, so every run and every
+  bullet above about them still stands exactly as written.
+- The old `hop8` finding (`26.3.17.110 -> 26.7.3.19`, self-healing,
+  confirmed on runs 32122682392, 32134303759, and reconfirmed once more
+  on 2026-09-21 by run
+  [963814682581](https://github.com/ooni/devops/actions/runs/963814682581))
+  does **not** transfer to the new final hop, `26.3.17.110 -> 26.8.9.10`.
+  It's evidence about a specific transition that no longer exists in this
+  ladder, not about the one that replaced it. Whatever shipped across
+  26.4 through 26.8 hasn't been looked at for backward-incompatible
+  on-disk changes the way 25.8 and 26.3 specifically were.
+- **The new final hop is untested**, full stop — not "probably fine by
+  analogy," not "covered by the same self-healing mechanism we've seen
+  three times already." That pattern is a reasonable basis for
+  *expecting* the same behavior, not for treating it as confirmed. Run
+  `staged-upgrade` (and ideally `aggressive-skip-upgrade`, which also now
+  lands on `26.8.9.10`) at least once after this change lands, and update
+  this section with the result before calling `RECOMMENDED_LTS_HOPS` fully
+  proven again the way the `26.7.3.19`-terminated version of it briefly
+  was.
+
+This also means the CI run that prompted this retarget
+([963814682581](https://github.com/ooni/devops/actions/runs/963814682581),
+still on the 8-hop `LTS_HOPS` workflow at the time) doesn't tell us
+anything new about ClickHouse's behavior — hops 1-5 clean, hop6/hop7/hop8
+hit the identical, already-catalogued self-healing pattern one more time.
+What it prompted was re-checking whether `26.7.3.19` was still the right
+number to be chasing, not a new incompatibility to chase down.
+
+## Trialing an even more aggressive ladder (experimental, not a production recommendation)
+
+ClickHouse's own compatibility rule
+([clickhouse.com/docs/operations/update](https://clickhouse.com/docs/operations/update))
+is actually an *or*: versions can coexist if the difference between them is
+less than one year, **or** if there are fewer than two LTS versions between
+them. `RECOMMENDED_LTS_HOPS` satisfies this via the calendar-time clause (each
+hop is under a year). The "< 2 LTS versions between them" clause is, in
+places, looser — it would technically permit skipping `25.3.14.14` and
+`26.3.17.110` as waypoints entirely, landing hops directly on `25.8.29.51`
+and `26.8.9.10`:
+
+```
+24.8.6.70  →  25.8.29.51  →  26.8.9.10
+ (current)    LTS (skips     (latest LTS,
+               25.3.14.14)    skips 26.3.17.110)
+```
+
+This is `harness/versions.py`'s `AGGRESSIVE_SKIP_HOPS` constant, wired into
+a new, separate `aggressive-skip-upgrade` CI job
+(`.github/workflows/clickhouse_upgrade_test.yml`). It's `workflow_dispatch`
+only (`scenario: aggressive-skip`) — it doesn't run on `pull_request` or
+`push`, and is deliberately left out of both the `both` and `all` scenario
+options too, so it only ever runs when explicitly requested.
+
+**This is explicitly not a production recommendation.** It's formally
+within ClickHouse's documented ceiling, but it combines two
+independently-observed incompatibility boundaries (`25.8.29.51`'s mark-file
+format change, `26.3.17.110`'s nested-type serialization change) into two
+bigger hops that had never actually been run before this job existed --
+and its second hop, `25.8.29.51 -> 26.8.9.10`, now also carries the same
+"untested against the current LTS" gap described in "Retargeting to the
+current LTS" above, stacked on top of "never been run at all." The job
+exists purely to gather evidence — a green run is a useful data point,
+not a green light to promote this over `RECOMMENDED_LTS_HOPS`. A red run is
+useful too: it would say the "< 2 LTS versions" clause doesn't hold up in
+practice for this cluster, which is worth knowing regardless.
 
 ## PR #477 review response
 
@@ -370,7 +510,7 @@ Raised in review on [ooni/devops#477](https://github.com/ooni/devops/pull/477)
    measurements, ingests them through the actual `oonidata`/`oonipipeline`
    pipeline and `fastpath`, and re-runs `ooni/data`'s own pytest suite
    against the real `api-oonimeasurements` service at every hop of
-   `PRODUCTION_HOPS` — not just ClickHouse's own replication mechanics
+   `RECOMMENDED_LTS_HOPS` — not just ClickHouse's own replication mechanics
    (which the synthetic scenario above already covers), but the actual
    ingestion and query paths OONI's data pipeline depends on. One caveat:
    it exercises `ooni/data`'s test suite and `ooni/backend`'s
@@ -382,19 +522,23 @@ Raised in review on [ooni/devops#477](https://github.com/ooni/devops/pull/477)
    quote) — in progress, not complete. What's confirmed so far is captured
    in points 1-3 above.
 
-Net effect: `LTS_HOPS` (what this harness's `staged` CI job actually
-tests) walks the full ladder to `26.7.3.19`. As of run 32122682392 it
-completed clean, with both the mark-file finding and the 26.3 nested-type
-serialization change turning out to be transient, self-healing mixed-
-version friction rather than structural blocks (see "Real CI findings,
-continued" above); a later run (32134303759) showed the same friction can
-also surface at the final hop (`26.3.17.110 -> 26.7.3.19`), self-healing
-the same way. The production recommendation (`RECOMMENDED_NOW` /
-`PRODUCTION_HOPS`, and the README TL;DR above) now covers the whole
-ladder, with an operational caveat (upgrade the trailing node promptly)
-attached to the three hops that have hit a real incompatibility at least
-once. Point 4 is now addressed by the `real-data-upgrade` job (see
-below). Points 2 and 5 remain open.
+Net effect: the `staged` CI job walked the full 8-hop `LTS_HOPS` ladder to
+`26.7.3.19` at the time these findings were gathered (it now runs the
+equivalent 4-hop `RECOMMENDED_LTS_HOPS` ladder directly instead — see "Reducing
+the CI ladder" above). As of run 32122682392 it completed clean, with both
+the mark-file finding and the 26.3 nested-type serialization change
+turning out to be transient, self-healing mixed-version friction rather
+than structural blocks (see "Real CI findings, continued" above); a later
+run (32134303759) showed the same friction can also surface at the final
+hop (`26.3.17.110 -> 26.7.3.19`), self-healing the same way. The
+production recommendation (`RECOMMENDED_NOW` / `RECOMMENDED_LTS_HOPS`, and the
+README TL;DR above) has since been retargeted from `26.7.3.19` to the
+current LTS, `26.8.9.10` (see "Retargeting to the current LTS" above), so
+it now covers the whole ladder with an operational caveat (upgrade the
+trailing node promptly) attached to all three LTS-boundary hops -- two
+directly confirmed, the third (the retargeted final hop) expected by
+analogy but not yet directly run. Point 4 is now addressed by the
+`real-data-upgrade` job (see below). Points 2 and 5 remain open.
 
 ## Real-data end-to-end scenario (`real-data-upgrade` job)
 
@@ -425,7 +569,7 @@ every deliberate difference from the upstream compose file (auth, dropped
 - **Real data is downloaded and ingested exactly once per CI run**, right
   after standing up a fresh cluster at `BASE_VERSION` (`24.8.6.70`) — not
   re-downloaded at every hop. Re-ingesting fresh data at each of
-  `PRODUCTION_HOPS`'s 4 checkpoints would multiply this already-slow job's
+  `RECOMMENDED_LTS_HOPS`'s 4 checkpoints would multiply this already-slow job's
   runtime for no real gain: the question this job answers is "does
   upgrading corrupt or break access to what's already there," not "can
   fresh data still be ingested at every intermediate version" (a real but
@@ -436,7 +580,7 @@ every deliberate difference from the upstream compose file (auth, dropped
   ClickHouse's own idiom for hashing a whole table without listing columns
   by hand) per real-data table, on all 3 nodes, requiring they already
   agree with each other.
-- **After every hop of `PRODUCTION_HOPS`** (all 3 nodes upgraded
+- **After every hop of `RECOMMENDED_LTS_HOPS`** (all 3 nodes upgraded
   back-to-back, reusing the exact same `upgrade_node_step()` mechanics the
   synthetic scenario uses — these are already version/schema-agnostic):
   1. re-snapshot all 3 nodes and diff against the golden baseline — any
@@ -471,19 +615,20 @@ every deliberate difference from the upstream compose file (auth, dropped
   tracks the originally-ingested rows, not the canary's own writes); and
   all 3 nodes agree on the canary table's final contents. This replaces
   the four separate `real-data-hop` steps that used to run in the
-  workflow (`rd-hop1`..`rd-hop4`, one per `PRODUCTION_HOPS` hop) with one
+  workflow (`rd-hop1`..`rd-hop4`, one per `RECOMMENDED_LTS_HOPS` hop) with one
   `zero-downtime-upgrade` step spanning all 4 hops — the whole point is a
   single canary thread that never stops between hops, so it can't be
   split back across separate steps without losing that continuity.
   `real_data.real_data_hop_step()` / `ci_step.py real-data-hop` are
   unchanged and still available as a standalone primitive (e.g. for a
   future scenario that wants one hop in isolation, without the canary).
-- Uses `PRODUCTION_HOPS` (4 hops), not the 8-hop `LTS_HOPS` bisection
-  ladder — this job verifies the actual recommended production upgrade
-  path, not every diagnostic waypoint used to originally localize the
-  mark-file incompatibility. A workflow-level sanity check (mirroring the
-  `staged-upgrade` job's own `LTS_HOPS` check) fails loudly if
-  `harness/versions.py`'s `PRODUCTION_HOPS` and this job's hardcoded step
+- Uses `RECOMMENDED_LTS_HOPS` (4 hops) — this job always verified the actual
+  recommended production upgrade path rather than every diagnostic
+  waypoint used to originally localize the mark-file incompatibility, and
+  `staged-upgrade` now runs the same 4-hop ladder too (see "Reducing the
+  CI ladder" above). A workflow-level sanity check (mirroring the
+  `staged-upgrade` job's own `RECOMMENDED_LTS_HOPS` check) fails loudly if
+  `harness/versions.py`'s `RECOMMENDED_LTS_HOPS` and this job's hardcoded step
   list ever drift apart.
 
 **Does not replace the synthetic scenario.** `harness/seed_data.py` and
@@ -570,7 +715,7 @@ Hub / S3 access), before any real run:
 - All Python modules compile and the seed-data generator runs and produces
   well-formed `INSERT` statements against the real column lists.
 
-**Still worth doing:** one more CI run of `PRODUCTION_HOPS` itself (the
+**Still worth doing:** one more CI run of `RECOMMENDED_LTS_HOPS` itself (the
 4-hop runbook, skipping the monthly bisection releases) to directly
 confirm self-healing holds for a genuine single-hop
 `25.3.14.14 -> 25.8.29.51` jump, not just the bisected sub-hop; and

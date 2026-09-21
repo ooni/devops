@@ -51,7 +51,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from harness import compose, real_data, report
 from harness import availability
 from harness.scenarios import setup_step, step_ok, upgrade_node_step, verify_ddl_step
-from harness.versions import PRODUCTION_HOPS
+from harness.versions import RECOMMENDED_LTS_HOPS
 
 PROJECT_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = PROJECT_DIR / "results"
@@ -187,12 +187,12 @@ def cmd_teardown_real_data(args) -> int:
 
 
 def cmd_zero_downtime_upgrade(args) -> int:
-    # PRODUCTION_HOPS[1:] -- skip the BASE_VERSION entry (24.8.6.70, None),
+    # RECOMMENDED_LTS_HOPS[1:] -- skip the BASE_VERSION entry (24.8.6.70, None),
     # since that's the version setup-real-data already brought the cluster
     # up on; the canary starts running from the current (base) version and
     # the first real hop upgrades away from it, exactly like real-data-hop
-    # is invoked once per remaining PRODUCTION_HOPS entry today.
-    result = availability.run_zero_downtime_upgrade(PRODUCTION_HOPS[1:], label=args.label)
+    # is invoked once per remaining RECOMMENDED_LTS_HOPS entry today.
+    result = availability.run_zero_downtime_upgrade(RECOMMENDED_LTS_HOPS[1:], label=args.label)
     _save_step(args.label, result)
     ok = step_ok(result)
     print(f"[{args.label}] {'OK' if ok else 'PROBLEM DETECTED'}")
@@ -251,7 +251,7 @@ def main() -> int:
     p_zdt = sub.add_parser(
         "zero-downtime-upgrade",
         help=(
-            "Run every remaining PRODUCTION_HOPS hop back-to-back in one process, with a "
+            "Run every remaining RECOMMENDED_LTS_HOPS hop back-to-back in one process, with a "
             "continuous read/write canary (round-robin + failover across all 3 nodes) running "
             "the whole time -- proves no full-cluster downtime, no blocked writes, and no lost "
             "or corrupted data across the entire rollout, not just at per-hop checkpoints"

@@ -7,10 +7,11 @@ through a version ladder upgrading exactly one node at a time -- i.e. a real
 rolling upgrade, never taking the whole shard down.
 
 * scenario_staged_lts(): walks 24.8.6.70 -> 25.3.14.14 -> 25.8.29.51 ->
-  26.3.17.110 -> 26.7.3.19, one LTS hop at a time. Each hop stays within
-  ClickHouse's documented ~1 year mixed-version compatibility window.
+  26.3.17.110 -> 26.8.9.10 (RECOMMENDED_LTS_HOPS -- see harness/versions.py),
+  one LTS hop at a time. Each hop stays within ClickHouse's documented
+  ~1 year mixed-version compatibility window.
 
-* scenario_direct_jump(): goes straight from 24.8.6.70 to 26.7.3.19,
+* scenario_direct_jump(): goes straight from 24.8.6.70 to 26.8.9.10,
   node-by-node. This intentionally puts the cluster in a state ClickHouse's
   own docs say not to run (>1 year version skew between replicas of the same
   shard) so we can observe -- rather than assume -- what actually breaks.
@@ -23,7 +24,7 @@ from pathlib import Path
 from . import compose, validate
 from .ch_http import ChNode
 from .seed_data import build_all_seed_statements
-from .versions import BASE_VERSION, DIRECT_JUMP, LATEST_VERSION, LTS_HOPS
+from .versions import BASE_VERSION, DIRECT_JUMP, LATEST_VERSION, RECOMMENDED_LTS_HOPS
 
 SQL_DIR = Path(__file__).resolve().parent.parent / "sql"
 NODE_ORDER = ["ch1", "ch2", "ch3"]
@@ -255,9 +256,10 @@ def scenario_staged_lts(log=print) -> dict:
         "name": "Staged rolling upgrade via LTS hops",
         "description": (
             f"Rolling (one node at a time) upgrade from {BASE_VERSION} to {LATEST_VERSION}, "
-            "stepping through each intermediate LTS release so no two replicas are ever "
-            "more than ~1 year of ClickHouse releases apart (per ClickHouse's documented "
-            "mixed-version compatibility window)."
+            "stepping through each intermediate LTS release (RECOMMENDED_LTS_HOPS -- the actual "
+            "recommended production runbook, not the historical monthly bisection ladder) "
+            "so no two replicas are ever more than ~1 year of ClickHouse releases apart "
+            "(per ClickHouse's documented mixed-version compatibility window)."
         ),
         "steps": [],
     }
@@ -266,7 +268,7 @@ def scenario_staged_lts(log=print) -> dict:
         scenario["verdict"] = f"ERROR during setup: {setup.get('error')}"
         return scenario
 
-    hop_versions = [v for v, _months in LTS_HOPS[1:]]  # skip the starting version
+    hop_versions = [v for v, _months in RECOMMENDED_LTS_HOPS[1:]]  # skip the starting version
     all_ok = True
     for hop_version in hop_versions:
         for node_name in NODE_ORDER:

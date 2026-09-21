@@ -15,14 +15,14 @@ its own CI job -- see the `real-data-upgrade` job in
 Design, per the explicit instructions this was built to:
   - Download and ingest the real dataset exactly ONCE per run, at
     BASE_VERSION, rather than at every hop -- re-downloading/re-ingesting
-    at each of PRODUCTION_HOPS's 4 checkpoints would multiply this job's
+    at each of RECOMMENDED_LTS_HOPS's 4 checkpoints would multiply this job's
     already-substantial runtime for no real gain, since the interesting
     question is "does upgrading corrupt what's already there and keep
     queries working", not "can fresh data still be ingested at every
     intermediate version" (the latter is a real question too, but a
     different one -- see the module-level TODO below).
-  - PRODUCTION_HOPS (4 hops: 24.8.6.70 -> 25.3.14.14 -> 25.8.29.51 ->
-    26.3.17.110 -> 26.7.3.19), not the 8-hop LTS_HOPS bisection ladder --
+  - RECOMMENDED_LTS_HOPS (4 hops: 24.8.6.70 -> 25.3.14.14 -> 25.8.29.51 ->
+    26.3.17.110 -> 26.8.9.10), not the 8-hop LTS_HOPS bisection ladder --
     this job verifies the actual recommended upgrade path, not every
     diagnostic waypoint used to find where the mark-file incompatibility
     lived.
