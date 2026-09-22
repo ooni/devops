@@ -134,6 +134,8 @@ admin_group_name: admin
 clickhouse_default_profiles:
   default:
     readonly: 2
+    # 5 GB
+    max_memory_usage: 5005005000
   write:
     readonly: 0
   admin:
@@ -154,7 +156,7 @@ clickhouse_default_users:
     networks:
       - "127.0.0.1"
     profile: default
-    quota: default
+    quota: notebook_default
   - user:
     name: write
     password_sha256_hex: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_notebook_write_password', profile='oonidevops_user_prod') | hash('sha256') }}"
@@ -162,6 +164,17 @@ clickhouse_default_users:
       - "127.0.0.1"
     profile: write
     quota: default
+
+clickhouse_custom_quotas_xml:
+  - quota:
+    name: notebook_default
+    duration: 3600
+    queries: 0
+    errors: 0
+    result_rows: 0
+    read_rows: 0
+    execution_time: 0
+    # No query execution time limit
 
 # configure extra domains for dehydrated
 ssl_domains:
