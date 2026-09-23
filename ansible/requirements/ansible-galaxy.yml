@@ -3,10 +3,9 @@ roles:
     version: 0.26.0
   - src: geerlingguy.certbot
     version: 5.2.0
-  - src: https://github.com/idealista/clickhouse_role
-    scm: git
-    version: 3.5.1
-    name: idealista.clickhouse_role
+  # idealista.clickhouse_role: vendored at ansible/roles/idealista.clickhouse_role
+  # (with local fixes) instead of pulled from Galaxy/git at install time.
+  # See ansible/roles/idealista.clickhouse_role/VENDORED.md for why and provenance.
   - src: https://github.com/ooni/airflow-role.git
     scm: git
     name: ooni.airflow_role
