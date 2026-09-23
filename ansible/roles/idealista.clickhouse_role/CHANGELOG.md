@@ -46,6 +46,15 @@ This project adheres to [Semantic Versioning](http://semver.org/) and [Keep a ch
   in `tasks/install-Debian.yml` instead of actually being referenced, silently breaking
   override support for both. Added `clickhouse_deb_keyring_path` so the keyring file
   location is one variable instead of a literal duplicated three times.
+- The apt repository signing key is now pinned at `files/clickhouse-repo-keyring.asc`
+  (installed via a plain `copy` task) instead of fetched fresh from `clickhouse_deb_key_url`
+  on every run — a compromised/MITM'd `packages.clickhouse.com` could otherwise silently
+  substitute a malicious key into an automated deploy with no human in the loop. Verified
+  the pinned key before vendoring: its primary fingerprint (`8919 F6BD 2B48 D754` short ID)
+  exactly matches `clickhouse_deb_keyid`, which this role has had hardcoded since before
+  `signed-by=` support existed — via an entirely different fetch channel (the Ubuntu HKP
+  keyserver). Two independent sources, years apart, agree. `clickhouse_deb_key_source`
+  (default `pinned`) can be set to `fetch` to restore the fetch-every-run behaviour.
 
 ## [3.5.1](https://github.com/idealista/clickhouse_role/tree/3.5.1) (2024-04-18)
 

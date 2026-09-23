@@ -39,11 +39,20 @@
     mode: "0755"
   tags: [clickhouse_install]
 
-- name: CLICKHOUSE | Be sure key is present
+- name: CLICKHOUSE | Install pinned apt repository key
+  ansible.builtin.copy:
+    src: clickhouse-repo-keyring.asc
+    dest: "{{ clickhouse_deb_keyring_path }}"
+    mode: "0644"
+  when: clickhouse_deb_key_source | default('pinned') == 'pinned'
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Fetch apt repository key
   ansible.builtin.get_url:
     url: "{{ clickhouse_deb_key_url }}"
     dest: "{{ clickhouse_deb_keyring_path }}"
     mode: "0644"
+  when: clickhouse_deb_key_source | default('pinned') == 'fetch'
   tags: [clickhouse_install]
 
 - name: CLICKHOUSE | Add clickhouse apt repository (deb)

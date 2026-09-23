@@ -59,6 +59,18 @@ clickhouse_prerequisite_repos:
   - dirmngr
 clickhouse_service: "clickhouse-server"
 clickhouse_deb_repo: "deb [signed-by={{ clickhouse_deb_keyring_path }}] https://packages.clickhouse.com/deb {{ clickhouse_release_type }} main"
+# ooni fork: the repo signing key is pinned (files/clickhouse-repo-keyring.asc) rather
+# than fetched fresh from clickhouse_deb_key_url on every run, so a compromise of
+# packages.clickhouse.com or a MITM can't silently substitute a malicious key into an
+# automated deploy - rotating it requires a reviewed commit instead. Set
+# clickhouse_deb_key_source to 'fetch' to restore upstream's fetch-every-run behaviour.
+# Pinned key verified 2026-09-22: primary fingerprint
+# 3A9E A119 3A97 B548 BE14 57D4 8919 F6BD 2B48 D754 (RSA4096, created 2021-11-22, UID
+# "ClickHouse Inc. Repositories Key <packages@clickhouse.com>"), matching key ID
+# 8919F6BD2B48D754 that this role has independently hardcoded (via a different fetch
+# channel, the Ubuntu keyserver) since before signed-by= support was added - i.e. two
+# independent sources, fetched years apart via different mechanisms, agree.
+clickhouse_deb_key_source: pinned # "pinned" (default) or "fetch"
 clickhouse_deb_key_url: "https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key"
 clickhouse_deb_keyring_path: /etc/apt/keyrings/clickhouse.asc
 clickhouse_packages:
