@@ -35,6 +35,17 @@ This project adheres to [Semantic Versioning](http://semver.org/) and [Keep a ch
   repos in at least one downstream user's setup, which would print the password straight
   into a public Actions log). Gating on verbosity keeps normal/CI runs silent by default
   while making `ansible-playbook -vvv` show the real command and output for debugging.
+- Brings in the functional change from
+  [idealista/clickhouse_role#80](https://github.com/idealista/clickhouse_role/pull/80)
+  (open since March 2026, unreviewed): replaces the deprecated `ansible.builtin.apt_key`
+  module (removed in ansible-core 2.25; also doesn't work on Debian 12/13 since `apt-key`
+  itself is gone from those releases) with the `signed-by=` keyring approach, matching
+  ClickHouse's own current official install docs. Fixed two variable-hygiene bugs found in
+  the original PR while bringing it in: `clickhouse_deb_key_url` and the new form of
+  `clickhouse_deb_repo` were added as overridable defaults but then hardcoded as literals
+  in `tasks/install-Debian.yml` instead of actually being referenced, silently breaking
+  override support for both. Added `clickhouse_deb_keyring_path` so the keyring file
+  location is one variable instead of a literal duplicated three times.
 
 ## [3.5.1](https://github.com/idealista/clickhouse_role/tree/3.5.1) (2024-04-18)
 

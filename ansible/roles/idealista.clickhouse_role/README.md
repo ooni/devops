@@ -5,7 +5,9 @@
 
 ![Logo](https://raw.githubusercontent.com/idealista/clickhouse_role/main/logo.gif)
 
-This ansible role installs [Clickhouse](https://clickhouse.com/) in a Debian environment. It has been tested for Debian bullseye.
+This ansible role installs [Clickhouse](https://clickhouse.com/) in a Debian environment. It has been tested for Debian bullseye and Debian trixie (13).
+
+> **Note (Debian 12+):** The deprecated `apt_key` module has been replaced with the modern `signed-by` keyring approach (`/etc/apt/keyrings/clickhouse.asc`), required for Debian bookworm and trixie.
 
 This role has been generated using the [cookiecutter](https://github.com/cookiecutter/cookiecutter) tool, you can generate a similar role that fits your needs using the this [cookiecutter template](https://github.com/idealista/cookiecutter-ansible-role).
 
