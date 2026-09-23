@@ -1,0 +1,11 @@
+# ansible-managed in ooni/devops.git
+# Included from /etc/nginx/sites-enabled/01-jupyterhub
+
+# Static file downloads. Only exact file names are exposed, not the whole directory
+location = /dump/intersection_domains_dump.csv.lz4 {
+    alias /mnt/data/fariba/intersection_domains_dump.csv.lz4;
+
+    default_type application/octet-stream;
+    add_header Content-Disposition 'attachment';
+    add_header Access-Control-Allow-Origin *;
+}
