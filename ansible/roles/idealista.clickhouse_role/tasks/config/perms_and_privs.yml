@@ -7,7 +7,7 @@
   register: ldap_user_list
   changed_when: False
   when: clickhouse_custom_grants_previous_cleanup
-  no_log: True
+  no_log: "{{ ansible_verbosity < 3 }}"
   tags:
     - clickhouse_grants
     - select
@@ -20,7 +20,7 @@
   register: grants_clean
   changed_when: grants_clean.rc != 0
   when: clickhouse_custom_grants_previous_cleanup
-  no_log: True
+  no_log: "{{ ansible_verbosity < 3 }}"
   tags:
     - clickhouse_grants
     - select

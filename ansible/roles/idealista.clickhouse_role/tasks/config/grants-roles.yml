@@ -5,7 +5,7 @@
   when: clickhouse_custom_grant_roles is defined
   register: assigning_roles
   changed_when: assigning_roles.rc != 0
-  no_log: True
+  no_log: "{{ ansible_verbosity < 3 }}"
   tags:
     - clickhouse_grants
     - grant

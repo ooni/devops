@@ -4,7 +4,7 @@
   ansible.builtin.command: "clickhouse-client -u {{ clickhouse_admin_user }} --password {{ clickhouse_admin_password }} -q \"SELECT name FROM system.settings_profiles WHERE storage == 'local directory';\""
   changed_when: False
   register: clickhouse_existing_sql_settings_profiles
-  no_log: True
+  no_log: "{{ ansible_verbosity < 3 }}"
   tags:
     - clickhouse_settings_profiles
     - select
@@ -16,7 +16,7 @@
   when:
     - clickhouse_existing_sql_settings_profiles is defined
     - item not in clickhouse_custom_settings_profiles | map(attribute='name') | list
-  no_log: True
+  no_log: "{{ ansible_verbosity < 3 }}"
   register: drop_profiles
   changed_when: drop_profiles.rc != 0
   tags:
@@ -31,7 +31,7 @@
   when:
     - clickhouse_custom_settings_profiles is defined
     - clickhouse_sql_objects_or_replace | default(true) or item.name not in clickhouse_existing_sql_settings_profiles.stdout_lines
-  no_log: True
+  no_log: "{{ ansible_verbosity < 3 }}"
   register: add_profiles
   changed_when: add_profiles.rc != 0
   tags:

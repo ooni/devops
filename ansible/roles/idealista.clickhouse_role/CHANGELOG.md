@@ -24,6 +24,17 @@ This project adheres to [Semantic Versioning](http://semver.org/) and [Keep a ch
   `no_log: True` on the surrounding task), and prevents this combination from ever having
   worked upstream. Inline settings and `PROFILE 'name'` entries are now merged into one
   comma-separated `SETTINGS ...` clause, per the documented grammar.
+- All `no_log: True` on SQL-driven tasks (users, roles, quotas, settings-profiles,
+  databases, grants, grants-roles, perms_and_privs — every task that runs
+  `clickhouse-client ... --password {{ clickhouse_admin_password }} ...`) replaced with
+  `no_log: "{{ ansible_verbosity < 3 }}"`. Blanket `no_log: True` meant any failure in
+  these tasks (e.g. the SETTINGS-clause syntax error above) was completely silent — no
+  error text, no way to see what actually went wrong, in CI or locally. The admin password
+  is a real argument on these command lines, so unconditionally removing `no_log` isn't
+  safe either (this role's tasks run in `ansible-playbook --check --diff` in CI on public
+  repos in at least one downstream user's setup, which would print the password straight
+  into a public Actions log). Gating on verbosity keeps normal/CI runs silent by default
+  while making `ansible-playbook -vvv` show the real command and output for debugging.
 
 ## [3.5.1](https://github.com/idealista/clickhouse_role/tree/3.5.1) (2024-04-18)
 

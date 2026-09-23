@@ -18,7 +18,7 @@
     \""
   changed_when: False
   register: clickhouse_existing_sql_grants
-  no_log: True
+  no_log: "{{ ansible_verbosity < 3 }}"
   tags:
     - clickhouse_grants
     - select
@@ -36,7 +36,7 @@
   when: actual_privs is defined
   register: revoke_grants_missing
   changed_when: revoke_grants_missing.rc != 0
-  no_log: True
+  no_log: "{{ ansible_verbosity < 3 }}"
   tags:
     - clickhouse_grants
     - revoke
@@ -48,7 +48,7 @@
     - item.privileges is defined
   register: do_grants
   changed_when: do_grants.rc != 0
-  no_log: True
+  no_log: "{{ ansible_verbosity < 3 }}"
   tags:
     - clickhouse_grants
     - grant
