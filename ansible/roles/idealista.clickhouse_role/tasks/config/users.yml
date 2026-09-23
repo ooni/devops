@@ -24,12 +24,18 @@
     - delete
     - SQL_driven
 
-- name: CLICKHOUSE | Add users (SQL-driven)
+# NOTE (ooni fork): with clickhouse_sql_objects_or_replace (default true), this uses
+# `CREATE USER OR REPLACE` (see templates/DDL/USER.j2) and runs unconditionally, so that
+# changes to an already-existing user's password/networks/profile/settings/quota/grantees
+# in clickhouse_custom_users are actually applied on every run, instead of being silently
+# skipped forever once the user exists (upstream behaviour, preserved here when the
+# toggle is set to false).
+- name: CLICKHOUSE | Add/update users (SQL-driven)
   ansible.builtin.command: "clickhouse-client -u {{ clickhouse_admin_user }} --password {{ clickhouse_admin_password }} -q {{ lookup('template', 'DDL/USER.j2') | quote }}"
   with_items: "{{ clickhouse_custom_users }}"
   when:
     - clickhouse_custom_users is defined
-    - item.name not in clickhouse_existing_sql_users.stdout_lines
+    - clickhouse_sql_objects_or_replace | default(true) or item.name not in clickhouse_existing_sql_users.stdout_lines
   no_log: True
   register: add_users
   changed_when: add_users.rc != 0

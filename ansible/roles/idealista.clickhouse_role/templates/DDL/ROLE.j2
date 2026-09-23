@@ -1,5 +1,12 @@
-CREATE ROLE IF NOT EXISTS {{ item.name }}
-{% if item.settings is defined %} SETTINGS {% for setting in item.settings %}{{ setting }}{{ ", " if not loop.last else "" }}{% endfor %}{% endif %}
-{% if item.profile is defined %} SETTINGS PROFILE {% for profile in item.profile %}'{{ profile }}'{{ ", " if not loop.last else "" }}{% endfor %}{% endif %}
+CREATE ROLE {% if clickhouse_sql_objects_or_replace | default(true) %}OR REPLACE{% else %}IF NOT EXISTS{% endif %} {{ item.name }}
+{%- set ch_settings_parts = [] -%}
+{%- if item.settings is defined -%}
+{%- for setting in item.settings -%}{%- set _ = ch_settings_parts.append(setting) -%}{%- endfor -%}
+{%- endif -%}
+{%- if item.profile is defined -%}
+{%- for profile in item.profile -%}{%- set _ = ch_settings_parts.append("PROFILE '" ~ profile ~ "'") -%}{%- endfor -%}
+{%- endif -%}
+{% if ch_settings_parts | length > 0 %} SETTINGS {{ ch_settings_parts | join(", ") }}{% endif %}
 ;
 {# https://clickhouse.com/docs/en/sql-reference/statements/create/role/ #}
+{# NOTE (ooni fork): settings/profile merged into a single SETTINGS clause; see USER.j2 for rationale. #}

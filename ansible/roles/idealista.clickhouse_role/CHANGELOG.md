@@ -5,6 +5,26 @@ This project adheres to [Semantic Versioning](http://semver.org/) and [Keep a ch
 
 ## [Unreleased](https://github.com/idealista/clickhouse_role/tree/develop)
 
+## [ooni-alter-support](https://github.com/ooni/clickhouse_role/tree/ooni-alter-support) (fork, based on 3.5.2)
+
+### :hammer_and_wrench: Fixed
+
+- SQL-driven `clickhouse_custom_users`/`_roles`/`_quotas`/`_settings_profiles` now use
+  `CREATE ... OR REPLACE` instead of `CREATE ... IF NOT EXISTS`, and the corresponding
+  "Add" tasks no longer skip objects that already exist. Previously, once one of these
+  objects was created once, no subsequent change to its definition in group/host vars
+  would ever be applied — `CREATE ... IF NOT EXISTS` is a permanent no-op after first
+  creation, and there was no `ALTER` task anywhere in the role to pick up the slack.
+  Controlled by the new `clickhouse_sql_objects_or_replace` var (default `true`); set to
+  `false` to restore upstream's original create-once behaviour.
+- `DDL/USER.j2` and `DDL/ROLE.j2` no longer emit two separate `SETTINGS` clauses when both
+  `settings` and `profile` are set on the same user/role. ClickHouse's grammar only allows
+  one `SETTINGS` keyword per `CREATE USER`/`CREATE ROLE` statement; emitting it twice is
+  very likely a hard SQL syntax error on the affected object (silently swallowed by
+  `no_log: True` on the surrounding task), and prevents this combination from ever having
+  worked upstream. Inline settings and `PROFILE 'name'` entries are now merged into one
+  comma-separated `SETTINGS ...` clause, per the documented grammar.
+
 ## [3.5.1](https://github.com/idealista/clickhouse_role/tree/3.5.1) (2024-04-18)
 
 ### :hammer_and_wrench: Fixed

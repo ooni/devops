@@ -15,6 +15,14 @@ clickhouse_role_manage_settings_profiles: False
 clickhouse_role_manage_quotas: False
 clickhouse_role_manage_grants: False
 
+# ooni fork: SQL-driven users/roles/quotas/settings-profiles are created with
+# `CREATE ... OR REPLACE` and re-applied on every run, so that changes made to
+# clickhouse_custom_users/_roles/_quotas/_settings_profiles for an object that
+# already exists actually take effect (upstream only ever runs
+# `CREATE ... IF NOT EXISTS`, which is a permanent no-op after first creation).
+# Set to False to restore upstream's create-once behaviour.
+clickhouse_sql_objects_or_replace: True
+
 ## Service options
 # Documentation
 clickhouse_documentation_link: https://clickhouse.tech/docs/en/
