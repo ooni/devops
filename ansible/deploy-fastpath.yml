@@ -13,7 +13,8 @@
       ansible.builtin.find:
         paths: /etc/apt/sources.list.d
         patterns: "*.list"
-        contains: "nginx.org/packages"
+        contains: "nginx\\.org/packages"
+        read_whole_file: true
       register: _stale_nginx_apt_sources
       tags:
         - nginx
