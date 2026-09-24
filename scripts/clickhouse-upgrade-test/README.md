@@ -143,7 +143,7 @@ Two changes fix this without hiding anything:
    bytes are the same — an upgrade that silently rewrote a column while
    leaving row count untouched would sail through a row-count-only check.
    `harness/validate.py:table_snapshot()` checksums every seed table with
-   `sum(cityHash64(*))` (the same idiom `harness/real_data.py`'s
+   `sum(cityHash64(tuple(*)))` (the same idiom `harness/real_data.py`'s
    golden-snapshot mechanism already used for the separate, real-data
    `real-data-upgrade` job — see that section below; **this was previously
    real-data-only**, not applied to the fast synthetic `staged`/`direct`
@@ -215,6 +215,52 @@ nodes with an unchanged row count is much more likely a checksum-scope bug
 like this one than a genuine incompatibility -- check `system.columns`
 for schema drift (this harness's own `verify-ddl` steps, or a real `ALTER`
 if one's ever added elsewhere) before assuming the worst.
+
+### Bugfix: checksums silently missing for every table except citizenlab (run 97445863954)
+
+A later run surfaced a second, more serious checksum-scope bug: the
+`content-integrity` step's golden snapshot and final snapshot both had a
+real, non-null checksum for `citizenlab`, but `checksum: null` for
+`fastpath`, `analysis_web_measurement`, and `obs_web` on every node, in
+every snapshot -- row counts for those three were present and correct
+(2000/1000/5000), only the checksum was missing. Because two `null`
+values compare equal, this wasn't just "no checksum" -- it meant
+`content-integrity` could never have caught real data corruption in any
+of those three tables; it was silently checking row counts only for 3 of
+this harness's 4 seed tables, the opposite of what the check exists to do.
+
+The cause: `cityHash64()`, like most ClickHouse scalar functions,
+propagates `NULL` -- if *any* argument to a given call is `NULL`, the
+result of that call is `NULL`. `harness/seed_data.py`'s synthetic rows set
+several `Nullable` columns to `NULL` on literally every row (fastpath's
+`ooni_run_link_id`; `analysis_web_measurement`'s `top_dns_failure` /
+`top_tcp_failure` / `top_tls_failure`; most of `obs_web`'s `Nullable`
+columns), so `cityHash64(tuple_of_columns)` returned `NULL` for every
+single row of those three tables, and `sum()` over an all-`NULL` column
+returns `NULL`. `citizenlab`'s four columns are all non-nullable strings,
+so it was never affected -- which is exactly why this stayed invisible
+until someone looked closely at a full report rather than just its
+overall PASS/FAIL.
+
+Fixed by wrapping the column list in `tuple(...)`:
+`sum(cityHash64(tuple(...)))` instead of `sum(cityHash64(...))`, in both
+`harness/validate.py:table_snapshot()` and
+`harness/real_data.py:snapshot_tables()` (the latter has the identical
+bug, latent rather than confirmed, since `obs_web`/`obs_web_ctrl`/
+`obs_http_middlebox` all have `Nullable` columns real OONI measurements
+routinely leave `NULL`). A `Tuple` value is never itself `Nullable`, even
+when its elements are, so `cityHash64()` always gets one well-defined
+argument per row regardless of how many underlying columns are `NULL` --
+this is ClickHouse's own documented way to checksum a table containing
+`NULL`s
+([clickhouse.com/docs/sql-reference/functions/hash-functions](https://clickhouse.com/docs/sql-reference/functions/hash-functions):
+"Hash of NULL is NULL. To get a non-NULL hash of a Nullable column, wrap
+it in a tuple").
+
+Lesson, alongside the one above: a checksum of `null` isn't merely a
+missing value here, it's a silent false pass. Any future table added to
+`TABLES`/`REAL_DATA_TABLES` that has `Nullable` columns needs this same
+`tuple(...)` wrapping to actually be checked, not just counted.
 
 ## Running it
 
@@ -707,10 +753,13 @@ every deliberate difference from the upstream compose file (auth, dropped
   different question — see the `TODO` in `harness/real_data.py`'s module
   docstring for a possible follow-up).
 - Right after that one ingestion, a **golden snapshot** is taken — row
-  count + an order-independent content checksum (`sum(cityHash64(*))`,
-  ClickHouse's own idiom for hashing a whole table without listing columns
-  by hand) per real-data table, on all 3 nodes, requiring they already
-  agree with each other.
+  count + an order-independent content checksum
+  (`sum(cityHash64(tuple(*)))`, ClickHouse's own idiom for hashing a whole
+  table without listing columns by hand — the `tuple(...)` wrapper matters
+  for these particular tables, since several of their columns are
+  `Nullable`; see "Bugfix: checksums silently missing" above) per
+  real-data table, on all 3 nodes, requiring they already agree with each
+  other.
 - **After every hop of `RECOMMENDED_LTS_HOPS`** (all 3 nodes upgraded
   back-to-back, reusing the exact same `upgrade_node_step()` mechanics the
   synthetic scenario uses — these are already version/schema-agnostic):

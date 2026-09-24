@@ -76,17 +76,33 @@ LOAD_TIMEOUT_SECONDS = 30 * 60
 
 def snapshot_tables(node: ChNode, tables: list[str] = REAL_DATA_TABLES) -> dict[str, dict]:
     """Row count + an order-independent content checksum per table.
-    `sum(cityHash64(*))` is ClickHouse's own idiom for "checksum a table
-    without listing its columns by hand" -- cityHash64 is variadic and `*`
-    expands to every column, and summing (rather than, say, concatenating)
-    means row order -- which MergeTree never guarantees is stable across
-    replicas or across a re-merge triggered by an upgrade -- can't cause a
-    false mismatch."""
+    `sum(cityHash64(tuple(*)))` is ClickHouse's own idiom for "checksum a
+    table without listing its columns by hand" -- cityHash64 is variadic
+    and `*` expands to every column, and summing (rather than, say,
+    concatenating) means row order -- which MergeTree never guarantees is
+    stable across replicas or across a re-merge triggered by an upgrade --
+    can't cause a false mismatch.
+
+    The `tuple(...)` wrapper matters: cityHash64() propagates NULL like
+    most ClickHouse scalar functions (any NULL argument -> NULL result),
+    and obs_web/obs_web_ctrl/obs_http_middlebox all have Nullable columns
+    that real OONI measurements routinely leave NULL. A bare
+    `cityHash64(*)` would return NULL for any row with a NULL in *any*
+    column, and `sum()` over an all-NULL column returns NULL -- silently
+    turning off corruption detection for exactly the tables this snapshot
+    exists to protect (confirmed happening in practice for the synthetic
+    scenario's equivalent tables -- see harness/validate.py's
+    table_snapshot(), CI run 97445863954). A Tuple is never itself
+    Nullable even when its elements are, so wrapping the columns in
+    `tuple(...)` gives cityHash64() one well-defined argument per row
+    regardless of how many underlying columns are NULL -- the workaround
+    ClickHouse's own docs give
+    (https://clickhouse.com/docs/sql-reference/functions/hash-functions)."""
     out = {}
     for t in tables:
         try:
             row = node.query_rows(
-                f"SELECT count() AS cnt, sum(cityHash64(*)) AS checksum FROM ooni.{t}"
+                f"SELECT count() AS cnt, sum(cityHash64(tuple(*))) AS checksum FROM ooni.{t}"
             )[0]
             out[t] = {"row_count": int(row["cnt"]), "checksum": str(row["checksum"])}
         except Exception as e:

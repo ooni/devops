@@ -86,12 +86,33 @@ def counts_converged(counts_by_node: dict[str, dict[str, int | None]]) -> bool:
 # would sail through counts_converged(). harness/real_data.py's
 # golden-snapshot mechanism already checksums real-data tables the same
 # way for the separate real-data-upgrade job; table_snapshot() below is
-# the same idiom (`sum(cityHash64(*))`, ClickHouse's own way to checksum a
-# whole table without listing columns by hand -- variadic + order-
-# independent, so a MergeTree re-merge triggered by an upgrade can't cause
-# a false mismatch just because row order changed) applied to this
+# the same idiom (`sum(cityHash64(tuple(*)))`, ClickHouse's own way to
+# checksum a whole table without listing columns by hand -- variadic +
+# order-independent, so a MergeTree re-merge triggered by an upgrade can't
+# cause a false mismatch just because row order changed) applied to this
 # harness's synthetic TABLES, for the fast staged/direct scenarios that
 # previously only ever checked row counts.
+#
+# Bugfix (CI run 97445863954): the column list is wrapped in `tuple(...)`,
+# not hashed bare. cityHash64() (like most ClickHouse scalar functions)
+# propagates NULL -- if ANY argument is NULL, the whole call returns NULL
+# for that row. fastpath/analysis_web_measurement/obs_web each have at
+# least one Nullable column that this harness's own synthetic seed data
+# (harness/seed_data.py) sets to NULL on *every* row (fastpath's
+# `ooni_run_link_id`, analysis_web_measurement's `top_dns_failure` et al.),
+# so every row's hash -- and therefore sum() over the whole table -- came
+# back NULL for all three of those tables, while citizenlab (whose columns
+# are all non-nullable) checksummed fine. That's not a cosmetic gap: a
+# NULL checksum trivially "matches" another NULL checksum, so real data
+# corruption in any of these tables would have gone completely undetected.
+# Wrapping the column list in `tuple(...)` avoids this: a Tuple value is
+# not itself Nullable even when its elements are, so cityHash64() gets one
+# well-defined (non-NULL) argument per row regardless of how many of the
+# underlying columns are NULL -- exactly the workaround ClickHouse's own
+# docs give for hashing tables with NULLs
+# (https://clickhouse.com/docs/sql-reference/functions/hash-functions,
+# "Hash of NULL is NULL. To get a non-NULL hash of a Nullable column, wrap
+# it in a tuple").
 #
 # citizenlab gets exactly one new row per upgrade step from
 # probe_write_then_read() below (domain `probe-<uuid>.example.test`) --
@@ -111,7 +132,7 @@ _PROBE_DOMAIN_FILTER = " WHERE domain NOT LIKE 'probe-%.example.test'"
 # literally grows over the course of a rollout (4 extra columns by the end
 # of scenario_staged_lts()'s 4 hops), all backfilled with the same constant
 # default on every row, old and new. cityHash64(*) hashes over whatever
-# columns exist AT QUERY TIME, so a naive `SELECT ... cityHash64(*) ...`
+# columns exist AT QUERY TIME, so a naive `SELECT ... cityHash64(tuple(*)) ...`
 # taken after those ALTERs will never match the golden snapshot taken
 # before any of them ran -- not because any row's real data changed, but
 # because there are simply more (constant-valued) columns to hash now.
@@ -154,7 +175,7 @@ def table_snapshot(node: ChNode) -> dict[str, dict]:
         try:
             columns = ", ".join(_content_columns(node, t))
             row = node.query_rows(
-                f"SELECT count() AS cnt, sum(cityHash64({columns})) AS checksum FROM ooni.{t}{where}"
+                f"SELECT count() AS cnt, sum(cityHash64(tuple({columns}))) AS checksum FROM ooni.{t}{where}"
             )[0]
             out[t] = {"row_count": int(row["cnt"]), "checksum": str(row["checksum"])}
         except Exception as e:
