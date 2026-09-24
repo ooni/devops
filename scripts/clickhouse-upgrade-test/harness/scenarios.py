@@ -9,7 +9,12 @@ rolling upgrade, never taking the whole shard down.
 * scenario_staged_lts(): walks 24.8.6.70 -> 25.3.14.14 -> 25.8.29.51 ->
   26.3.17.110 -> 26.8.9.10 (RECOMMENDED_LTS_HOPS -- see harness/versions.py),
   one LTS hop at a time. Each hop stays within ClickHouse's documented
-  ~1 year mixed-version compatibility window.
+  ~1 year mixed-version compatibility window. The golden-snapshot content
+  checksum (content_integrity_step()) is re-checked once per hop, right
+  after that hop's verify_ddl_step() -- not just once at the very end --
+  so a corruption-causing release is pinpointed to the specific hop that
+  introduced it, rather than only being visible as "something in the
+  whole rollout broke it" once every hop has already run.
 
 * scenario_direct_jump(): goes straight from 24.8.6.70 to 26.8.9.10,
   node-by-node. This intentionally puts the cluster in a state ClickHouse's
@@ -33,10 +38,11 @@ RESULTS_DIR = PROJECT_DIR / "results"
 # Golden content-checksum snapshot of the synthetic seed data (row count +
 # cityHash64 checksum per table, probe rows excluded -- see
 # validate.table_snapshot()), taken once right after setup_step() and
-# diffed against by content_integrity_step() at the end of a rollout. Read
-# back from disk rather than passed in memory because ci_step.py runs each
-# step as its own separate process (mirrors harness/real_data.py's
-# SNAPSHOT_PATH, same reasoning).
+# diffed against by content_integrity_step() after every hop (not just at
+# the end of the rollout -- see scenario_staged_lts()). Read back from disk
+# rather than passed in memory because ci_step.py runs each step as its own
+# separate process (mirrors harness/real_data.py's SNAPSHOT_PATH, same
+# reasoning).
 SEED_SNAPSHOT_PATH = RESULTS_DIR / "seed_golden_snapshot.json"
 NODE_ORDER = ["ch1", "ch2", "ch3"]
 
@@ -113,9 +119,9 @@ def take_seed_golden_snapshot(log=print) -> dict:
     all 3 nodes, require they already agree (replication should have long
     since converged -- load_schema_and_seed() just waited on
     wait_for_convergence()), and persist as the baseline
-    content_integrity_step() diffs the end-of-rollout state against. Same
-    idiom as harness/real_data.py's take_golden_snapshot_step(), applied to
-    this harness's own seed data instead of real OONI data."""
+    content_integrity_step() diffs the post-hop state against, after every
+    hop. Same idiom as harness/real_data.py's take_golden_snapshot_step(),
+    applied to this harness's own seed data instead of real OONI data."""
     nodes = make_nodes()
     snap = validate.table_snapshot_all_nodes(nodes)
     agree = validate.snapshots_converged(snap)
@@ -309,19 +315,38 @@ def verify_ddl_step(version: str, label: str | None = None, log=print) -> dict:
 
 
 def content_integrity_step(label: str = "content-integrity", log=print) -> dict:
-    """End-of-rollout check: does the pre-existing seed data (loaded once
-    at setup, probe-tagged rows excluded -- see validate.table_snapshot())
-    still checksum-match the golden snapshot taken right after setup, on
-    every node, now that every hop has run? This is what actually answers
-    "no data loss or corruption by the time the rollout finished" --
-    independent of whether any individual mid-rollout step logged a hard
+    """Does the pre-existing seed data (loaded once at setup, probe-tagged
+    rows excluded -- see validate.table_snapshot()) still checksum-match
+    the golden snapshot taken right after setup, on every node, right now?
+
+    Called once per hop by scenario_staged_lts() (right after that hop's
+    verify_ddl_step(), once every node in the hop is on the new version) --
+    not just once at the very end of the whole rollout -- so a mismatch
+    localizes to the specific hop/release that introduced it, the same way
+    a bad node-upgrade step already localizes to a specific node. Calling
+    it with a fresh, per-hop `label` each time (e.g. "content-integrity-
+    25.3.14.14") is what lets ci_step.py's results/steps/*.json record each
+    hop's check as its own step, rather than one that only overwrites
+    itself; see .github/workflows/clickhouse_upgrade_test.yml.
+
+    Whichever call happens to run last (after the final hop) also answers
+    "no data loss or corruption by the time the rollout finished" as a side
+    effect of having already answered it after every earlier hop too --
+    there's no separate end-of-rollout-only check anymore.
+
+    Independent of whether any individual mid-rollout step logged a hard
     error that later cleared (that's a separate, per-hop question; see
-    _hop_settled() and report.py's self_healed()). New writes made *during*
-    the rollout (each step's probe_write_then_read() row) are already
-    separately proven to have landed by that same per-step check; this step
-    is scoped to "did anything that was ALREADY there get altered or lost",
-    which a hard error that cleared by the end of its own hop, by
-    definition, didn't."""
+    _hop_settled() and report.py's self_healed()) -- and, unlike that
+    question, a content mismatch is never eligible for the self-healing
+    exception: self-healing is specifically about a mixed-version
+    replication hiccup clearing once every replica reaches the same
+    version, and actual data loss/corruption doesn't "clear" the same way,
+    so this always gates. New writes made *during* the rollout (each
+    node-upgrade step's probe_write_then_read() row) are already separately
+    proven to have landed by that same per-step check; this step is scoped
+    to "did anything that was ALREADY there get altered or lost", which a
+    hard error that cleared by the end of its own hop, by definition,
+    didn't."""
     if not SEED_SNAPSHOT_PATH.exists():
         # "diffs": {} even here (not just in the success/mismatch path
         # below) so report.render_ci_step() can dispatch on this shape by
@@ -409,25 +434,44 @@ def scenario_staged_lts(log=print) -> dict:
         # node in this hop finished and DDL was re-verified, not whether
         # every individual node-upgrade step inside it was clean.
         ddl_ok = step_ok(ddl_result)
-        hop_ok = ddl_ok and bool(ddl_result.get("settled"))
-        recovered = hop_ok and any(not step_ok(s) for s in hop_steps)
+        hop_settled = ddl_ok and bool(ddl_result.get("settled"))
+        recovered = hop_settled and any(not step_ok(s) for s in hop_steps)
         for s in hop_steps:
             if not step_ok(s):
                 s["self_healed"] = recovered
         log(
-            f"[staged] hop -> {hop_version} settled by end of hop: {'YES' if hop_ok else 'NO'}"
+            f"[staged] hop -> {hop_version} settled by end of hop: {'YES' if hop_settled else 'NO'}"
             + (" (recovered from a mid-hop hard error)" if recovered else "")
         )
+
+        # Content-checksum check, once per hop rather than only once at the
+        # very end -- see content_integrity_step()'s docstring. A distinct
+        # per-hop label (not the shared "content-integrity" default) is
+        # what lets the CI-step-model report (ci_step.py/report.py) show
+        # each hop's check as its own step instead of one overwriting the
+        # last; the local, single-process report below uses
+        # "content_integrity_checks" (a list) for the same reason.
+        content_check = content_integrity_step(label=f"content-integrity-{hop_version}", log=log)
+        scenario.setdefault("content_integrity_checks", []).append(content_check)
+
+        # Never eligible for the self-healing exception above -- see
+        # content_integrity_step()'s docstring.
+        hop_ok = hop_settled and content_check["ok"]
         all_ok = all_ok and hop_ok
 
-    content_check = content_integrity_step(log=log)
-    scenario["content_integrity"] = content_check
-    all_ok = all_ok and content_check["ok"]
+    # Kept as a single key too (in addition to the per-hop list above) so
+    # anything still reading scenario["content_integrity"] -- e.g. older
+    # results/report.json consumers -- keeps working: the last hop's check
+    # IS "did the rollout end with no data loss or corruption", since
+    # nothing runs between it and the end of the rollout.
+    if scenario.get("content_integrity_checks"):
+        scenario["content_integrity"] = scenario["content_integrity_checks"][-1]
 
     scenario["verdict"] = (
-        "PASS -- rolling, node-by-node upgrade completed with no data loss or corruption by the end of "
-        "the rollout (content-checksum verified against the golden seed snapshot; any mid-hop hard-looking "
-        "errors are marked self-healed per-step above where the cluster reconverged before that hop ended)"
+        "PASS -- rolling, node-by-node upgrade completed with no data loss or corruption after ANY "
+        "hop (content-checksum verified against the golden seed snapshot after every hop, not just "
+        "at the end -- see content_integrity_checks; any mid-hop hard-looking errors are marked "
+        "self-healed per-step above where the cluster reconverged before that hop ended)"
         if all_ok else "FAIL -- see steps above for where it broke"
     )
     return scenario
@@ -466,7 +510,12 @@ def scenario_direct_jump(log=print) -> dict:
         if not step_ok(s):
             s["self_healed"] = recovered
 
-    content_check = content_integrity_step(log=log)
+    # Only one hop here, so this is simultaneously "per-hop" and
+    # "end-of-rollout" -- same content_integrity_step() the staged scenario
+    # now calls once per hop, labeled the same way for consistency in
+    # reports (see scenario_staged_lts()).
+    content_check = content_integrity_step(label=f"content-integrity-{LATEST_VERSION}", log=log)
+    scenario["content_integrity_checks"] = [content_check]
     scenario["content_integrity"] = content_check
 
     all_ok = settled and content_check["ok"]

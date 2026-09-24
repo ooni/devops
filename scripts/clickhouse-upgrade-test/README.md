@@ -116,10 +116,12 @@ Docker host. `sql/001_schema.sql` creates the real table schemas
   breaks when replicas are held ~2 years apart in version for the whole
   rollout.
 
-Once the whole rollout finishes, both scenarios also re-checksum every
-pre-existing seed row (content, not just row count — see "CI pass/fail:
-self-healing vs. genuine failure" below) against a golden snapshot taken
-right after setup, on all 3 nodes.
+After every hop (not just once at the very end — see "Per-hop content
+integrity" below), both scenarios also re-checksum every pre-existing seed
+row (content, not just row count — see "CI pass/fail: self-healing vs.
+genuine failure" below) against a golden snapshot taken right after setup,
+on all 3 nodes, so a corrupting release is pinpointed to the specific hop
+that introduced it.
 
 Results land in `results/report.md` (human-readable) and
 `results/report.json` (full structured data, including every row-count
@@ -150,13 +152,13 @@ Two changes fix this without hiding anything:
    scenarios most PRs actually exercise). `setup_step()` takes a golden
    snapshot of the seed data right after loading it (excluding the
    probe rows each upgrade step writes — those are expected new data, not
-   part of what should stay untouched), and a new end-of-rollout
-   `content-integrity` CI step (`ci_step.py content-integrity`,
-   `harness/scenarios.py:content_integrity_step()`) diffs the final state
-   against it. Any difference here is genuine data loss or corruption —
-   nothing should be rewriting the pre-existing seed data at any point —
-   and this check is **not** eligible for the self-healing exception below;
-   it always gates the job.
+   part of what should stay untouched), and a `content-integrity` CI step
+   (`ci_step.py content-integrity`, `harness/scenarios.py:content_integrity_step()`)
+   diffs the current state against it. Any difference here is genuine data
+   loss or corruption — nothing should be rewriting the pre-existing seed
+   data at any point — and this check is **not** eligible for the
+   self-healing exception below; it always gates the job. See "Per-hop
+   content integrity" below for when this runs.
 2. **Self-healing no longer fails the job, but is called out explicitly.**
    Each hop's `verify-ddl` step (`harness/scenarios.py:verify_ddl_step()`)
    now also re-checks that the cluster has *settled* — row counts converged
@@ -329,6 +331,54 @@ almost never a ClickHouse-version-compatibility finding -- it's a bug in
 this harness's own checksum query, and it's worth reproducing locally
 (chdb makes this fast, no Docker or real cluster needed) rather than
 iterating purely against CI.
+
+### Per-hop content integrity (was end-of-rollout-only)
+
+The `content-integrity` checksum check above originally ran exactly once,
+after the very last hop of a scenario. That answers "did the rollout, taken
+as a whole, lose or corrupt anything" -- a real and useful question -- but
+not "which hop/release did it": a mismatch surfacing only at the very end
+of a 4-hop `staged-upgrade` run left no way to tell whether `25.3.14.14`,
+`25.8.29.51`, `26.3.17.110`, or `26.8.9.10` was the one that actually broke
+something, short of manually re-running the ladder and stopping early --
+exactly the kind of localization this harness exists to automate for
+`system.errors`/replication already (see "What the test actually does"
+above), just not yet for content.
+
+Fixed by moving the `content-integrity` check inside the hop loop:
+`scenario_staged_lts()` now calls `content_integrity_step()` once per hop,
+immediately after that hop's `verify_ddl_step()` (once every node in the
+hop is on the new version and the cluster has settled), rather than once
+after the whole loop. Each call gets a hop-scoped label
+(`content-integrity-25.3.14.14`, `content-integrity-25.8.29.51`, ...) so
+`ci_step.py`'s per-step `results/steps/*.json` model -- and the CI job's
+own step-by-step checkmarks -- record each hop's check as its own
+pass/fail rather than one overwriting the last. `.github/workflows/clickhouse_upgrade_test.yml`
+now has one `content-integrity` step per hop in `staged-upgrade` (`hop1-`
+through `hop4-content-integrity`) and `aggressive-skip-upgrade`
+(`skip-hop1-`/`skip-hop2-content-integrity`); `direct-jump-upgrade` only
+ever had one hop, so its single check (`direct-content-integrity`) already
+was per-hop, just relabeled for consistency. There's no longer a separate
+"end-of-rollout" step anywhere -- the last hop's check already answers that
+question, since nothing happens between it and the end of the rollout.
+
+This check keeps its existing gating behavior exactly as before: it is
+**never** eligible for the self-healing exception (a content mismatch
+doesn't "clear" the way a transient mixed-version replication hiccup
+does -- see the numbered list above), so a failure at, say, hop 2 still
+fails the job even if hops 3 and 4 go on to run cleanly afterward (the
+loop deliberately doesn't stop early on a content-integrity failure, the
+same way it already didn't stop early on a `verify-ddl` or node-upgrade
+failure -- every hop still gets a chance to run and report, so a report
+shows the full picture of what happened before and after the break, not
+just the first failure).
+
+`harness/report.py`'s `render_scenario()` (the local, single-process
+`run_test.py` report) now renders a `content_integrity_checks` list -- one
+entry per hop -- instead of a single `content_integrity` key; the CI-step
+model (`ci_step.py`/`harness/report.py:render_ci_steps_report()`) needed no
+changes at all, since it already renders and gates on whatever
+`results/steps/*.json` files exist by their shape, independent of label.
 
 ## Running it
 

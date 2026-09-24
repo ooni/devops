@@ -22,7 +22,7 @@ Usage:
     python3 ci_step.py setup --base-version 24.8.6.70 --label setup
     python3 ci_step.py upgrade-node --node ch1 --version 25.3.14.14 --label hop-25.3-ch1
     python3 ci_step.py verify-ddl --version 25.3.14.14 --label hop-25.3-verify-ddl
-    python3 ci_step.py content-integrity --label content-integrity  # run once, after the last hop
+    python3 ci_step.py content-integrity --label content-integrity-25.3.14.14  # run once per hop, right after that hop's verify-ddl
     python3 ci_step.py report
     python3 ci_step.py teardown
 
@@ -32,9 +32,12 @@ loss or corruption, not whether every single step was individually clean
 self-heals by the end of its own hop (its hop's verify-ddl step settles
 cleanly) no longer fails the job on its own; see harness/report.py's
 self_healed()/effective_ok()/overall_ok() for the exact rule, and
-harness/scenarios.py's content_integrity_step() for the end-of-rollout
-"did anything ALREADY there get lost or corrupted" check `report` also
-requires to pass.
+harness/scenarios.py's content_integrity_step() for the "did anything
+ALREADY there get lost or corrupted" check `report` also requires to pass
+at every hop it ran at (not just the last one -- see .github/workflows/
+clickhouse_upgrade_test.yml, which now invokes this once per hop with a
+distinct --label so a corrupting release is pinpointed to its own hop
+instead of only surfacing as "something in the rollout broke it").
 
 Real-data scenario (harness/real_data.py) -- separate CLI verbs, since it's
 a different flow (load real data once, then hop):
@@ -250,10 +253,13 @@ def main() -> int:
     p_ci = sub.add_parser(
         "content-integrity",
         help=(
-            "End-of-rollout check: does the pre-existing seed data (probe rows from "
-            "mid-rollout writes excluded) still checksum-match the golden snapshot "
-            "taken at setup, on all 3 nodes? This is the 'no data loss or corruption' "
-            "signal, independent of whether any mid-rollout step self-healed."
+            "Does the pre-existing seed data (probe rows from mid-rollout writes "
+            "excluded) still checksum-match the golden snapshot taken at setup, on "
+            "all 3 nodes, right now? This is the 'no data loss or corruption' "
+            "signal, independent of whether any mid-rollout step self-healed. Run "
+            "once per hop (see .github/workflows/clickhouse_upgrade_test.yml), each "
+            "time with a distinct --label, so a mismatch pinpoints the hop/release "
+            "that caused it rather than only 'somewhere in the rollout'."
         ),
     )
     p_ci.add_argument("--label", default="content-integrity")

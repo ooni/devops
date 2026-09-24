@@ -142,9 +142,14 @@ def render_step(step: dict, all_steps: list[dict] | None = None) -> str:
 
 
 def render_content_integrity(step: dict) -> str:
-    """scenarios.content_integrity_step()'s shape -- the end-of-rollout
-    "did the pre-existing seed data survive untouched" check, keyed on its
-    always-present "diffs" field (see that function's docstring)."""
+    """scenarios.content_integrity_step()'s shape -- "does the pre-existing
+    seed data still survive untouched, right now" -- keyed on its
+    always-present "diffs" field (see that function's docstring). Called
+    once per hop (not just once at the end of the rollout -- see
+    scenario_staged_lts()), so the wording below deliberately says "as of
+    this check" rather than "by the end of the rollout": whichever call
+    happens to be the last one IS the end-of-rollout answer, but every
+    earlier one is just as real a pass/fail for the hop it followed."""
     label = step.get("label", "content-integrity")
     ok = step.get("ok")
     lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
@@ -154,11 +159,11 @@ def render_content_integrity(step: dict) -> str:
         lines.append(
             "Every pre-existing seed row (probe-tagged rows from mid-rollout "
             "writes excluded) still checksum-matches the golden snapshot "
-            "taken right after setup, on all 3 nodes -- **no data loss or "
-            "corruption in the pre-existing data by the end of the rollout.**"
+            "taken right after setup, on all 3 nodes, as of this check -- "
+            "**no data loss or corruption in the pre-existing data so far.**"
         )
     else:
-        lines.append("Pre-existing seed data changed somewhere during the rollout -- genuine data loss/corruption, not self-healing:")
+        lines.append("Pre-existing seed data changed by this point in the rollout -- genuine data loss/corruption, not self-healing:")
         lines.append("")
         lines.append("```")
         lines.append(json.dumps(step.get("diffs"), indent=2, default=str)[:3000])
@@ -184,8 +189,15 @@ def render_scenario(scenario: dict) -> str:
             f"- `ALTER TABLE ... ON CLUSTER` at `{ddl.get('version')}`: **{_fmt_bool(ddl.get('on_cluster_alter_ok'))}**\n"
             f"- Cluster settled (converged, no stuck replication-queue entries) by end of this hop: **{_fmt_bool(ddl.get('settled'))}**\n"
         )
-    if "content_integrity" in scenario:
-        lines.append(render_content_integrity(scenario["content_integrity"]))
+    # "content_integrity_checks" (plural, one per hop) is the current shape
+    # -- see scenario_staged_lts()/scenario_direct_jump() in scenarios.py.
+    # Falls back to the older singular "content_integrity" key so any
+    # results.json produced before this change still renders.
+    content_checks = scenario.get("content_integrity_checks")
+    if content_checks is None and "content_integrity" in scenario:
+        content_checks = [scenario["content_integrity"]]
+    for check in content_checks or []:
+        lines.append(render_content_integrity(check))
     return "\n".join(lines)
 
 
@@ -213,10 +225,13 @@ def render_ci_step(step: dict, all_steps: list[dict] | None = None) -> str:
     """Render one step from ci_step.py's results/steps/*.json. Dispatches on
     which keys are present the same way scenarios.step_ok() does -- covers
     both the original three shapes (setup / upgrade-node / verify-ddl), the
-    end-of-rollout content-integrity shape, and the real-data scenario's
-    shapes from harness/real_data.py (setup-real-data / load-real-data /
-    golden-snapshot / verify-e2e / real-data-hop). `all_steps` (the full
-    flat list this step came from) is threaded through so upgrade-node
+    content-integrity shape (now recorded once per hop, not just once at
+    the end of the rollout -- see content_integrity_step()'s docstring;
+    dispatch here doesn't care which hop it came from, only its shape), and
+    the real-data scenario's shapes from harness/real_data.py
+    (setup-real-data / load-real-data / golden-snapshot / verify-e2e /
+    real-data-hop). `all_steps` (the full flat list this step came from) is
+    threaded through so upgrade-node
     steps can report self_healed() status -- see render_step()."""
     label = step.get("label", "?")
 

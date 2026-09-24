@@ -109,6 +109,21 @@ jobs:
         run: python3 ci_step.py verify-ddl --version 25.3.14.14 --label hop1-verify-ddl
         continue-on-error: true
 
+      # Per-hop data-integrity gate: does the seed data loaded before any
+      # hop (probe rows from the per-step write-then-read-back checks
+      # excluded) still checksum-match, on all 3 nodes, now that THIS hop
+      # has run? Checked after every hop (not just once at the very end --
+      # see harness/scenarios.py's content_integrity_step() and
+      # scenario_staged_lts()) so a corrupting release is pinpointed to the
+      # specific hop that introduced it, rather than only surfacing as
+      # "something in the whole rollout broke it" once every hop has
+      # already run. Like the old end-of-rollout version of this check,
+      # this is NOT eligible for the self-healing exception (see
+      # harness/report.py's self_healed()/overall_ok()) -- it always gates.
+      - name: "Hop 1/4 (-> 25.3.14.14): verify no data loss or corruption (content checksums vs. golden seed snapshot)"
+        run: python3 ci_step.py content-integrity --label hop1-content-integrity
+        continue-on-error: true
+
       # --- Hop 2/4: 25.3.14.14 -> 25.8.29.51 (LTS) -- previously this job
       # only ever tested this transition via the bisected monthly-release
       # ladder; this is now the first CI coverage of the actual un-bisected
@@ -130,6 +145,12 @@ jobs:
         run: python3 ci_step.py verify-ddl --version 25.8.29.51 --label hop2-verify-ddl
         continue-on-error: true
 
+      # Per-hop data-integrity gate -- see hop 1's equivalent step above for
+      # the full rationale.
+      - name: "Hop 2/4 (-> 25.8.29.51): verify no data loss or corruption (content checksums vs. golden seed snapshot)"
+        run: python3 ci_step.py content-integrity --label hop2-content-integrity
+        continue-on-error: true
+
       # --- Hop 3/4: 25.8.29.51 -> 26.3.17.110 (LTS) -- the nested-data-type
       # serialization change flagged in the ooni/devops#477 review; same
       # self-healing pattern expected on the trailing node. ---
@@ -144,6 +165,12 @@ jobs:
         continue-on-error: true
       - name: "Hop 3/4 (-> 26.3.17.110): verify ON CLUSTER DDL"
         run: python3 ci_step.py verify-ddl --version 26.3.17.110 --label hop3-verify-ddl
+        continue-on-error: true
+
+      # Per-hop data-integrity gate -- see hop 1's equivalent step above for
+      # the full rationale.
+      - name: "Hop 3/4 (-> 26.3.17.110): verify no data loss or corruption (content checksums vs. golden seed snapshot)"
+        run: python3 ci_step.py content-integrity --label hop3-content-integrity
         continue-on-error: true
 
       # --- Hop 4/4: 26.3.17.110 -> 26.8.9.10 (LTS, retargeted 2026-09-21 from
@@ -165,17 +192,17 @@ jobs:
         run: python3 ci_step.py verify-ddl --version 26.8.9.10 --label hop4-verify-ddl
         continue-on-error: true
 
-      # End-of-rollout data-integrity gate: does the seed data loaded before
-      # any hop (probe rows from the per-step write-then-read-back checks
-      # excluded) still checksum-match, on all 3 nodes, now that every hop
-      # has run? This -- not "did every individual step stay clean" -- is
-      # what `report` below actually gates the job on: a hard-looking error
-      # from e.g. hop2-ch2/hop3-ch2/hop4-ch1 above that cleared by its own
-      # hop's verify-ddl no longer fails the job on its own (see
-      # harness/report.py's self_healed()/overall_ok()), but this step
-      # failing always does.
-      - name: "End-of-rollout: verify no data loss or corruption (content checksums vs. golden seed snapshot)"
-        run: python3 ci_step.py content-integrity --label content-integrity
+      # Per-hop data-integrity gate -- see hop 1's equivalent step above for
+      # the full rationale. This is also, as a side effect of being the
+      # last hop, the "did the rollout end with no data loss or corruption"
+      # answer -- there is no separate end-of-rollout-only check anymore,
+      # since checking after every hop (including this one) subsumes it: a
+      # hard-looking error from e.g. hop2-ch2/hop3-ch2/hop4-ch1 above that
+      # cleared by its own hop's verify-ddl no longer fails the job on its
+      # own (see harness/report.py's self_healed()/overall_ok()), but any
+      # one of these per-hop content-integrity steps failing always does.
+      - name: "Hop 4/4 (-> 26.8.9.10): verify no data loss or corruption (content checksums vs. golden seed snapshot)"
+        run: python3 ci_step.py content-integrity --label hop4-content-integrity
         continue-on-error: true
 
       - name: Generate report
@@ -351,10 +378,11 @@ jobs:
         run: python3 ci_step.py verify-ddl --version 26.8.9.10 --label direct-verify-ddl
         continue-on-error: true
 
-      # Same end-of-rollout data-integrity gate as staged-upgrade above --
-      # see that job's equivalent step for the full rationale.
-      - name: "End-of-rollout: verify no data loss or corruption (content checksums vs. golden seed snapshot)"
-        run: python3 ci_step.py content-integrity --label content-integrity
+      # Same per-hop data-integrity gate as each hop of staged-upgrade above
+      # (see that job's hop 1 step for the full rationale) -- there's only
+      # one hop here, so it's simultaneously "per-hop" and "end-of-rollout".
+      - name: "Direct jump (-> 26.8.9.10): verify no data loss or corruption (content checksums vs. golden seed snapshot)"
+        run: python3 ci_step.py content-integrity --label direct-content-integrity
         continue-on-error: true
 
       - name: Generate report
@@ -450,6 +478,14 @@ jobs:
         run: python3 ci_step.py verify-ddl --version 25.8.29.51 --label skip-hop1-verify-ddl
         continue-on-error: true
 
+      # Per-hop data-integrity gate -- same rationale as staged-upgrade's
+      # equivalent step (see that job's hop 1 step), applied here too so a
+      # corrupting release is pinpointed to whichever of these two
+      # (larger-than-normal) EXPERIMENTAL hops actually introduced it.
+      - name: "EXPERIMENTAL Hop 1/2 (-> 25.8.29.51, skips 25.3.14.14): verify no data loss or corruption (content checksums vs. golden seed snapshot)"
+        run: python3 ci_step.py content-integrity --label skip-hop1-content-integrity
+        continue-on-error: true
+
       # --- EXPERIMENTAL Hop 2/2: 25.8.29.51 -> 26.8.9.10, skipping
       # 26.3.17.110 entirely (only 1 LTS version -- 26.3 -- in between).
       # Combines two independently-observed incompatibility boundaries
@@ -471,10 +507,12 @@ jobs:
         run: python3 ci_step.py verify-ddl --version 26.8.9.10 --label skip-hop2-verify-ddl
         continue-on-error: true
 
-      # Same end-of-rollout data-integrity gate as staged-upgrade above --
-      # see that job's equivalent step for the full rationale.
-      - name: "End-of-rollout: verify no data loss or corruption (content checksums vs. golden seed snapshot)"
-        run: python3 ci_step.py content-integrity --label content-integrity
+      # Per-hop data-integrity gate -- see hop 1's equivalent step above for
+      # the full rationale. This is also, as a side effect of being the
+      # last hop, the "did the rollout end with no data loss or corruption"
+      # answer -- there is no separate end-of-rollout-only check anymore.
+      - name: "EXPERIMENTAL Hop 2/2 (-> 26.8.9.10, skips 26.3.17.110): verify no data loss or corruption (content checksums vs. golden seed snapshot)"
+        run: python3 ci_step.py content-integrity --label skip-hop2-content-integrity
         continue-on-error: true
 
       - name: Generate report
