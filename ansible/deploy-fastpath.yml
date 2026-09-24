@@ -6,6 +6,27 @@
     - fastpath2.prod.ooni.io
     - reuploaderfastpath.prod.ooni.io
   become: true
+  vars:
+    nginx_install_method: official_repo
+  pre_tasks:
+    - name: Find any nginx.org apt source files left over from a previous nginxinc.nginx install
+      ansible.builtin.find:
+        paths: /etc/apt/sources.list.d
+        patterns: "*.list"
+        contains: "nginx.org/packages"
+      register: _stale_nginx_apt_sources
+      tags:
+        - nginx
+        - packages
+
+    - name: Remove stale nginx.org apt source files (avoids "Conflicting values set for option Signed-By")
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ _stale_nginx_apt_sources.files }}"
+      tags:
+        - nginx
+        - packages
   roles:
     - role: bootstrap
     - role: nginx
