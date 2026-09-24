@@ -143,7 +143,7 @@ Two changes fix this without hiding anything:
    bytes are the same — an upgrade that silently rewrote a column while
    leaving row count untouched would sail through a row-count-only check.
    `harness/validate.py:table_snapshot()` checksums every seed table with
-   `sum(cityHash64(tuple(*)))` (the same idiom `harness/real_data.py`'s
+   `sum(cityHash64(toString(tuple(*))))` (the same idiom `harness/real_data.py`'s
    golden-snapshot mechanism already used for the separate, real-data
    `real-data-upgrade` job — see that section below; **this was previously
    real-data-only**, not applied to the fast synthetic `staged`/`direct`
@@ -259,8 +259,76 @@ it in a tuple").
 
 Lesson, alongside the one above: a checksum of `null` isn't merely a
 missing value here, it's a silent false pass. Any future table added to
-`TABLES`/`REAL_DATA_TABLES` that has `Nullable` columns needs this same
-`tuple(...)` wrapping to actually be checked, not just counted.
+`TABLES`/`REAL_DATA_TABLES` that has `Nullable` columns needs the same
+NULL-safe handling below to actually be checked, not just counted.
+
+### Bugfix, round 2: `tuple(...)` alone crashes instead of fixing it (run 97476149999)
+
+The `tuple(...)` fix above didn't actually work. The very next real CI
+run failed at the `setup` step itself -- before any upgrade hop ran at
+all -- with `fastpath`, `analysis_web_measurement`, and `obs_web` all
+erroring out on every node:
+
+```
+Code: 48. DB::Exception: Method getDataAt is not supported for
+Nullable(UInt64) in case if value is NULL: while executing
+'FUNCTION cityHash64(tuple(...))'
+```
+
+(and the equivalent for `Nullable(String)` columns in the other two
+tables). `tuple(...)` stops `cityHash64()` from propagating `NULL`
+outward for the whole call, as intended -- but it turns out `cityHash64`
+has a real, longstanding bug of its own
+([github.com/ClickHouse/ClickHouse/issues/51541](https://github.com/ClickHouse/ClickHouse/issues/51541),
+open since ClickHouse 22.9) in how it reads a `Nullable` column's
+underlying storage from *inside* a `Tuple` argument: it throws instead
+of handling a real, in-storage `NULL` value, even though the outer
+`Tuple` itself is never `Nullable`. The ClickHouse docs' own suggested
+`tuple(...)` workaround only demonstrates this against a literal
+`tuple(NULL)` constant, not an actual `Nullable` column read from a
+table -- which is exactly the difference that matters, and exactly what
+this harness's queries do.
+
+Reproduced directly (via [chdb](https://github.com/chdb-io/chdb), an
+embeddable build of ClickHouse usable without Docker or a running
+server) against ClickHouse 24.5.1.1 -- close to this project's
+`BASE_VERSION`, `24.8.6.70` -- with the identical error code and message
+CI saw. Confirmed fixed by wrapping the tuple in `toString(...)` as
+well: `sum(cityHash64(toString(tuple(...))))`. Once the tuple is
+rendered to a plain `String`, `cityHash64` never touches the original
+`Nullable` columns' storage at all, so the buggy code path is never
+reached, on any ClickHouse version -- this isn't a fix that depends on a
+particular ClickHouse release patching the bug, it structurally avoids
+triggering it.
+
+That still leaves an open question a NULL-safe fix alone doesn't answer:
+this checksum has to compare equal across nodes running *different*
+ClickHouse versions during a mixed-version rollout, so it only works if
+`toString()`'s text rendering of a value is itself stable across
+versions -- if, say, float formatting changed between releases, two
+nodes could disagree on a checksum despite holding identical data,
+turning this into a new source of false mismatches. Checked directly (again
+via chdb, comparing ClickHouse 24.5.1.1 against 26.7.2.1): a row
+containing a `Float64`, a `DateTime64(3)`, and a `NULL` renders to
+byte-identical text and hashes to the identical `UInt64` on both
+versions. Not an exhaustive check of every type this schema uses, but
+enough to be confident the approach is sound rather than swapping one
+silent failure mode for another.
+
+`harness/validate.py:table_snapshot()` and
+`harness/real_data.py:snapshot_tables()` both now use
+`sum(cityHash64(toString(tuple(...))))` -- the latter's bug was latent
+(never observed failing in CI, since the real-data job hadn't run since
+round 1 landed) but structurally identical, since
+`obs_web`/`obs_web_ctrl`/`obs_http_middlebox` all have `Nullable`
+columns real OONI measurements routinely leave `NULL`.
+
+Lesson on top of the last two: a scary-looking exception that's
+reproducible on the very first `setup` step, before any upgrade, is
+almost never a ClickHouse-version-compatibility finding -- it's a bug in
+this harness's own checksum query, and it's worth reproducing locally
+(chdb makes this fast, no Docker or real cluster needed) rather than
+iterating purely against CI.
 
 ## Running it
 
@@ -754,11 +822,12 @@ every deliberate difference from the upstream compose file (auth, dropped
   docstring for a possible follow-up).
 - Right after that one ingestion, a **golden snapshot** is taken — row
   count + an order-independent content checksum
-  (`sum(cityHash64(tuple(*)))`, ClickHouse's own idiom for hashing a whole
-  table without listing columns by hand — the `tuple(...)` wrapper matters
-  for these particular tables, since several of their columns are
-  `Nullable`; see "Bugfix: checksums silently missing" above) per
-  real-data table, on all 3 nodes, requiring they already agree with each
+  (`sum(cityHash64(toString(tuple(*))))`, ClickHouse's own idiom for
+  hashing a whole table without listing columns by hand — both the
+  `tuple(...)` and `toString(...)` wrappers matter for these particular
+  tables, since several of their columns are `Nullable`; see "Bugfix:
+  checksums silently missing" and "Bugfix, round 2" above) per real-data
+  table, on all 3 nodes, requiring they already agree with each
   other.
 - **After every hop of `RECOMMENDED_LTS_HOPS`** (all 3 nodes upgraded
   back-to-back, reusing the exact same `upgrade_node_step()` mechanics the

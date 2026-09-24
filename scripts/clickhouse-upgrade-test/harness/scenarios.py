@@ -280,7 +280,7 @@ def verify_ddl_step(version: str, label: str | None = None, log=print) -> dict:
 
     The added column is named with validate.DDL_VERIFY_MARKER_PREFIX so
     validate.table_snapshot()'s content checksum can recognize and exclude
-    it -- otherwise cityHash64(tuple(*)) would pick up the new (constant-valued)
+    it -- otherwise cityHash64(toString(tuple(*))) would pick up the new (constant-valued)
     column and make content_integrity_step() see a "mismatch" that's just
     schema growth, not lost or corrupted data (see that constant's
     docstring for how this went wrong in CI run 96419815217 before the

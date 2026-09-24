@@ -86,33 +86,58 @@ def counts_converged(counts_by_node: dict[str, dict[str, int | None]]) -> bool:
 # would sail through counts_converged(). harness/real_data.py's
 # golden-snapshot mechanism already checksums real-data tables the same
 # way for the separate real-data-upgrade job; table_snapshot() below is
-# the same idiom (`sum(cityHash64(tuple(*)))`, ClickHouse's own way to
-# checksum a whole table without listing columns by hand -- variadic +
-# order-independent, so a MergeTree re-merge triggered by an upgrade can't
-# cause a false mismatch just because row order changed) applied to this
-# harness's synthetic TABLES, for the fast staged/direct scenarios that
-# previously only ever checked row counts.
+# the same idiom (`sum(cityHash64(toString(tuple(*))))`, ClickHouse's own
+# way to checksum a whole table without listing columns by hand -- variadic
+# + order-independent, so a MergeTree re-merge triggered by an upgrade
+# can't cause a false mismatch just because row order changed) applied to
+# this harness's synthetic TABLES, for the fast staged/direct scenarios
+# that previously only ever checked row counts.
 #
-# Bugfix (CI run 97445863954): the column list is wrapped in `tuple(...)`,
-# not hashed bare. cityHash64() (like most ClickHouse scalar functions)
-# propagates NULL -- if ANY argument is NULL, the whole call returns NULL
-# for that row. fastpath/analysis_web_measurement/obs_web each have at
-# least one Nullable column that this harness's own synthetic seed data
-# (harness/seed_data.py) sets to NULL on *every* row (fastpath's
+# Bugfix, round 1 (CI run 97445863954): the column list is wrapped in
+# `tuple(...)`, not hashed bare. cityHash64() (like most ClickHouse scalar
+# functions) propagates NULL -- if ANY argument is NULL, the whole call
+# returns NULL for that row. fastpath/analysis_web_measurement/obs_web
+# each have at least one Nullable column that this harness's own synthetic
+# seed data (harness/seed_data.py) sets to NULL on *every* row (fastpath's
 # `ooni_run_link_id`, analysis_web_measurement's `top_dns_failure` et al.),
 # so every row's hash -- and therefore sum() over the whole table -- came
 # back NULL for all three of those tables, while citizenlab (whose columns
 # are all non-nullable) checksummed fine. That's not a cosmetic gap: a
 # NULL checksum trivially "matches" another NULL checksum, so real data
 # corruption in any of these tables would have gone completely undetected.
-# Wrapping the column list in `tuple(...)` avoids this: a Tuple value is
-# not itself Nullable even when its elements are, so cityHash64() gets one
-# well-defined (non-NULL) argument per row regardless of how many of the
-# underlying columns are NULL -- exactly the workaround ClickHouse's own
-# docs give for hashing tables with NULLs
-# (https://clickhouse.com/docs/sql-reference/functions/hash-functions,
+# `tuple(...)` was meant to fix this -- a Tuple value is not itself
+# Nullable even when its elements are, so cityHash64() should get one
+# well-defined (non-NULL) argument per row regardless of how many
+# underlying columns are NULL. This is what ClickHouse's own docs suggest
+# (https://clickhouse.com/docs/sql-reference/functions/hash-functions:
 # "Hash of NULL is NULL. To get a non-NULL hash of a Nullable column, wrap
-# it in a tuple").
+# it in a tuple") -- but the docs' own example only tries this against a
+# literal `tuple(NULL)`, not a real Nullable column read from storage.
+#
+# Bugfix, round 2 (CI run 97476149999): `cityHash64(tuple(...))` fails
+# outright -- not NULL, an exception -- the moment a wrapped column is
+# Nullable AND actually holds NULL in a real (non-constant) column read
+# from a table: `Code: 48. DB::Exception: Method getDataAt is not
+# supported for Nullable(UInt64) in case if value is NULL`. This is a
+# real ClickHouse bug (github.com/ClickHouse/ClickHouse/issues/51541,
+# open since 22.9) in cityHash64's own internal handling of Nullable
+# columns -- confirmed reproducible against ClickHouse 24.5.1.1 (via
+# chdb) with the identical error text and error code as CI run
+# 97476149999 saw against our actual 24.8.6.70, i.e. this affects every
+# version this harness runs against, not a fluke of one release.
+#
+# Fixed for real this time by wrapping in `toString(...)` as well:
+# `cityHash64(toString(tuple(...)))`. This sidesteps the bug entirely
+# rather than relying on a ClickHouse-version-specific fix landing: once
+# the tuple is rendered to a plain String, cityHash64 never touches the
+# original Nullable columns' underlying storage at all, so the buggy
+# code path is never reached, regardless of ClickHouse version. Verified
+# (via chdb) that this doesn't just avoid the crash but stays
+# cross-version stable, which matters since this checksum has to compare
+# equal across nodes on *different* ClickHouse versions during a mixed
+# rollout: the same row (Float64s, DateTime64s, and NULLs included)
+# renders to byte-identical text and hashes to the identical UInt64 on
+# both ClickHouse 24.5.1.1 and 26.7.2.1.
 #
 # citizenlab gets exactly one new row per upgrade step from
 # probe_write_then_read() below (domain `probe-<uuid>.example.test`) --
@@ -132,7 +157,7 @@ _PROBE_DOMAIN_FILTER = " WHERE domain NOT LIKE 'probe-%.example.test'"
 # literally grows over the course of a rollout (4 extra columns by the end
 # of scenario_staged_lts()'s 4 hops), all backfilled with the same constant
 # default on every row, old and new. cityHash64(*) hashes over whatever
-# columns exist AT QUERY TIME, so a naive `SELECT ... cityHash64(tuple(*)) ...`
+# columns exist AT QUERY TIME, so a naive `SELECT ... cityHash64(toString(tuple(*))) ...`
 # taken after those ALTERs will never match the golden snapshot taken
 # before any of them ran -- not because any row's real data changed, but
 # because there are simply more (constant-valued) columns to hash now.
@@ -175,7 +200,7 @@ def table_snapshot(node: ChNode) -> dict[str, dict]:
         try:
             columns = ", ".join(_content_columns(node, t))
             row = node.query_rows(
-                f"SELECT count() AS cnt, sum(cityHash64(tuple({columns}))) AS checksum FROM ooni.{t}{where}"
+                f"SELECT count() AS cnt, sum(cityHash64(toString(tuple({columns})))) AS checksum FROM ooni.{t}{where}"
             )[0]
             out[t] = {"row_count": int(row["cnt"]), "checksum": str(row["checksum"])}
         except Exception as e:

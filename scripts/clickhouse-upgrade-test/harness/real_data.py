@@ -76,33 +76,52 @@ LOAD_TIMEOUT_SECONDS = 30 * 60
 
 def snapshot_tables(node: ChNode, tables: list[str] = REAL_DATA_TABLES) -> dict[str, dict]:
     """Row count + an order-independent content checksum per table.
-    `sum(cityHash64(tuple(*)))` is ClickHouse's own idiom for "checksum a
-    table without listing its columns by hand" -- cityHash64 is variadic
-    and `*` expands to every column, and summing (rather than, say,
-    concatenating) means row order -- which MergeTree never guarantees is
-    stable across replicas or across a re-merge triggered by an upgrade --
-    can't cause a false mismatch.
+    `sum(cityHash64(toString(tuple(*))))` is ClickHouse's own idiom for
+    "checksum a table without listing its columns by hand" -- cityHash64
+    is variadic and `*` expands to every column, and summing (rather
+    than, say, concatenating) means row order -- which MergeTree never
+    guarantees is stable across replicas or across a re-merge triggered
+    by an upgrade -- can't cause a false mismatch.
 
-    The `tuple(...)` wrapper matters: cityHash64() propagates NULL like
-    most ClickHouse scalar functions (any NULL argument -> NULL result),
-    and obs_web/obs_web_ctrl/obs_http_middlebox all have Nullable columns
-    that real OONI measurements routinely leave NULL. A bare
-    `cityHash64(*)` would return NULL for any row with a NULL in *any*
-    column, and `sum()` over an all-NULL column returns NULL -- silently
-    turning off corruption detection for exactly the tables this snapshot
-    exists to protect (confirmed happening in practice for the synthetic
-    scenario's equivalent tables -- see harness/validate.py's
-    table_snapshot(), CI run 97445863954). A Tuple is never itself
-    Nullable even when its elements are, so wrapping the columns in
-    `tuple(...)` gives cityHash64() one well-defined argument per row
-    regardless of how many underlying columns are NULL -- the workaround
-    ClickHouse's own docs give
-    (https://clickhouse.com/docs/sql-reference/functions/hash-functions)."""
+    Both wrappers matter, and were added one at a time, each fixing a
+    real CI failure this exact idiom hit:
+
+    - `tuple(...)`: cityHash64() propagates NULL like most ClickHouse
+      scalar functions (any NULL argument -> NULL result), and
+      obs_web/obs_web_ctrl/obs_http_middlebox all have Nullable columns
+      that real OONI measurements routinely leave NULL. A bare
+      `cityHash64(*)` returns NULL for any row with a NULL in *any*
+      column, and `sum()` over an all-NULL column returns NULL --
+      silently turning off corruption detection for exactly the tables
+      this snapshot exists to protect (confirmed happening in practice
+      for the synthetic scenario's equivalent tables -- see
+      harness/validate.py's table_snapshot(), CI run 97445863954). A
+      Tuple is never itself Nullable even when its elements are, so
+      wrapping the columns in `tuple(...)` gets cityHash64() one
+      well-defined argument per row regardless of how many underlying
+      columns are NULL.
+    - `toString(...)`: `tuple(...)` alone isn't enough -- cityHash64()
+      has a real bug (github.com/ClickHouse/ClickHouse/issues/51541,
+      open since 22.9) where it throws `Code: 48. DB::Exception: Method
+      getDataAt is not supported for Nullable(X) in case if value is
+      NULL` the moment a wrapped column is Nullable AND a real (non-
+      constant) row actually holds NULL -- confirmed hitting this
+      exactly, on ClickHouse 24.8.6.70, in CI run 97476149999 (via
+      harness/validate.py's identically-shaped query). Rendering the
+      tuple to a String first sidesteps the bug entirely: once it's a
+      plain String, cityHash64 never touches the original Nullable
+      columns' storage, so the buggy code path is never reached, on any
+      ClickHouse version. Confirmed (via chdb) that the same row renders
+      to byte-identical text and hashes to the identical UInt64 on both
+      ClickHouse 24.5.1.1 and 26.7.2.1 -- this checksum has to compare
+      equal across nodes on *different* ClickHouse versions during a
+      mixed rollout, so that cross-version stability is the property
+      that actually matters here, not just "doesn't crash"."""
     out = {}
     for t in tables:
         try:
             row = node.query_rows(
-                f"SELECT count() AS cnt, sum(cityHash64(tuple(*))) AS checksum FROM ooni.{t}"
+                f"SELECT count() AS cnt, sum(cityHash64(toString(tuple(*)))) AS checksum FROM ooni.{t}"
             )[0]
             out[t] = {"row_count": int(row["cnt"]), "checksum": str(row["checksum"])}
         except Exception as e:
