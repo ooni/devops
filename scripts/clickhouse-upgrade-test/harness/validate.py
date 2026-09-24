@@ -104,16 +104,57 @@ def counts_converged(counts_by_node: dict[str, dict[str, int | None]]) -> bool:
 # a "mismatch" against the initial one for a completely expected reason.
 _PROBE_DOMAIN_FILTER = " WHERE domain NOT LIKE 'probe-%.example.test'"
 
+# scenarios.verify_ddl_step() runs `ALTER TABLE ooni.citizenlab ON CLUSTER
+# ... ADD COLUMN IF NOT EXISTS test_marker_<version> String DEFAULT ''`
+# once per hop, to prove ON CLUSTER DDL still propagates mid-rollout. That's
+# a real, useful check on its own -- but it means citizenlab's column set
+# literally grows over the course of a rollout (4 extra columns by the end
+# of scenario_staged_lts()'s 4 hops), all backfilled with the same constant
+# default on every row, old and new. cityHash64(*) hashes over whatever
+# columns exist AT QUERY TIME, so a naive `SELECT ... cityHash64(*) ...`
+# taken after those ALTERs will never match the golden snapshot taken
+# before any of them ran -- not because any row's real data changed, but
+# because there are simply more (constant-valued) columns to hash now.
+# Confirmed exactly this way in CI run 96419815217: citizenlab mismatched
+# on every node with row_count identical (132 == 132), and all 3 nodes
+# agreed with each other on the new checksum -- a schema-drift false
+# positive, not real corruption (real corruption would disagree
+# node-to-node, or move the row count). Excluding these columns from the
+# checksum -- rather than everything skating through undetected -- is what
+# lets this check still catch a genuine change to a real column's data.
+DDL_VERIFY_MARKER_PREFIX = "test_marker_"
+
+
+def _content_columns(node: ChNode, table: str) -> list[str]:
+    """Column list for `table`'s content checksum: the same columns a bare
+    `SELECT *` would expand to (ClickHouse excludes ALIAS/MATERIALIZED
+    columns from `*` by default -- e.g. fastpath/jsonl's `update_time
+    DateTime64(3) MATERIALIZED now64()`, their ReplacingMergeTree version
+    column), minus verify_ddl_step()'s DDL_VERIFY_MARKER_PREFIX-prefixed
+    probe columns (see module comment above). Queried fresh each time
+    rather than hardcoded, since the schema itself is exactly what a real
+    (non-test) `ALTER TABLE` during a rollout could legitimately add to --
+    this only needs to ignore the specific columns *this harness's own* DDL
+    check adds, not resist arbitrary schema drift in general."""
+    rows = node.query_rows(
+        f"SELECT name FROM system.columns WHERE database = 'ooni' AND table = '{table}' "
+        f"AND name NOT LIKE '{DDL_VERIFY_MARKER_PREFIX}%' "
+        f"AND default_kind NOT IN ('ALIAS', 'MATERIALIZED') ORDER BY name"
+    )
+    return [r["name"] for r in rows]
+
 
 def table_snapshot(node: ChNode) -> dict[str, dict]:
     """Row count + content checksum per table, citizenlab's probe-tagged
-    rows excluded (see module comment above)."""
+    rows and every table's DDL-verification marker columns excluded (see
+    module comment above)."""
     out = {}
     for t in TABLES:
         where = _PROBE_DOMAIN_FILTER if t == "citizenlab" else ""
         try:
+            columns = ", ".join(_content_columns(node, t))
             row = node.query_rows(
-                f"SELECT count() AS cnt, sum(cityHash64(*)) AS checksum FROM ooni.{t}{where}"
+                f"SELECT count() AS cnt, sum(cityHash64({columns})) AS checksum FROM ooni.{t}{where}"
             )[0]
             out[t] = {"row_count": int(row["cnt"]), "checksum": str(row["checksum"])}
         except Exception as e:

@@ -276,9 +276,17 @@ def verify_ddl_step(version: str, label: str | None = None, log=print) -> dict:
     step model (ci_step.py invokes each step as its own process -- see
     report.py's self_healed(), which keys off this step's `settled` field
     to decide whether an earlier hard error in the same hop should still
-    gate the job)."""
+    gate the job).
+
+    The added column is named with validate.DDL_VERIFY_MARKER_PREFIX so
+    validate.table_snapshot()'s content checksum can recognize and exclude
+    it -- otherwise cityHash64(*) would pick up the new (constant-valued)
+    column and make content_integrity_step() see a "mismatch" that's just
+    schema growth, not lost or corrupted data (see that constant's
+    docstring for how this went wrong in CI run 96419815217 before the
+    exclusion existed)."""
     nodes = make_nodes()
-    marker = f"test_marker_{version.replace('.', '_')}"
+    marker = f"{validate.DDL_VERIFY_MARKER_PREFIX}{version.replace('.', '_')}"
     try:
         nodes[0].execute(
             f"ALTER TABLE ooni.citizenlab ON CLUSTER oonidata_cluster "

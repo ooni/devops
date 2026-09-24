@@ -180,6 +180,42 @@ while the per-step log still shows every hard-looking error that occurred
 and whether it turned out to be the expected transient kind or something
 that never cleared.
 
+### Bugfix: the content-checksum check itself had a false-positive (run 96419815217)
+
+The very first run against the `content-integrity` check above failed --
+both `staged-upgrade` and `direct-jump-upgrade` reported `citizenlab`
+mismatched on **every** node, with row count identical (132 == 132) both
+before and after. That pattern -- same wrong answer on all 3 replicas, row
+count untouched -- doesn't look like replication dropping or corrupting
+data (that shows up as nodes *disagreeing* with each other, or a changed
+row count); it looks like something that changed identically everywhere,
+which pointed straight at schema, not data.
+
+The actual cause: `verify_ddl_step()` (the same step this section's
+self-healing check is built into) proves `ALTER TABLE ... ON CLUSTER`
+still propagates by adding a real column,
+`test_marker_<version>` `String DEFAULT ''`, to `citizenlab` once per hop.
+That's a good check on its own, but it means `citizenlab` picks up 4 extra
+(constant-valued) columns over the course of `scenario_staged_lts()`'s 4
+hops. `sum(cityHash64(*))` hashes over whatever columns exist *at query
+time* -- so the golden snapshot (taken before any hop ran, 0 marker
+columns) could never match the end-of-rollout snapshot (4 marker columns
+added since), regardless of whether any actual data changed. Fixed by
+`harness/validate.py:_content_columns()`, which builds the checksum's
+column list from `system.columns` at query time, filtered to exclude
+`DDL_VERIFY_MARKER_PREFIX`-prefixed columns and (to match plain `SELECT
+*`'s own semantics) `ALIAS`/`MATERIALIZED` columns like `fastpath`/`jsonl`'s
+`update_time` version column -- rather than hardcoding a column list that
+would itself drift from the schema.
+
+Lesson for reading future `content-integrity` failures: a mismatch that
+disagrees *between nodes*, or comes with a changed row count, is a real
+data-loss/corruption signal. A mismatch that's identical across all 3
+nodes with an unchanged row count is much more likely a checksum-scope bug
+like this one than a genuine incompatibility -- check `system.columns`
+for schema drift (this harness's own `verify-ddl` steps, or a real `ALTER`
+if one's ever added elsewhere) before assuming the worst.
+
 ## Running it
 
 Requires Docker + Compose v2, and — this matters — **network access to pull
