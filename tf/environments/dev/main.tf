@@ -581,7 +581,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "feat/experiment-versions"
   environment             = local.environment
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
@@ -1018,7 +1018,7 @@ module "ooniapi_oonirun_deployer" {
 
   service_name            = "oonirun"
   repo                    = "ooni/backend"
-  branch_name             = "oonirun-v2-1"
+  branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
   trigger_path            = "ooniapi/services/oonirun/**"
