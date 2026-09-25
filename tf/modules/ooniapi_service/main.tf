@@ -126,6 +126,9 @@ resource "aws_ecs_service" "ooniapi_service" {
 
   lifecycle {
     create_before_destroy = true
+    # fixes an issue when AWS changes the capacity provider
+    # on its own, terraform has no record of that on its internal state
+    ignore_changes = [capacity_provider_strategy]
   }
 
   force_new_deployment = true
