@@ -665,7 +665,7 @@ module "ooniapi_ooniprobe_legacy" {
   vpc_id = module.network.vpc_id
 
   service_name             = "ooniprobe-legacy"
-  default_docker_image_url = "ooni/api-ooniprobe:20260824-f2dac67a"
+  default_docker_image_url = "ooni/api-ooniprobe:20260921-da8b057f"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
   key_name                 = module.adm_iam_roles.oonidevops_key_name
