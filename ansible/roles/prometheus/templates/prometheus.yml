@@ -84,9 +84,6 @@ scrape_configs:
         - https://data2.htz-fsn.prod.ooni.nu/metrics/node_exporter
         - https://data3.htz-fsn.prod.ooni.nu/metrics/node_exporter
         - https://notebook1.htz-fsn.prod.ooni.nu/metrics/node_exporter
-        - http://0.do.th.prod.ooni.io:9001/metrics
-        - http://1.do.th.prod.ooni.io:9001/metrics
-        - http://2.do.th.prod.ooni.io:9001/metrics
         - https://wc.th.dev.ooni.io/metrics
         - https://wcth0.fra1.prod.ooni.io:9001/metrics/node_exporter
         - https://wcth1.fra1.prod.ooni.io:9001/metrics/node_exporter
@@ -209,9 +206,6 @@ scrape_configs:
       password: '{{ prometheus_metrics_password }}'
     static_configs:
       - targets:
-        - 0.do.th.prod.ooni.io
-        - 1.do.th.prod.ooni.io
-        - 2.do.th.prod.ooni.io
         - wcth0.fra1.prod.ooni.io
         - wcth1.fra1.prod.ooni.io
         - wcth2.fra1.prod.ooni.io
