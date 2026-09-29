@@ -88,9 +88,9 @@ scrape_configs:
         - http://1.do.th.prod.ooni.io:9001/metrics
         - http://2.do.th.prod.ooni.io:9001/metrics
         - https://wc.th.dev.ooni.io/metrics
-        - https://wcth0.fra1.prod.ooni.io/metrics
-        - https://wcth1.fra1.prod.ooni.io/metrics
-        - https://wcth2.fra1.prod.ooni.io/metrics
+        - https://wcth0.fra1.prod.ooni.io/metrics/node_exporter
+        - https://wcth1.fra1.prod.ooni.io/metrics/node_exporter
+        - https://wcth2.fra1.prod.ooni.io/metrics/node_exporter
     relabel_configs:
         # set the scheme based on what has been parsed in the address
       - source_labels: [__address__]
