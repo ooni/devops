@@ -75,20 +75,7 @@ CREATE TABLE
         `cc` FixedString (32),
         `category_code` String
     ) ENGINE = ReplicatedReplacingMergeTree (
-        '/clickhouse/{cluster}/tables/ooni/citizenlab/{shard}',
-        '{replica}'
-    )
-ORDER BY
-    (domain, url, cc, category_code) SETTINGS index_granularity = 4;
-
-CREATE TABLE
-    ooni.citizenlab_flip ON CLUSTER oonidata_cluster (
-        `domain` String,
-        `url` String,
-        `cc` FixedString (32),
-        `category_code` String
-    ) ENGINE = ReplicatedReplacingMergeTree (
-        '/clickhouse/{cluster}/tables/ooni/citizenlab_flip/{shard}',
+        '/clickhouse/{cluster}/tables/ooni/citizenlab',
         '{replica}'
     )
 ORDER BY
