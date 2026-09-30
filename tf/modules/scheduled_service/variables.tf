@@ -77,3 +77,10 @@ variable "scheduled_task_cluster" {
   nullable    = true
   default     = null
 }
+
+variable "command" {
+  type        = list(string)
+  description = "Override the container command. Uses the image default when null."
+  nullable    = true
+  default     = null
+}

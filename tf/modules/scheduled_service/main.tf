@@ -117,7 +117,8 @@ resource "aws_ecs_task_definition" "scheduled_service" {
   network_mode = "bridge"
 
   container_definitions = jsonencode([
-    {
+    # Only add command when var.command is set, so the default task definition is unchanged
+    merge({
       memoryReservation = var.task_memory,
       memory            = var.memory_hard_limit
       essential         = true,
@@ -146,7 +147,7 @@ resource "aws_ecs_task_definition" "scheduled_service" {
           awslogs-region = var.aws_region
         }
       }
-    }
+    }, { for k, v in { command = var.command } : k => v if v != null })
   ])
   task_role_arn      = aws_iam_role.scheduled_service_task.arn
   execution_role_arn = aws_iam_role.scheduled_service_task.arn
