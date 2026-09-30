@@ -85,6 +85,40 @@ blackbox_jobs:
       - "https://oonimeasurements.prod.ooni.io/api/v1/measurements"
       - "https://oonimeasurements.prod.ooni.io/api/v1/aggregation"
 
+  # Fixed past time windows keep the query cost constant
+  - name: "ooni API measurements data"
+    module: "https_2xx_json"
+    ignore_instance_down: true
+    scrape_interval: 5m
+    scrape_timeout: 30s
+    labels:
+      tier: "tier-1"
+    targets:
+      - "https://api.ooni.org/api/v1/measurement_meta?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
+      - "https://api.ooni.org/api/v1/torsf_stats?probe_cc=IT&since=2026-09-01T00:00:00&until=2026-09-08T00:00:00"
+      - "https://api.ooni.org/api/v1/observations?probe_cc=IT&since=2026-09-01&until=2026-09-02&limit=1"
+      - "https://api.ooni.org/api/v1/analysis?probe_cc=IT&since=2026-09-01&until=2026-09-02&limit=1"
+      - "https://api.ooni.org/api/v1/aggregation/observations?probe_cc=IT&since=2026-09-01&until=2026-09-02"
+      - "https://api.ooni.org/api/v1/aggregation/observations/ctrl?hostname=www.google.com&since=2026-09-01&until=2026-09-02"
+      - "https://api.ooni.org/api/v1/aggregation/analysis?probe_cc=IT&since=2026-09-01&until=2026-09-02"
+      # not routed to oonimeasurements by the ALB
+      - "https://oonimeasurements.prod.ooni.io/api/v1/measurement/20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
+      - "https://oonimeasurements.prod.ooni.io/api/v1/files"
+
+  # api.ooni.io goes to backend-fsn nginx and the legacy API
+  - name: "ooni API measurements data (legacy)"
+    module: "https_2xx_json"
+    ignore_instance_down: true
+    scrape_interval: 5m
+    scrape_timeout: 30s
+    labels:
+      tier: "tier-1"
+    targets:
+      - "https://api.ooni.io/api/v1/files"
+      - "https://api.ooni.io/api/v1/measurement/20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
+      - "https://api.ooni.io/api/v1/measurement_meta?measurement_uid=20240924151005.116855_IT_httpinvalidrequestline_f63463817af9eebe"
+      - "https://api.ooni.io/api/v1/torsf_stats?probe_cc=IT&since=2026-09-01T00:00:00&until=2026-09-08T00:00:00"
+
   - name: "ooni API test-list urls"
     module: "https_2xx_json_meta"
     labels:
@@ -200,6 +234,17 @@ blackbox_jobs:
     targets:
       - "https://api.ooni.org/api/v2/oonirun/links/10009"
       - "https://api.ooni.org/api/v2/oonirun/links/10009/revisions"
+      - "https://api.ooni.org/api/v2/oonirun/links/10009/full-descriptor/latest"
+      - "https://api.ooni.org/api/v2/oonirun/links"
+
+  - name: "OONI testlists API"
+    module: "https_2xx_json"
+    ignore_instance_down: true
+    labels:
+      tier: "tier-2"
+    targets:
+      - "https://api.ooni.org/api/_/url-priorities/list"
+      - "https://api.ooni.io/api/_/url-priorities/list"
 
   - name: "Changepoints API"
     module: "http_2xx"
@@ -233,6 +278,22 @@ blackbox_jobs:
     targets:
       # Anonymous Credentials
       - "https://ooniprobe.prod.ooni.io/api/v1/manifest"
+      - "https://ooniprobe.prod.ooni.io/api/v1/collectors"
+      - "https://api.ooni.org/api/v1/collectors"
+      - "https://api.ooni.io/api/v1/collectors"
+
+  # Prioritization scans a week of fastpath; vpn-config may fetch from riseup
+  - name: "OONI Probe GET (slow)"
+    module: "https_2xx_json"
+    ignore_instance_down: true
+    scrape_interval: 5m
+    scrape_timeout: 30s
+    targets:
+      - "https://api.ooni.org/api/_/show_countries_prioritization"
+      - "https://api.ooni.org/api/_/debug_prioritization?probe_cc=IT&limit=10"
+      - "https://api.ooni.org/api/v2/ooniprobe/vpn-config/riseupvpn"
+      - "https://api.ooni.io/api/_/show_countries_prioritization"
+      - "https://api.ooni.io/api/_/debug_prioritization?probe_cc=IT&limit=10"
 
   - name: "OONI Probe report"
     module: "ooni_http_post_report"
