@@ -704,6 +704,56 @@ module "ooniapi_ooniprobe_legacy" {
   )
 }
 
+# Periodically refreshes tor_targets.json in the config bucket
+module "tor_targets_updater" {
+  source = "../../modules/scheduled_service"
+
+  task_memory = 128
+
+  vpc_id = module.network.vpc_id
+
+  first_run                = true
+  service_name             = "tor-targets-updater"
+  default_docker_image_url = "ooni/api-ooniprobe:dev"
+  command                  = ["python", "-m", "ooniprobe.tor_targets"]
+  schedule_expression      = "cron(0 3 * * ? *)"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  scheduled_task_cluster   = module.ooniapi_cluster.cluster_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+
+  task_environment = {
+    CONFIG_BUCKET = aws_s3_bucket.ooni_private_config_bucket.bucket
+    TOR_TARGETS   = "tor_targets.json"
+  }
+
+  ooniapi_service_security_groups = [
+    module.ooniapi_cluster.web_security_group_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-tor-targets-updater" }
+  )
+}
+
+resource "aws_iam_role_policy" "tor_targets_updater_role" {
+  name = "${local.name}-tor-targets-updater"
+  role = module.tor_targets_updater.task_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = "${aws_s3_bucket.ooni_private_config_bucket.arn}/tor_targets.json"
+      }
+    ]
+  })
+}
+
 #### OONI Backend proxy service
 
 module "ooniapi_reverseproxy_deployer" {
