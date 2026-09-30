@@ -89,7 +89,7 @@ blackbox_jobs:
   - name: "ooni API measurements data"
     module: "https_2xx_json"
     ignore_instance_down: true
-    scrape_interval: 5m
+    scrape_interval: 4m
     scrape_timeout: 30s
     labels:
       tier: "tier-1"
@@ -109,7 +109,7 @@ blackbox_jobs:
   - name: "ooni API measurements data (legacy)"
     module: "https_2xx_json"
     ignore_instance_down: true
-    scrape_interval: 5m
+    scrape_interval: 4m
     scrape_timeout: 30s
     labels:
       tier: "tier-1"
@@ -146,7 +146,7 @@ blackbox_jobs:
   - name: "ooni API private"
     module: "https_2xx_json"
     ignore_instance_down: true
-    scrape_interval: 5m
+    scrape_interval: 4m
     scrape_timeout: 30s
     labels:
       tier: "tier-1"
@@ -176,7 +176,7 @@ blackbox_jobs:
   - name: "ooni API private (legacy)"
     module: "https_2xx_json"
     ignore_instance_down: true
-    scrape_interval: 5m
+    scrape_interval: 4m
     scrape_timeout: 30s
     labels:
       tier: "tier-1"
@@ -286,7 +286,7 @@ blackbox_jobs:
   - name: "OONI Probe GET (slow)"
     module: "https_2xx_json"
     ignore_instance_down: true
-    scrape_interval: 5m
+    scrape_interval: 4m
     scrape_timeout: 30s
     targets:
       - "https://api.ooni.org/api/_/show_countries_prioritization"
