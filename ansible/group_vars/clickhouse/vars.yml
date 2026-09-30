@@ -168,7 +168,8 @@ clickhouse_role_manage_settings_profiles: True
 clickhouse_default_profiles:
   default:
     readonly: 2
-    max_memory_usage: 11001001000
+    # 10 GB
+    max_memory_usage: 10010010000
     use_uncompressed_cache: 0
     load_balancing: random
     max_partitions_per_insert_block: 100

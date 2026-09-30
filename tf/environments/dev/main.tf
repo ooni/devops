@@ -393,22 +393,6 @@ moved {
 
 ### OONI Tier0 Backend Proxy
 
-module "ooni_th_droplet" {
-  source = "../../modules/ooni_th_droplet"
-
-  stage             = local.environment
-  instance_location = "fra1"
-  instance_size     = "s-1vcpu-1gb"
-  droplet_count     = 1
-  deployer_key      = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
-  metrics_password  = data.aws_ssm_parameter.prometheus_metrics_password.arn
-  ssh_keys = [
-    "3d:81:99:17:b5:d1:20:a5:fe:2b:14:96:67:93:d6:34",
-    "f6:4b:8b:e2:0e:d2:97:c5:45:5c:07:a6:fe:54:60:0e"
-  ]
-  dns_zone_ooni_io = local.dns_zone_ooni_io
-}
-
 resource "digitalocean_ssh_key" "oonidevops" {
   name       = "oonidevops"
   public_key = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
@@ -581,7 +565,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "1237-check-in-to-th"
+  branch_name             = "feat/experiment-versions"
   environment             = local.environment
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
@@ -648,6 +632,59 @@ module "ooniapi_ooniprobe" {
   tags = merge(
     local.tags,
     { Name = "ooni-tier0-ooniprobe" }
+  )
+}
+
+# Legacy ooniprobe service, used  to serve older probes. Identified by the
+# X-Protocol-Version header that specifies the anonymous credentials protocol
+# version.
+module "ooniapi_ooniprobe_legacy" {
+  source = "../../modules/ooniapi_service"
+
+  # First run should be set on first run to bootstrap the task definition
+  # first_run = true
+
+  task_memory = 256
+
+  vpc_id = module.network.vpc_id
+
+  service_name             = "ooniprobe-legacy"
+  default_docker_image_url = "ooni/api-ooniprobe:20260921-da8b057f"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+
+  task_secrets = {
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
+    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_ooniprobe_url.arn
+    ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
+  }
+
+  task_environment = {
+    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
+    FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
+    FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    COLLECTOR_ID          = 3 # use a different one in prod
+    CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
+    TOR_TARGETS           = "tor_targets.json"
+    PSIPHON_CONFIG        = "psiphon_config.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
+  }
+
+  ooniapi_service_security_groups = [
+    # module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling       = false
+  service_desired_count = 1
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-ooniprobe-legacy" }
   )
 }
 
@@ -949,7 +986,7 @@ module "fastpath_builder" {
 
   service_name            = "fastpath"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "feat/wc-x-flags"
   environment             = local.environment
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
@@ -965,7 +1002,7 @@ module "ooniapi_oonirun_deployer" {
 
   service_name            = "oonirun"
   repo                    = "ooni/backend"
-  branch_name             = "oonirun-v2-1"
+  branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
   trigger_path            = "ooniapi/services/oonirun/**"
@@ -1301,6 +1338,7 @@ module "ooniapi_frontend" {
   ooniapi_oonirun_target_group_arn          = module.ooniapi_oonirun.alb_target_group_id
   ooniapi_ooniauth_target_group_arn         = module.ooniapi_ooniauth.alb_target_group_id
   ooniapi_ooniprobe_target_group_arn        = module.ooniapi_ooniprobe.alb_target_group_id
+  ooniapi_ooniprobe_legacy_target_group_arn = module.ooniapi_ooniprobe_legacy.alb_target_group_id
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
   ooniapi_testlists_target_group_arn        = module.ooniapi_testlists.alb_target_group_id

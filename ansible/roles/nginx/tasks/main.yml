@@ -71,7 +71,7 @@
 
     - name: Add the nginx.org apt repository
       ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/debian {{ ansible_distribution_release }} nginx"
+        repo: "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] https://nginx.org/packages/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} nginx"
         filename: nginx
         state: present
 

@@ -28,6 +28,10 @@ variable "ooniapi_ooniprobe_target_group_arn" {
   description = "arn for the target group of the ooniprobe service"
 }
 
+variable "ooniapi_ooniprobe_legacy_target_group_arn" {
+  description = "arn for the target group of the legacy ooniprobe service"
+}
+
 variable "ooniapi_oonifindings_target_group_arn" {
   description = "arn for the target group of the oonifindings service"
 }
