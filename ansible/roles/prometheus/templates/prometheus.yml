@@ -22,6 +22,12 @@ scrape_configs:
   # Node exporter metrics
 {% for bbjob in blackbox_jobs %}
   - job_name: "{{ bbjob.name }}"
+{% if bbjob.scrape_interval is defined %}
+    scrape_interval: {{ bbjob.scrape_interval }}
+{% endif %}
+{% if bbjob.scrape_timeout is defined %}
+    scrape_timeout: {{ bbjob.scrape_timeout }}
+{% endif %}
     metrics_path: /probe
     params:
       module:
