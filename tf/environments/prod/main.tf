@@ -1580,7 +1580,9 @@ module "ooniapi_frontend" {
     module.oonitier1plus_cluster.web_security_group_id
   ]
 
-  ooniapi_acm_certificate_arn = aws_acm_certificate.ooniapi_frontend.arn
+  # Use the validated ARN so the listener only switches to a new certificate
+  # (e.g. after adding a SAN) once ACM has finished validating it.
+  ooniapi_acm_certificate_arn = aws_acm_certificate_validation.ooniapi_frontend.certificate_arn
 
   oonith_domains = [
     "*.th.ooni.org",
@@ -1601,6 +1603,7 @@ module "ooniapi_frontend" {
 locals {
   ooniapi_frontend_alternative_domains = {
     "api.ooni.org" : local.dns_root_zone_ooni_org,
+    "api.ooni.io" : local.dns_root_zone_ooni_io,
     "0.th.ooni.org" : local.dns_root_zone_ooni_org,
     "1.th.ooni.org" : local.dns_root_zone_ooni_org,
     "2.th.ooni.org" : local.dns_root_zone_ooni_org,
@@ -1638,6 +1641,14 @@ resource "aws_route53_record" "ooniapi_frontend_main" {
     zone_id                = module.ooniapi_frontend.ooniapi_dns_zone_id
     evaluate_target_health = true
   }
+}
+
+# api.ooni.io used to be a plain A record to backend-fsn (dns_records.tf).
+# Move it into the ALB alias set so Terraform updates the record in place
+# instead of trying to create a conflicting second record.
+moved {
+  from = aws_route53_record.api-ooni-io-_A_
+  to   = aws_route53_record.ooniapi_frontend_alt["api.ooni.io"]
 }
 
 resource "aws_route53_record" "ooniapi_frontend_alt" {
