@@ -1,6 +1,5 @@
 dom0_hosts:
   - ams-slack-1.ooni.org
-  - doams1-countly.ooni.nu
 
 blackbox_jobs:
   # TODO add these records to the ALB config
@@ -247,11 +246,6 @@ blackbox_jobs:
       - "https://ooniprobe.prod.ooni.io/api/v1/check-in"
 
   # end of API #
-
-  - name: "countly.ooni.io ping"
-    module: "http_2xx"
-    targets:
-      - "https://countly.ooni.io/o/ping"
 
   - name: "slack inviter"
     module: "http_2xx"
