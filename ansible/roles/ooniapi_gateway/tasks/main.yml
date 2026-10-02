@@ -1,0 +1,227 @@
+---
+# One-time (and idempotent-on-rerun) bootstrap for a host that will run
+# tier0 services via Docker Compose blue/green deploys, plus the nginx
+# gateway vhost that fronts them. See the Terraform side of this in
+# tf/modules/ooniapi_service_deployer (deploy_mode = "blue_green") and its
+# files/deploy.py, which is what actually performs each deploy -- this role
+# only prepares the host for that job to run against.
+#
+# Runs as root (become: true at the play level). Each deploy runs `docker
+# compose up` as root (via the scoped sudoers rule below), matching this.
+
+- name: Ensure per-service state directories exist
+  ansible.builtin.file:
+    path: "/etc/ooniapi/{{ item.name }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ ooniapi_gateway_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# Files land here (not shared /tmp) before being moved/installed into
+# place, so the per-secret files scp'd in on every deploy are never briefly
+# world-readable on their way in -- only the deploy user (and root) can
+# even list this directory.
+- name: Ensure the deploy user's private staging directory exists
+  ansible.builtin.file:
+    path: "{{ ooniapi_gateway_staging_dir }}"
+    state: directory
+    owner: "{{ ooniapi_gateway_deploy_user }}"
+    group: "{{ ooniapi_gateway_deploy_user }}"
+    mode: "0700"
+
+- name: Check whether each service already has an active_slot marker
+  ansible.builtin.stat:
+    path: "/etc/ooniapi/{{ item.name }}/active_slot"
+  loop: "{{ ooniapi_gateway_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ooniapi_gateway_active_slot_stat
+
+- name: Seed active_slot with "a" for services deploying for the first time
+  ansible.builtin.copy:
+    dest: "/etc/ooniapi/{{ item.item.name }}/active_slot"
+    content: "a"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ ooniapi_gateway_active_slot_stat.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not item.stat.exists
+
+- name: Check whether each service already has an nginx upstream conf
+  ansible.builtin.stat:
+    path: "/etc/nginx/conf.d/{{ item.name }}-upstream.conf"
+  loop: "{{ ooniapi_gateway_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ooniapi_gateway_upstream_stat
+
+# Seeded with slot "a" up / "b" down, matching active_slot's "a" default
+# above, so the very first `nginx -t` (run when installing the gateway
+# vhost below) succeeds before that service's first real deploy has run.
+- name: Seed a placeholder upstream conf for services deploying for the first time
+  ansible.builtin.copy:
+    dest: "/etc/nginx/conf.d/{{ item.item.name }}-upstream.conf"
+    content: |
+      upstream {{ item.item.name }} {
+          server 127.0.0.1:{{ item.item.host_port_a }};
+          server 127.0.0.1:{{ item.item.host_port_b }} down;
+      }
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ ooniapi_gateway_upstream_stat.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not item.stat.exists
+  notify: reload ooniapi gateway nginx
+
+# Follows https://docs.docker.com/engine/install/debian/ (the officially
+# supported docker-ce packages, rather than Debian's own docker.io/
+# docker-compose-v2) so we get upstream's release cadence. The repo URL is
+# built from ansible_distribution_release rather than a hardcoded codename
+# (e.g. "trixie") so this keeps working unchanged across Debian releases.
+- name: Remove conflicting docker packages
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-doc
+      - docker-compose
+      - docker-compose-v2
+      - podman-docker
+      - containerd
+      - runc
+    state: absent
+
+- name: Install docker's prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+
+- name: Ensure the apt keyrings directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Download docker's official apt signing key
+  ansible.builtin.get_url:
+    url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Read the fingerprint of the downloaded key
+  ansible.builtin.command: gpg --with-colons --show-keys /etc/apt/keyrings/docker.asc
+  register: ooniapi_gateway_docker_key_check
+  changed_when: false
+
+# Pins against docker's known-good key fingerprint (9DC8 5822 9FC7 DD38
+# 854A E2D8 8D81 803C 0EBF CD88) so a compromised/MITM'd download of the key
+# itself (which apt would otherwise trust blindly via signed-by=) gets
+# caught here instead of silently being trusted for every future `apt
+# update`.
+- name: Verify the downloaded key's fingerprint matches docker's published one
+  ansible.builtin.assert:
+    that:
+      - ooniapi_gateway_docker_key_check.stdout is
+        search('^fpr:::::::::9DC858229FC7DD38854AE2D88D81803C0EBFCD88:$', multiline=true)
+    fail_msg: >-
+      docker.asc's fingerprint does not match the expected
+      9DC858229FC7DD38854AE2D88D81803C0EBFCD88 -- refusing to trust it.
+    success_msg: "docker.asc's fingerprint matches the expected value."
+
+- name: Get dpkg architecture
+  ansible.builtin.command: dpkg --print-architecture
+  register: ooniapi_gateway_dpkg_arch
+  changed_when: false
+
+- name: Add the docker apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch={{ ooniapi_gateway_dpkg_arch.stdout }} signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/{{ ansible_distribution | lower }}
+      {{ ansible_distribution_release }} stable
+    filename: docker
+    state: present
+
+- name: Install docker
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Make docker's containerd use the nftables firewall backend
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    line: 'firewall-backend="nftables"'
+    state: present
+    create: true
+    mode: "0644"
+  notify: restart docker
+
+- name: Ensure docker is running
+  ansible.builtin.systemd_service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Check whether the shared docker network already exists
+  ansible.builtin.command: docker network inspect {{ ooniapi_gateway_network_name }}
+  register: ooniapi_gateway_network_check
+  changed_when: false
+  failed_when: false
+
+- name: Create the shared docker network
+  ansible.builtin.command: docker network create {{ ooniapi_gateway_network_name }}
+  when: ooniapi_gateway_network_check.rc != 0
+
+- name: Ensure sudoers.d directory exists
+  ansible.builtin.file:
+    path: /etc/sudoers.d
+    state: directory
+    owner: root
+    group: root
+
+- name: Install scoped sudoers rule for the deploy user
+  ansible.builtin.template:
+    src: sudoers-ooniapi-deploy.j2
+    dest: /etc/sudoers.d/90-ooniapi-deploy
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: Render the gateway vhost
+  ansible.builtin.template:
+    src: gateway.conf.j2
+    dest: /etc/nginx/conf.d/ooniapi-gateway.conf.pending
+    owner: root
+    group: root
+    mode: "0644"
+
+# Split into "render" + "install" so a bad template is visible
+# (.conf.pending) without ever being loaded by nginx, and so the vhost is
+# never installed at all until ooniapi_gateway_cert_ready is true -- see
+# defaults/main.yml for why that's a separate, deliberate step.
+- name: Install the gateway vhost now that its cert is ready
+  ansible.builtin.copy:
+    remote_src: true
+    src: /etc/nginx/conf.d/ooniapi-gateway.conf.pending
+    dest: /etc/nginx/conf.d/ooniapi-gateway.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: ooniapi_gateway_cert_ready
+  notify: reload ooniapi gateway nginx
