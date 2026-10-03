@@ -145,6 +145,7 @@ clickhouse_listen_hosts:
 
 # this only applies to SQL managed users
 clickhouse_role_manage_users: false
+clickhouse_role_manage_grants: false
 # these are handled via config files
 clickhouse_default_users:
   - user:

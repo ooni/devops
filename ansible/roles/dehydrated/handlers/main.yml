@@ -3,6 +3,11 @@
     name: nginx
     state: reloaded
 
+- name: restart nginx
+  service:
+    name: nginx
+    state: restarted
+
 - name: reload nftables
   service: 
     name: nftables
@@ -13,10 +18,3 @@
     name: dehydrated
     state: restarted
     enabled: yes
-
-- name: reload nginx and restart dehydrated
-  service: 
-    name: nginx
-    state: reloaded
-  notify:
-    restart dehydrated

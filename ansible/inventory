@@ -5,7 +5,7 @@ ghs_ams
 ## Role tags
 
 [clickhouse]
-notebook1.htz-fsn.prod.ooni.nu
+notebook.ooni.org
 data1.htz-fsn.prod.ooni.nu
 data2.htz-fsn.prod.ooni.nu
 data3.htz-fsn.prod.ooni.nu
@@ -17,7 +17,7 @@ data1.htz-fsn.prod.ooni.nu
 
 [htz_fsn]
 monitoring.ooni.org
-notebook1.htz-fsn.prod.ooni.nu
+notebook.ooni.org
 data1.htz-fsn.prod.ooni.nu
 data2.htz-fsn.prod.ooni.nu
 data3.htz-fsn.prod.ooni.nu
@@ -35,6 +35,12 @@ ams-ps.ooni.nu
 #mia-echoth.ooni.nu
 #mia-httpth.ooni.nu
 
+[do_fra]
+wc.th.dev.ooni.io
+wcth0.fra1.prod.ooni.io
+wcth1.fra1.prod.ooni.io
+wcth2.fra1.prod.ooni.io
+
 [aws-proxy]
 clickhouseproxy.dev.ooni.io
 clickhouseproxy.prod.ooni.io
@@ -48,6 +54,10 @@ openvpn2.htz-fsn.prod.ooni.nu
 [aws-backend]
 fastpath.dev.ooni.io
 fastpath.prod.ooni.io
+json.th.dev.ooni.io
+echo.th.dev.ooni.io
+json.th.prod.ooni.io
+echo.th.prod.ooni.io
 fastpath2.prod.ooni.io
 reuploaderfastpath.prod.ooni.io
 anonc.dev.ooni.io

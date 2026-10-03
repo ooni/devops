@@ -239,16 +239,24 @@ data "aws_ssm_parameter" "oonipg_url" {
   name = "/oonidevops/secrets/ooni-tier0-postgres/postgresql_write_url"
 }
 
-data "aws_ssm_parameter" "clickhouse_readonly_url" {
-  name = "/oonidevops/secrets/clickhouse_readonly_url"
+data "aws_ssm_parameter" "clickhouse_write_url" {
+  name = "/oonidevops/secrets/clickhouse_write_url"
 }
 
 data "aws_ssm_parameter" "clickhouse_oonimeasurements_url" {
   name = "/oonidevops/secrets/clickhouse_oonimeasurements_url"
 }
 
-data "aws_ssm_parameter" "clickhouse_write_url" {
-  name = "/oonidevops/secrets/clickhouse_write_url"
+data "aws_ssm_parameter" "clickhouse_oonimeasurements_test_url" {
+  name = "/oonidevops/secrets/clickhouse_oonimeasurements_test_url"
+}
+
+data "aws_ssm_parameter" "clickhouse_ooniprobe_url" {
+  name = "/oonidevops/secrets/clickhouse_ooniprobe_url"
+}
+
+data "aws_ssm_parameter" "clickhouse_oonirun_url" {
+  name = "/oonidevops/secrets/clickhouse_oonirun_url"
 }
 
 data "aws_ssm_parameter" "account_id_hashing_key" {
@@ -383,6 +391,10 @@ resource "random_id" "artifact_id" {
   byte_length = 4
 }
 
+data "aws_s3_bucket" "ooniprobe_failed_reports_2026_04_10" {
+  bucket = "ooniprobe-failed-reports-eu-central-1-1d24426a"
+}
+
 resource "aws_s3_bucket" "ooniprobe_failed_reports" {
   bucket = "ooniprobe-failed-reports-${var.aws_region}-${random_id.artifact_id.hex}"
 }
@@ -503,21 +515,28 @@ moved {
 
 ### OONI Tier0 Backend Proxy
 
-module "ooni_th_droplet" {
-  source = "../../modules/ooni_th_droplet"
+module "ooni_test_helpers_wc" {
+  source = "../../modules/ooni_th_binary_droplet"
 
   stage             = local.environment
   instance_location = "fra1"
-  instance_size     = "s-1vcpu-1gb"
-  droplet_count     = 3
-  deployer_key      = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
-  metrics_password  = data.aws_ssm_parameter.prometheus_metrics_password.arn
-  ssh_keys = [
-    "3d:81:99:17:b5:d1:20:a5:fe:2b:14:96:67:93:d6:34",
-    "f6:4b:8b:e2:0e:d2:97:c5:45:5c:07:a6:fe:54:60:0e"
-  ]
+  name              = "ooniwcth${count.index}-fra1"
+  hostname          = "wcth${count.index}.fra1"
+
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
 
   dns_zone_ooni_io = local.dns_zone_ooni_io
+  count            = 3
+}
+
+resource "aws_route53_record" "ooni_wc_th" {
+  zone_id = local.dns_root_zone_ooni_org
+  name    = "wcth${count.index}.fra1.ooni.org"
+  type    = "A"
+  ttl     = 60
+
+  count   = 3
+  records = [module.ooni_test_helpers_wc[count.index].droplet_ipv4_address]
 }
 
 module "ooniapi_reverseproxy_deployer" {
@@ -1037,7 +1056,7 @@ module "ooniapi_ooniprobe" {
   ]
 
   use_autoscaling       = false
-  service_desired_count = 2
+  service_desired_count = 4
   # max_desired_count     = 8
   # autoscale_policies = [
   #   {
@@ -1050,6 +1069,59 @@ module "ooniapi_ooniprobe" {
   tags = merge(
     local.tags,
     { Name = "ooni-tier0-ooniprobe" }
+  )
+}
+
+# Legacy ooniprobe service, used  to serve older probes. Identified by the
+# X-Protocol-Version header that specifies the anonymous credentials protocol
+# version.
+module "ooniapi_ooniprobe_legacy" {
+  source = "../../modules/ooniapi_service"
+
+  # First run should be set on first run to bootstrap the task definition
+  # first_run = true
+
+  vpc_id = module.network.vpc_id
+
+  service_name             = "ooniprobe-legacy"
+  default_docker_image_url = "ooni/api-ooniprobe:20260921-da8b057f"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+  task_memory              = 1024
+
+  task_secrets = {
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
+    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_write_url.arn
+    ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
+  }
+
+  task_environment = {
+    # hardcoded IP for fastpath2.prod.prod.ooni.io
+    FASTPATH_URL          = "http://10.0.0.32:8472"
+    FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
+    FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    COLLECTOR_ID          = 4 # be sure this is different from dev
+    CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
+    TOR_TARGETS           = "tor_targets.json"
+    PSIPHON_CONFIG        = "psiphon_config.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
+  }
+
+  ooniapi_service_security_groups = [
+    module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling       = false
+  service_desired_count = 1
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-ooniprobe-legacy" }
   )
 }
 
@@ -1145,6 +1217,130 @@ module "fastpath_builder" {
 }
 
 
+#### Test Helpers Machines
+#
+
+# Registers the same oonidevops keypair used for the EC2 instances (see
+# module.adm_iam_roles) as a DigitalOcean account key, so it can be installed
+# on droplets via their ssh_keys argument too.
+resource "digitalocean_ssh_key" "oonidevops" {
+  name       = "oonidevops"
+  public_key = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
+}
+
+module "ooni_test_helpers_json" {
+  source = "../../modules/ooni_th_binary_droplet"
+
+  stage    = local.environment
+  name     = "oonijsonth"
+  hostname = "json.th"
+
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
+
+  dns_zone_ooni_io = local.dns_zone_ooni_io
+}
+
+# Echo test helper requires a dedicated machine bc it's a tcp server,
+# not an HTTP server. It's impossible to reroute using nginx
+module "ooni_test_helpers_echo" {
+  source = "../../modules/ooni_th_binary_droplet"
+
+  stage    = local.environment
+  name     = "ooniechoth"
+  hostname = "echo.th"
+
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
+
+  dns_zone_ooni_io = local.dns_zone_ooni_io
+}
+
+
+module "reuploader_builder" {
+  source      = "../../modules/ooni_docker_build"
+  trigger_tag = ""
+
+  service_name            = "reuploader"
+  repo                    = "ooni/backend"
+  branch_name             = "master"
+  environment             = local.environment
+  buildspec_path          = "reuploader/buildspec.yml"
+  trigger_path            = "reuploader/**"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+}
+
+module "reuploader" {
+  source = "../../modules/scheduled_service"
+
+  task_memory = 256
+
+  vpc_id = module.network.vpc_id
+
+  first_run                = true
+  service_name             = "reuploader"
+  default_docker_image_url = "ooni/reuploader:20260617-8b35a38f"
+  schedule_expression      = "cron(30 0 * * ? 2000-2199)"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  scheduled_task_cluster   = module.ooniapi_cluster.cluster_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+
+  task_environment = {
+    AWS_REGION     = var.aws_region
+    BATCH_SIZE     = 50000
+    S3_BUCKET_NAME = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.bucket
+    FASTPATH_API   = "http://${module.ooni_reuploader_fastpath.aws_instance_private_ip}:8472"
+    LOG_LEVEL      = "DEBUG"
+  }
+
+  task_secrets = {
+  }
+
+  ooniapi_service_security_groups = [
+    module.ooniapi_cluster.web_security_group_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-reuploader" }
+  )
+}
+
+# For reuploader accessing the failed reports s3 bucket
+resource "aws_iam_role_policy" "reuploader_role" {
+  name = "${local.name}-task-role"
+  role = module.reuploader.task_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = "${data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn}/*"
+      },
+      {
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn
+      },
+      {
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = ["s3:DeleteObject"]
+        Resource = "${data.aws_s3_bucket.ooniprobe_failed_reports_2026_04_10.arn}/*"
+      }
+    ]
+  })
+}
+
+
+
+
 #### OONI Run service
 
 module "ooniapi_oonirun_deployer" {
@@ -1194,7 +1390,7 @@ module "ooniapi_oonirun" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonirun_url.arn
   }
 
   ooniapi_service_security_groups = [
@@ -1561,6 +1757,7 @@ module "ooniapi_frontend" {
   ooniapi_oonirun_target_group_arn          = module.ooniapi_oonirun.alb_target_group_id
   ooniapi_ooniauth_target_group_arn         = module.ooniapi_ooniauth.alb_target_group_id
   ooniapi_ooniprobe_target_group_arn        = module.ooniapi_ooniprobe.alb_target_group_id
+  ooniapi_ooniprobe_legacy_target_group_arn = module.ooniapi_ooniprobe_legacy.alb_target_group_id
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
   ooniapi_testlists_target_group_arn        = module.ooniapi_testlists.alb_target_group_id
@@ -1840,5 +2037,17 @@ resource "aws_route53_record" "jumphost_alias" {
 
   records = [
     module.ooni_jumphost.aws_instance_public_dns
+  ]
+}
+
+resource "aws_route53_record" "detector_panel_alias" {
+  zone_id = local.dns_zone_ooni_io
+  name    = "detector-panel.${local.environment}.ooni.io"
+  type    = "A"
+  ttl     = 300
+
+  records = [
+    # Airflow host
+    "142.132.254.225"
   ]
 }

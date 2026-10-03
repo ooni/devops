@@ -2,3 +2,13 @@
   ansible.builtin.systemd_service:
     name: nginx
     state: reloaded
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart detector-panel
+  ansible.builtin.systemd:
+    name: detector-panel.service
+    state: restarted
+    enabled: true

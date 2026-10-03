@@ -18,3 +18,7 @@ node_exporter_options: ''
 node_exporter_state: started
 node_exporter_enabled: true
 node_exporter_restart: on-failure
+http_port: 9001
+https_port: 443
+use_https: false
+monitoring_server_ip: "{{ lookup('dig', 'monitoring.ooni.org') }}"

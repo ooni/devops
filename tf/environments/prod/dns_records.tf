@@ -38,14 +38,6 @@ resource "aws_route53_record" "deb-ooni-org-_CNAME_" {
   zone_id = local.dns_root_zone_ooni_org
 }
 
-resource "aws_route53_record" "deb-ci-ooni-org-_A_" {
-  name    = "deb-ci.ooni.org"
-  records = ["188.166.93.143"]
-  ttl     = "1799"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_org
-}
-
 resource "aws_route53_record" "docs-ooni-org-_CNAME_" {
   name    = "docs.ooni.org"
   records = ["cname.vercel-dns.com"]

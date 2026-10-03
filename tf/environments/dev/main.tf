@@ -237,16 +237,20 @@ resource "aws_secretsmanager_secret_version" "oonipg_url" {
   )
 }
 
-data "aws_ssm_parameter" "clickhouse_readonly_url" {
-  name = "/oonidevops/secrets/clickhouse_readonly_url"
+data "aws_ssm_parameter" "clickhouse_oonimeasurements_url" {
+  name = "/oonidevops/secrets/clickhouse_oonimeasurements_url"
 }
 
-data "aws_ssm_parameter" "clickhouse_readonly_test_url" {
-  name = "/oonidevops/secrets/clickhouse_readonly_test_url"
+data "aws_ssm_parameter" "clickhouse_oonimeasurements_test_url" {
+  name = "/oonidevops/secrets/clickhouse_oonimeasurements_test_url"
 }
 
-data "aws_ssm_parameter" "clickhouse_write_url" {
-  name = "/oonidevops/secrets/clickhouse_write_url"
+data "aws_ssm_parameter" "clickhouse_ooniprobe_url" {
+  name = "/oonidevops/secrets/clickhouse_ooniprobe_url"
+}
+
+data "aws_ssm_parameter" "clickhouse_oonirun_url" {
+  name = "/oonidevops/secrets/clickhouse_oonirun_url"
 }
 
 data "aws_ssm_parameter" "account_id_hashing_key" {
@@ -480,19 +484,21 @@ moved {
 
 ### OONI Tier0 Backend Proxy
 
-module "ooni_th_droplet" {
-  source = "../../modules/ooni_th_droplet"
+resource "digitalocean_ssh_key" "oonidevops" {
+  name       = "oonidevops"
+  public_key = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
+}
 
-  stage             = local.environment
-  instance_location = "fra1"
-  instance_size     = "s-1vcpu-1gb"
-  droplet_count     = 1
-  deployer_key      = jsondecode(data.aws_secretsmanager_secret_version.deploy_key.secret_string)["public_key"]
-  metrics_password  = data.aws_ssm_parameter.prometheus_metrics_password.arn
-  ssh_keys = [
-    "3d:81:99:17:b5:d1:20:a5:fe:2b:14:96:67:93:d6:34",
-    "f6:4b:8b:e2:0e:d2:97:c5:45:5c:07:a6:fe:54:60:0e"
-  ]
+
+module "ooni_test_helpers_wc" {
+  source = "../../modules/ooni_th_binary_droplet"
+
+  stage    = local.environment
+  name     = "ooniwcth"
+  hostname = "wc.th"
+
+  ssh_keys = [digitalocean_ssh_key.oonidevops.fingerprint]
+
   dns_zone_ooni_io = local.dns_zone_ooni_io
 }
 
@@ -654,7 +660,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "feat/experiment-versions"
   environment             = local.environment
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
@@ -703,7 +709,7 @@ module "ooniapi_ooniprobe" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_write_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_ooniprobe_url.arn
     ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
   }
 
@@ -737,6 +743,59 @@ module "ooniapi_ooniprobe" {
   tags = merge(
     local.tags,
     { Name = "ooni-tier0-ooniprobe" }
+  )
+}
+
+# Legacy ooniprobe service, used  to serve older probes. Identified by the
+# X-Protocol-Version header that specifies the anonymous credentials protocol
+# version.
+module "ooniapi_ooniprobe_legacy" {
+  source = "../../modules/ooniapi_service"
+
+  # First run should be set on first run to bootstrap the task definition
+  # first_run = true
+
+  task_memory = 256
+
+  vpc_id = module.network.vpc_id
+
+  service_name             = "ooniprobe-legacy"
+  default_docker_image_url = "ooni/api-ooniprobe:20260921-da8b057f"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+
+  task_secrets = {
+    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
+    JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.arn
+    PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_ooniprobe_url.arn
+    ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.arn
+  }
+
+  task_environment = {
+    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
+    FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
+    FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    COLLECTOR_ID          = 3 # use a different one in prod
+    CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
+    TOR_TARGETS           = "tor_targets.json"
+    PSIPHON_CONFIG        = "psiphon_config.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
+  }
+
+  ooniapi_service_security_groups = [
+    # module.ooniapi_cluster.web_security_group_id
+  ]
+
+  use_autoscaling       = false
+  service_desired_count = 1
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-ooniprobe-legacy" }
   )
 }
 
@@ -1050,7 +1109,7 @@ module "fastpath_builder" {
 
   service_name            = "fastpath"
   repo                    = "ooni/backend"
-  branch_name             = "fix-fastpath"
+  branch_name             = "feat/wc-x-flags"
   environment             = local.environment
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
@@ -1070,7 +1129,7 @@ module "ooniapi_oonirun_deployer" {
 
   service_name            = "oonirun"
   repo                    = "ooni/backend"
-  branch_name             = "oonirun-v2-1"
+  branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
   trigger_path            = "ooniapi/services/oonirun/**"
@@ -1106,7 +1165,7 @@ module "ooniapi_oonirun" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonirun_url.arn
   }
 
   ooniapi_service_security_groups = [
@@ -1167,7 +1226,6 @@ module "ooniapi_oonifindings" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.arn
   }
 
   ooniapi_service_security_groups = [
@@ -1286,7 +1344,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "636-better-pagination"
   environment             = local.environment
   trigger_path            = "ooniapi/services/oonimeasurements/**"
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
@@ -1332,7 +1390,7 @@ module "ooniapi_oonimeasurements" {
     POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_test_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_test_url.arn
     ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
   }
 
@@ -1446,7 +1504,7 @@ module "testlists_builder" {
 
   service_name            = "testlists"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "fix_1238_testlists_worktree"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
   trigger_path            = "ooniapi/services/testlists/**"
@@ -1467,6 +1525,7 @@ module "ooniapi_frontend" {
   ooniapi_oonirun_target_group_arn          = module.ooniapi_oonirun.alb_target_group_id
   ooniapi_ooniauth_target_group_arn         = module.ooniapi_ooniauth.alb_target_group_id
   ooniapi_ooniprobe_target_group_arn        = module.ooniapi_ooniprobe.alb_target_group_id
+  ooniapi_ooniprobe_legacy_target_group_arn = module.ooniapi_ooniprobe_legacy.alb_target_group_id
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
   ooniapi_testlists_target_group_arn        = module.ooniapi_testlists.alb_target_group_id
@@ -1573,77 +1632,6 @@ module "ooni_monitoring" {
   aws_region  = var.aws_region
 
   tags = local.tags
-}
-
-### Anonymous credentials testing instance
-module "ooni_anonc" {
-  source = "../../modules/ec2"
-
-  stage = local.environment
-
-  vpc_id              = module.network.vpc_id
-  subnet_id           = module.network.vpc_subnet_public[0].id
-  private_subnet_cidr = module.network.vpc_subnet_private[*].cidr_block
-  dns_zone_ooni_io    = local.dns_zone_ooni_io
-
-  key_name      = module.adm_iam_roles.oonidevops_key_name
-  instance_type = "t3a.small"
-
-  name = "anonc"
-  ingress_rules = [{
-    from_port   = 22,
-    to_port     = 22,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 80, # for dehydrated challenge
-    to_port     = 80,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 443, # for the POC hosting
-    to_port     = 443,
-    protocol    = "tcp",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port   = 9100, # for node exporter metrics
-    to_port     = 9100,
-    protocol    = "tcp"
-    cidr_blocks = ["${module.ooni_monitoring_proxy.aws_instance_private_ip}/32"],
-  }]
-
-  egress_rules = [{
-    from_port   = 0,
-    to_port     = 0,
-    protocol    = "-1",
-    cidr_blocks = ["0.0.0.0/0"],
-    }, {
-    from_port        = 0,
-    to_port          = 0,
-    protocol         = "-1",
-    ipv6_cidr_blocks = ["::/0"],
-  }]
-
-  sg_prefix = "oonianonc"
-  tg_prefix = "anon"
-
-  disk_size = 20
-
-  tags = merge(
-    local.tags,
-    { Name = "ooni-tier0-anonc" }
-  )
-}
-
-resource "aws_route53_record" "anonc_alias" {
-  zone_id = local.dns_zone_ooni_io
-  name    = "anonc.${local.environment}.ooni.io"
-  type    = "CNAME"
-  ttl     = 300
-
-  records = [
-    module.ooni_anonc.aws_instance_public_dns
-  ]
 }
 
 # Jump host for accessing postgres

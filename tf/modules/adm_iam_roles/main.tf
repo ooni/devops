@@ -53,7 +53,8 @@ resource "aws_iam_policy" "oonidevops" {
         "secretsmanager:*",
         "cloudhsm:*",
         "athena:*",
-        "glue:*"
+        "glue:*",
+        "events:*"
       ],
       "Resource": "*"
     }

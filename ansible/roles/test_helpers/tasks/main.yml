@@ -1,0 +1,76 @@
+---
+
+# For prometheus scrape requests.
+- name: Allow traffic on port 9100 from the monitoring host only
+  become: true
+  tags: prometheus-proxy
+  blockinfile:
+    path: /etc/ooni/nftables/tcp/9100.nft
+    create: yes
+    block: |
+      add rule inet filter input ip saddr {{ monitoring_server_ip }} tcp dport 9100 counter accept comment "node exporter"
+  notify:
+   - reload nftables
+
+- name: Allow traffic on the {{ helper }} test helper port
+  become: true
+  tags: test-helpers
+  blockinfile:
+    path: "/etc/ooni/nftables/tcp/{{ port }}.nft"
+    create: yes
+    block: |
+      add rule inet filter input tcp dport {{ port }} counter accept comment "{{ helper }} test helper"
+  notify:
+   - reload nftables
+
+# Create test helpers user
+- name: Create the testhelpers user
+  ansible.builtin.user:
+    name: "testhelpers"
+    shell: "/bin/bash"
+    create_home: no
+    system: yes
+  become: yes
+
+# Install test helpers
+- name: Download the {{ helper }} test helper binary
+  ansible.builtin.get_url:
+    url: "{{ test_helpers_base_url }}/{{ helper }}"
+    dest: "/usr/local/bin/{{ helper }}"
+    checksum: "sha256:{{ test_helpers_checksum }}"
+    mode: '0755'
+    force: yes
+  become: yes
+  register: helper_binary
+
+# Create systemd units
+
+- name: Create <helper>.service file
+  tags: test-helpers
+  ansible.builtin.template:
+    src: templates/{{helper}}.service
+    dest: /etc/systemd/system/{{helper}}.service
+    mode: '0755'
+    owner: root
+  register: helper_unit
+
+- name: reload systemd
+  tags: test-helpers
+  ansible.builtin.systemd_service:
+    daemon_reload: yes
+  when: helper_unit.changed
+
+- name: Start helper
+  tags: test-helpers
+  systemd:
+    name: "{{helper}}.service"
+    state: started
+    enabled: yes
+
+- name: Restart helper if its binary or unit file changed
+  tags: test-helpers
+  ansible.builtin.systemd_service:
+    name: "{{ helper }}.service"
+    state: restarted
+  become: yes
+  when: helper_binary.changed or helper_unit.changed

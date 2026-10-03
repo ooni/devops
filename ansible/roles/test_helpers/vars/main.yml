@@ -1,0 +1,4 @@
+
+# choices: oojsonhelpd, ooechohelpd
+helper: "oojsonhelpd"
+port: "80"

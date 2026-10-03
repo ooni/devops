@@ -1,8 +1,5 @@
 dom0_hosts:
   - ams-slack-1.ooni.org
-  - doams1-countly.ooni.nu
-  - mia-echoth.ooni.nu
-  - mia-httpth.ooni.nu
 
 blackbox_jobs:
   # TODO add these records to the ALB config
@@ -25,6 +22,9 @@ blackbox_jobs:
       - "https://4.th.ooni.org/"
       - "https://5.th.ooni.org/"
       - "https://6.th.ooni.org/"
+      - "https://wcth0.fra1.prod.ooni.io/"
+      - "https://wcth1.fra1.prod.ooni.io/"
+      - "https://wcth2.fra1.prod.ooni.io/"
       - "https://d33d1gs9kpq1c5.cloudfront.net/status"
 
   - name: "ooni collector"
@@ -48,22 +48,27 @@ blackbox_jobs:
       # cloudfront
       - "https://d3kr4emv7f56qa.cloudfront.net/bouncer/net-tests"
 
-  # IP addresses are used for test-helpers in monitoring configuration for some
-  # historical reason hopefully remembered by @hellais.
-  - name: "ooni tcp echo"
-    module: "ooni_tcp_echo_ok"
-    targets:
-      - "{{ lookup('dig', 'c.echo.th.ooni.io/A') }}:80"
-
-  - name: "ooni http return json headers"
-    module: "ooni_http_return_json_headers_ok"
-    targets:
-      - "http://{{ lookup('dig', 'a.http.th.ooni.io/A') }}:80"
-
   - name: "ooni explorer homepage"
     module: "http_2xx"
     targets:
       - "https://explorer.ooni.org/"
+
+  # We use IP monitoring since this is what is served to users through check-in.
+  - name: "ooni tcp echo"
+    module: "ooni_tcp_echo_ok"
+    ignore_instance_down: true # covered by the more specific TestHelperDown alert
+    labels:
+      domain: "echo.th.prod.ooni.io"
+    targets:
+      - "{{ lookup('dig', 'echo.th.prod.ooni.io/A') }}:80"
+
+  - name: "ooni http return json headers"
+    module: "ooni_http_return_json_headers_ok"
+    ignore_instance_down: true # covered by the more specific TestHelperDown alert
+    labels:
+      domain: "json.th.prod.ooni.io"
+    targets:
+      - "http://{{ lookup('dig', 'json.th.prod.ooni.io/A') }}:80"
 
   # API #
 
@@ -102,6 +107,65 @@ blackbox_jobs:
     targets:
       - "https://api.ooni.io/api/_/global_overview"
       - "https://api.ooni.org/api/_/global_overview"
+
+  - name: "ooni API private"
+    module: "https_2xx_json"
+    ignore_instance_down: true
+    scrape_interval: 5m
+    scrape_timeout: 30s
+    labels:
+      tier: "tier-1"
+    targets:
+      - "https://api.ooni.org/api/_/asn_by_month"
+      - "https://api.ooni.org/api/_/countries_by_month"
+      - "https://api.ooni.org/api/_/test_names"
+      - "https://api.ooni.org/api/_/countries"
+      - "https://api.ooni.org/api/_/test_coverage?probe_cc=IT"
+      - "https://api.ooni.org/api/_/website_networks?probe_cc=IT"
+      - "https://api.ooni.org/api/_/website_stats?probe_cc=IT&probe_asn=3269&input=https://www.google.com/"
+      - "https://api.ooni.org/api/_/website_urls?probe_cc=IT&probe_asn=AS3269"
+      - "https://api.ooni.org/api/_/vanilla_tor_stats?probe_cc=IT"
+      - "https://api.ooni.org/api/_/im_networks?probe_cc=IT"
+      - "https://api.ooni.org/api/_/im_stats?probe_cc=IT&probe_asn=AS3269&test_name=signal"
+      - "https://api.ooni.org/api/_/network_stats?probe_cc=IT"
+      - "https://api.ooni.org/api/_/country_overview?probe_cc=IT"
+      - "https://api.ooni.org/api/_/global_overview_by_month"
+      - "https://api.ooni.org/api/_/circumvention_stats_by_country"
+      - "https://api.ooni.org/api/_/circumvention_runtime_stats"
+      - "https://api.ooni.org/api/_/domain_metadata?domain=google.com"
+      - "https://api.ooni.org/api/_/asnmeta?asn=3269"
+      - "https://api.ooni.org/api/_/networks"
+      - "https://api.ooni.org/api/_/domains"
+
+  # api.ooni.io goes to backend-fsn nginx, which caches some responses
+  - name: "ooni API private (legacy)"
+    module: "https_2xx_json"
+    ignore_instance_down: true
+    scrape_interval: 5m
+    scrape_timeout: 30s
+    labels:
+      tier: "tier-1"
+    targets:
+      - "https://api.ooni.io/api/_/asn_by_month"
+      - "https://api.ooni.io/api/_/countries_by_month"
+      - "https://api.ooni.io/api/_/test_names"
+      - "https://api.ooni.io/api/_/countries"
+      - "https://api.ooni.io/api/_/test_coverage?probe_cc=IT"
+      - "https://api.ooni.io/api/_/website_networks?probe_cc=IT"
+      - "https://api.ooni.io/api/_/website_stats?probe_cc=IT&probe_asn=3269&input=https://www.google.com/"
+      - "https://api.ooni.io/api/_/website_urls?probe_cc=IT&probe_asn=AS3269"
+      - "https://api.ooni.io/api/_/vanilla_tor_stats?probe_cc=IT"
+      - "https://api.ooni.io/api/_/im_networks?probe_cc=IT"
+      - "https://api.ooni.io/api/_/im_stats?probe_cc=IT&probe_asn=AS3269&test_name=signal"
+      - "https://api.ooni.io/api/_/network_stats?probe_cc=IT"
+      - "https://api.ooni.io/api/_/country_overview?probe_cc=IT"
+      - "https://api.ooni.io/api/_/global_overview_by_month"
+      - "https://api.ooni.io/api/_/circumvention_stats_by_country"
+      - "https://api.ooni.io/api/_/circumvention_runtime_stats"
+      - "https://api.ooni.io/api/_/domain_metadata?domain=google.com"
+      - "https://api.ooni.io/api/_/asnmeta?asn=3269"
+      - "https://api.ooni.io/api/_/networks"
+      - "https://api.ooni.io/api/_/domains"
 
   - name: "ooni API findings listing"
     module: "https_2xx_json"
@@ -182,11 +246,6 @@ blackbox_jobs:
       - "https://ooniprobe.prod.ooni.io/api/v1/check-in"
 
   # end of API #
-
-  - name: "countly.ooni.io ping"
-    module: "http_2xx"
-    targets:
-      - "https://countly.ooni.io/o/ping"
 
   - name: "slack inviter"
     module: "http_2xx"
