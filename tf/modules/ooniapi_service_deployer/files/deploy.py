@@ -151,15 +151,30 @@ def deploy_host(host, ctx):
             time.sleep(2)
     log.info(f"{service} on {host}: slot {target_slot} healthy after {time.monotonic() - started:.0f}s")
 
-    state_a, state_b = ("", "down") if target_slot == "a" else ("down", "")
     upstream_file = f"{service}-upstream.conf"
-    upstream_content = s3_fetch(ctx["bucket"], f"{service}/{upstream_file}")
-    upstream_content = upstream_content.replace("__STATE_A__", state_a).replace("__STATE_B__", state_b)
-    upstream_local = write_tmp(upstream_file, upstream_content)
-    scp(user, host, upstream_local, f"{STAGING_DIR}/{upstream_file}")
-    ssh(user, host,
-        f"sudo mv {STAGING_DIR}/{upstream_file} /etc/nginx/conf.d/{upstream_file}"
-        f" && sudo nginx -t && sudo systemctl reload nginx")
+    upstream_template = s3_fetch(ctx["bucket"], f"{service}/{upstream_file}")
+
+    def install_upstream(live_slot):
+        state_a, state_b = ("", "down") if live_slot == "a" else ("down", "")
+        content = upstream_template.replace("__STATE_A__", state_a).replace("__STATE_B__", state_b)
+        scp(user, host, write_tmp(upstream_file, content), f"{STAGING_DIR}/{upstream_file}")
+        ssh(user, host, f"sudo mv {STAGING_DIR}/{upstream_file} /etc/nginx/conf.d/{upstream_file}")
+
+    install_upstream(target_slot)
+    if not ssh_succeeds(user, host, "sudo nginx -t"):
+        # nginx is still running its old config, but a config that fails
+        # nginx -t must not stay in conf.d: the next reload (another
+        # service's deploy, a certificate renewal) would fail, and a restart
+        # would take every service on this host down. Put back the upstream
+        # of the slot still serving, which nginx -t accepted before.
+        log.error(f"{service} on {host}: nginx -t failed with slot {target_slot}'s upstream, restoring slot {active_slot}'s")
+        install_upstream(active_slot)
+        if not ssh_succeeds(user, host, "sudo nginx -t"):
+            sys.exit(f"{service} on {host}: nginx -t still fails after restoring slot {active_slot}'s upstream:"
+                     " the nginx config is broken independently of this deploy, fix it before reloading nginx")
+        sys.exit(f"{service} on {host}: nginx -t failed with slot {target_slot}'s upstream; restored slot"
+                 f" {active_slot}'s, which is still serving. Aborting deploy")
+    ssh(user, host, "sudo systemctl reload nginx")
     ssh(user, host, f"echo {target_slot} | sudo tee /etc/ooniapi/{service}/active_slot > /dev/null")
 
     log.info(f"=== {service} on {host}: now serving from slot {target_slot} ===")
