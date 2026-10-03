@@ -86,6 +86,12 @@ variable "host_port_b" {
   default     = null
 }
 
+variable "health_check_timeout" {
+  description = "Seconds a new blue/green slot has to pass its /health check twice in a row before the deploy is aborted. The ECS target groups give a new task about 60 s."
+  type        = number
+  default     = 120
+}
+
 variable "container_port" {
   description = "Port the service listens on inside the container. Required when deploy_mode = \"blue_green\"."
   type        = number

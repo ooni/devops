@@ -133,14 +133,23 @@ def deploy_host(host, ctx):
 
     ssh(user, host, f"sudo docker compose -f {compose_path} up -d --pull always --remove-orphans")
 
-    healthy = False
-    for _ in range(10):
-        if ssh_succeeds(user, host, f"curl -sf -o /dev/null http://127.0.0.1:{target_port}/health"):
-            healthy = True
-            break
-        time.sleep(2)
-    if not healthy:
-        sys.exit(f"{service} on {host}: slot {target_slot} failed health check, aborting deploy")
+    # like the ECS target groups' health check (ooniapi_service: timeout 5,
+    # healthy_threshold 2): each check may take up to 5 s, and the slot must
+    # pass twice in a row. ECS gives a new task about a minute to come up;
+    # the deadline defaults to twice that, and is logged so it can be tuned
+    started = time.monotonic()
+    passes = 0
+    while passes < 2:
+        if ssh_succeeds(user, host, f"curl -sf --max-time 5 -o /dev/null http://127.0.0.1:{target_port}/health"):
+            passes += 1
+        else:
+            passes = 0
+        elapsed = time.monotonic() - started
+        if passes < 2 and elapsed > ctx["health_check_timeout"]:
+            sys.exit(f"{service} on {host}: slot {target_slot} not healthy after {elapsed:.0f}s, aborting deploy")
+        if passes < 2:
+            time.sleep(2)
+    log.info(f"{service} on {host}: slot {target_slot} healthy after {time.monotonic() - started:.0f}s")
 
     state_a, state_b = ("", "down") if target_slot == "a" else ("down", "")
     upstream_file = f"{service}-upstream.conf"
@@ -175,6 +184,7 @@ def main():
         "image_tag": image_tag,
         "host_port_a": require_env("HOST_PORT_A"),
         "host_port_b": require_env("HOST_PORT_B"),
+        "health_check_timeout": int(os.environ.get("HEALTH_CHECK_TIMEOUT") or 120),
         "secrets": json.loads(secretsmanager_get(require_env("SERVICE_SECRETS_ARN"))),
     }
 

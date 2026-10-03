@@ -347,6 +347,10 @@ resource "aws_codebuild_project" "deploy" {
       name  = "DEPLOY_SSH_KEY_SECRET_ARN"
       value = var.deploy_ssh_key_secret_arn
     }
+    environment_variable {
+      name  = "HEALTH_CHECK_TIMEOUT"
+      value = tostring(var.health_check_timeout)
+    }
   }
 
   logs_config {
