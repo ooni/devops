@@ -5,6 +5,9 @@ data "aws_caller_identity" "current" {}
 locals {
   account_id = data.aws_caller_identity.current.account_id
   env_label  = var.environment == "prod" ? "latest" : "dev"
+
+  deploy_ecs        = contains(["ecs", "both"], var.deploy_mode)
+  deploy_blue_green = contains(["blue_green", "both"], var.deploy_mode)
 }
 
 resource "aws_iam_policy" "codebuild" {
@@ -161,10 +164,10 @@ resource "aws_codebuild_project" "ooniapi" {
   }
 }
 
-## Docker Compose blue/green deploy (deploy_mode = "blue_green")
+## Docker Compose blue/green deploy (deploy_mode = "blue_green" or "both")
 
 resource "aws_s3_object" "compose_file" {
-  for_each = var.deploy_mode == "blue_green" ? { a = var.host_port_a, b = var.host_port_b } : {}
+  for_each = local.deploy_blue_green ? { a = var.host_port_a, b = var.host_port_b } : {}
 
   bucket       = var.deploy_bucket
   key          = "${var.service_name}/${var.service_name}-${each.key}.yaml"
@@ -182,7 +185,7 @@ resource "aws_s3_object" "compose_file" {
 }
 
 resource "aws_s3_object" "nginx_upstream" {
-  count = var.deploy_mode == "blue_green" ? 1 : 0
+  count = local.deploy_blue_green ? 1 : 0
 
   bucket       = var.deploy_bucket
   key          = "${var.service_name}/${var.service_name}-upstream.conf"
@@ -196,7 +199,7 @@ resource "aws_s3_object" "nginx_upstream" {
 }
 
 resource "aws_s3_object" "deploy_script" {
-  count = var.deploy_mode == "blue_green" ? 1 : 0
+  count = local.deploy_blue_green ? 1 : 0
 
   bucket       = var.deploy_bucket
   key          = "${var.service_name}/deploy.py"
@@ -206,7 +209,7 @@ resource "aws_s3_object" "deploy_script" {
 }
 
 resource "aws_iam_policy" "deploy" {
-  count = var.deploy_mode == "blue_green" ? 1 : 0
+  count = local.deploy_blue_green ? 1 : 0
 
   description = "Policy used in trust relationship with the blue/green deploy CodeBuild project"
   name        = "codebuild-deploy-${var.service_name}-${var.aws_region}"
@@ -260,7 +263,7 @@ resource "aws_iam_policy" "deploy" {
 }
 
 resource "aws_iam_role" "deploy" {
-  count = var.deploy_mode == "blue_green" ? 1 : 0
+  count = local.deploy_blue_green ? 1 : 0
 
   assume_role_policy = <<POLICY
 {
@@ -286,7 +289,7 @@ POLICY
 }
 
 resource "aws_codebuild_project" "deploy" {
-  count = var.deploy_mode == "blue_green" ? 1 : 0
+  count = local.deploy_blue_green ? 1 : 0
 
   badge_enabled          = "false"
   build_timeout          = "20"
@@ -489,7 +492,7 @@ resource "aws_codepipeline" "ooniapi" {
     name = "Deploy"
 
     dynamic "action" {
-      for_each = var.deploy_mode == "ecs" ? [1] : []
+      for_each = local.deploy_ecs ? [1] : []
 
       content {
         category = "Deploy"
@@ -511,7 +514,7 @@ resource "aws_codepipeline" "ooniapi" {
     }
 
     dynamic "action" {
-      for_each = var.deploy_mode == "blue_green" ? [1] : []
+      for_each = local.deploy_blue_green ? [1] : []
 
       content {
         category = "Build"
@@ -520,13 +523,15 @@ resource "aws_codepipeline" "ooniapi" {
           ProjectName = aws_codebuild_project.deploy[0].name
         }
 
+        # in "both" this runs once ECS has deployed, so the hosts never get a
+        # version ECS rejected; each action needs its own name and namespace
         input_artifacts = ["BuildArtifact"]
-        name            = "Deploy"
-        namespace       = "DeployVariables"
+        name            = local.deploy_ecs ? "DeployBlueGreen" : "Deploy"
+        namespace       = local.deploy_ecs ? "DeployBlueGreenVariables" : "DeployVariables"
         owner           = "AWS"
         provider        = "CodeBuild"
         region          = var.aws_region
-        run_order       = "1"
+        run_order       = local.deploy_ecs ? "2" : "1"
         version         = "1"
       }
     }
