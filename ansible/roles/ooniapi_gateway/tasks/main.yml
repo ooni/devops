@@ -67,6 +67,9 @@
   ansible.builtin.copy:
     dest: "/etc/nginx/conf.d/{{ item.item.name }}-upstream.conf"
     content: |
+      map "" $ooniapi_cache_version_{{ item.item.name }} {
+          default "";
+      }
       upstream {{ item.item.name }} {
           server 127.0.0.1:{{ item.item.host_port_a }};
           server 127.0.0.1:{{ item.item.host_port_b }} down;

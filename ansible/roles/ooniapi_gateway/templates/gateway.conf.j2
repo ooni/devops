@@ -74,8 +74,10 @@ server {
   # routes.yaml (proxy_cache is off elsewhere). Responses are cached as long
   # as their Cache-Control allows (nginx skips no-cache, private, max-age=0
   # and those setting cookies), or ooniapi_gateway_cache_default_valid
-  # without one. Requests with credentials never use the cache.
-  proxy_cache_key "$scheme$host$request_uri";
+  # without one. Requests with credentials never use the cache. Each cached
+  # location keys on its service's $ooniapi_cache_version_<service>, the
+  # image tag its blue/green deploy writes to <service>-upstream.conf, so a
+  # deploy invalidates that service's responses, and only those.
   proxy_cache_methods GET HEAD;
   proxy_cache_valid 200 301 302 {{ ooniapi_gateway_cache_default_valid }};
   proxy_cache_valid any 0;
@@ -91,7 +93,7 @@ server {
   ## --- generated from routes.yaml, see tasks/main.yml ---
 {% for l in ooniapi_gateway_locations %}
 {% if l.service in service_names %}
-  location {{ l.match }} {{ l.path }} { proxy_pass http://{{ l.service }};{% if l.cache %} proxy_cache ooniapi_{{ l.cache }};{% endif %} } # {{ l.route }}
+  location {{ l.match }} {{ l.path }} { proxy_pass http://{{ l.service }};{% if l.cache %} proxy_cache ooniapi_{{ l.cache }}; proxy_cache_key "$ooniapi_cache_version_{{ l.service }}$scheme$host$request_uri";{% endif %} } # {{ l.route }}
 {% elif l.service in remote_upstreams %}
   # {{ l.service }} is not yet migrated off AWS, proxied cross-cloud until it is
   location {{ l.match }} {{ l.path }} { proxy_pass {{ remote_upstreams[l.service] }}; } # {{ l.route }}

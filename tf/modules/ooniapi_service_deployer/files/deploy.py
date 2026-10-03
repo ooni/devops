@@ -20,6 +20,7 @@
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -165,23 +166,31 @@ def deploy_host(host, ctx):
     log.info(f"{service} on {host}: slot {target_slot} healthy after {time.monotonic() - started:.0f}s")
 
     upstream_file = f"{service}-upstream.conf"
-    upstream_template = s3_fetch(ctx["bucket"], f"{service}/{upstream_file}")
+    upstream_path = f"/etc/nginx/conf.d/{upstream_file}"
+    state_a, state_b = ("", "down") if target_slot == "a" else ("down", "")
+    # the image tag doubles as this service's cache version on the gateway
+    # (see nginx_upstream.conf.tftpl): new tag, new cache keys
+    upstream_content = (
+        s3_fetch(ctx["bucket"], f"{service}/{upstream_file}")
+        .replace("__STATE_A__", state_a).replace("__STATE_B__", state_b)
+        .replace("__CACHE_VERSION__", ctx["image_tag"])
+    )
+    # kept as is, to put back if nginx rejects the new one
+    previous_content = ssh_output(user, host, f"cat {upstream_path}")
 
-    def install_upstream(live_slot):
-        state_a, state_b = ("", "down") if live_slot == "a" else ("down", "")
-        content = upstream_template.replace("__STATE_A__", state_a).replace("__STATE_B__", state_b)
+    def install_upstream(content):
         scp(user, host, write_tmp(upstream_file, content), f"{STAGING_DIR}/{upstream_file}")
-        ssh(user, host, f"sudo mv {STAGING_DIR}/{upstream_file} /etc/nginx/conf.d/{upstream_file}")
+        ssh(user, host, f"sudo mv {STAGING_DIR}/{upstream_file} {upstream_path}")
 
-    install_upstream(target_slot)
+    install_upstream(upstream_content)
     if not ssh_succeeds(user, host, "sudo nginx -t"):
         # nginx is still running its old config, but a config that fails
         # nginx -t must not stay in conf.d: the next reload (another
         # service's deploy, a certificate renewal) would fail, and a restart
-        # would take every service on this host down. Put back the upstream
-        # of the slot still serving, which nginx -t accepted before.
+        # would take every service on this host down. Put back the previous
+        # file, slot and cache version, which nginx -t accepted before.
         log.error(f"{service} on {host}: nginx -t failed with slot {target_slot}'s upstream, restoring slot {active_slot}'s")
-        install_upstream(active_slot)
+        install_upstream(previous_content)
         if not ssh_succeeds(user, host, "sudo nginx -t"):
             sys.exit(f"{service} on {host}: nginx -t still fails after restoring slot {active_slot}'s upstream:"
                      " the nginx config is broken independently of this deploy, fix it before reloading nginx")
@@ -197,6 +206,9 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
     with open("imagedefinitions.json") as f:
         image_tag = json.load(f)[0]["imageUri"].rsplit(":", 1)[-1]
+    # it ends up in an nginx string and in compose files
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", image_tag):
+        sys.exit(f"unexpected image tag: {image_tag!r}")
 
     service = require_env("SERVICE_NAME")
     log.info(f"Deploying {service} image tag {image_tag}")
