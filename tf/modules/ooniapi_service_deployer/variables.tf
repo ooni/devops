@@ -92,6 +92,12 @@ variable "health_check_timeout" {
   default     = 120
 }
 
+variable "drain_timeout" {
+  description = "Seconds requests may keep draining from a blue/green slot after it is taken out of rotation; must match ooniapi_gateway_drain_timeout on the hosts. A deploy waits this long after the previous one before restarting that slot. Mirrors the ALB deregistration delay (AWS default, 300 s)."
+  type        = number
+  default     = 300
+}
+
 variable "container_port" {
   description = "Port the service listens on inside the container. Required when deploy_mode = \"blue_green\"."
   type        = number

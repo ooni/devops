@@ -66,3 +66,10 @@ ooniapi_gateway_deploy_user: deploy
 # moved/installed into place. Must match STAGING_DIR in
 # tf/modules/ooniapi_service_deployer/files/deploy.py.
 ooniapi_gateway_staging_dir: /var/lib/ooniapi/deploy-staging
+
+# How long nginx workers left over from a reload may keep serving in-flight
+# requests (to the slot a deploy just took out of rotation) before they are
+# closed. Matches the ALB's deregistration delay on ECS (AWS default, 300 s),
+# and must match drain_timeout in ooniapi_service_deployer: a deploy waits
+# this long after the previous flip before it restarts the drained slot.
+ooniapi_gateway_drain_timeout: 300

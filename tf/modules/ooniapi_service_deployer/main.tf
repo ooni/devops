@@ -351,6 +351,10 @@ resource "aws_codebuild_project" "deploy" {
       name  = "HEALTH_CHECK_TIMEOUT"
       value = tostring(var.health_check_timeout)
     }
+    environment_variable {
+      name  = "DRAIN_TIMEOUT"
+      value = tostring(var.drain_timeout)
+    }
   }
 
   logs_config {

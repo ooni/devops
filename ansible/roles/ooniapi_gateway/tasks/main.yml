@@ -203,6 +203,20 @@
     mode: "0440"
     validate: "visudo -cf %s"
 
+# worker_shutdown_timeout is only valid in nginx's main context, which
+# conf.d can't reach; modules-enabled/*.conf is included there by both the
+# nginx role's nginx.conf and Debian's stock one.
+- name: Bound how long old nginx workers drain after a reload
+  ansible.builtin.copy:
+    dest: /etc/nginx/modules-enabled/90-ooniapi-gateway-drain.conf
+    content: |
+      # Managed by ansible - roles/ooniapi_gateway (ooniapi_gateway_drain_timeout)
+      worker_shutdown_timeout {{ ooniapi_gateway_drain_timeout }}s;
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload ooniapi gateway nginx
+
 - name: Render the gateway vhost
   ansible.builtin.template:
     src: gateway.conf.j2

@@ -106,6 +106,19 @@ def deploy_host(host, ctx):
     active_slot = ssh_output(
         user, host, f"cat /etc/ooniapi/{service}/active_slot 2>/dev/null || echo a"
     ).strip() or "a"
+
+    # the slot about to be replaced is the one the previous deploy took out
+    # of rotation: nginx workers from before that flip may still be serving
+    # requests to it, for up to drain_timeout (worker_shutdown_timeout in
+    # the ooniapi_gateway role). Don't restart it under them.
+    since_flip = int(ssh_output(
+        user, host,
+        f"echo $(( $(date +%s) - $(stat -c %Y /etc/ooniapi/{service}/active_slot 2>/dev/null || echo 0) ))",
+    ).strip())
+    wait = ctx["drain_timeout"] - since_flip
+    if wait > 0:
+        log.info(f"{service} on {host}: previous deploy flipped {since_flip}s ago, waiting {wait}s for its old slot to drain")
+        time.sleep(wait)
     target_slot = "b" if active_slot == "a" else "a"
     target_port = ctx["host_port_b"] if target_slot == "b" else ctx["host_port_a"]
     log.info(f"{service} on {host}: active slot is {active_slot}, deploying to slot {target_slot} (port {target_port})")
@@ -200,6 +213,7 @@ def main():
         "host_port_a": require_env("HOST_PORT_A"),
         "host_port_b": require_env("HOST_PORT_B"),
         "health_check_timeout": int(os.environ.get("HEALTH_CHECK_TIMEOUT") or 120),
+        "drain_timeout": int(os.environ.get("DRAIN_TIMEOUT") or 300),
         "secrets": json.loads(secretsmanager_get(require_env("SERVICE_SECRETS_ARN"))),
     }
 
