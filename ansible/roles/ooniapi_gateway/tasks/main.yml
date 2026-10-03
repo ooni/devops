@@ -220,6 +220,15 @@
 - name: Derive and check the gateway's locations
   ansible.builtin.import_tasks: routes.yml
 
+- name: Ensure the gateway's cache directories exist
+  ansible.builtin.file:
+    path: "{{ ooniapi_gateway_cache_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ ooniapi_gateway_nginx_user }}"
+    group: "{{ ooniapi_gateway_nginx_user }}"
+    mode: "0700"
+  loop: "{{ ooniapi_gateway_cache_zones.keys() | list }}"
+
 - name: Render the gateway vhost
   ansible.builtin.template:
     src: gateway.conf.j2

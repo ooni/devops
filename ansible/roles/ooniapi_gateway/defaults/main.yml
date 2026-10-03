@@ -61,6 +61,27 @@ ooniapi_gateway_network_name: ooniapi
 # gateway's locations are generated from them in tasks/main.yml
 ooniapi_gateway_routes: "{{ lookup('ansible.builtin.file', role_path ~ '/../../../tf/modules/ooniapi_frontend/routes.yaml') | from_yaml }}"
 
+# Response caches for the routes marked cache/cache_long in routes.yaml.
+# nginx keeps an entry until it goes unused for `inactive`, expired or not,
+# so responses valid for minutes and measurements valid for a day get zones
+# of their own, and the first can't push the second out. Sized per host, as
+# if it got all the traffic (2026-10, data2 query_log and api.ooni.org):
+# - long: measurement bodies (raw_measurement, measurement_meta), valid 1 d:
+#   at most ~50K distinct a day (28K measurement_meta + 25K raw lookups) of
+#   ~76 KB (max seen ~160 KB), ~3.8 GB a day; 2x that, ~130K keys.
+# - short: lists, aggregations, oonirun (valid 10 s to 1 h): ~7.5K requests
+#   an hour of up to ~60 KB (aggregations 0.3-22 KB, lists 35-70 KB,
+#   observations ~135 KB), ~450 MB an hour if all were distinct; 4x that.
+# 1 MB of keys_zone holds ~8K keys. nginx stores responses uncompressed.
+ooniapi_gateway_cache_dir: /var/cache/nginx/ooniapi-gateway
+ooniapi_gateway_cache_zones:
+  short: {keys_zone: 8m, max_size: 2g, inactive: 1h}
+  long: {keys_zone: 16m, max_size: 8g, inactive: 1d}
+# for responses without Cache-Control, like /api/v1/aggregation's today;
+# the same as the legacy ooni-api vhost's apicache
+ooniapi_gateway_cache_default_valid: 10s
+ooniapi_gateway_nginx_user: www-data
+
 # SSH user the deploy CodeBuild job connects as. Must match
 # `deploy_ssh_user` (default "deploy") in the ooniapi_service_deployer
 # Terraform module.

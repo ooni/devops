@@ -19,6 +19,10 @@
 #                (ALB only: they only choose between ooniprobe and its legacy)
 #   legacy       ALB only: ooniprobe_legacy is being retired and does not run
 #                on the gateway, which sends these paths to ooniprobe
+#   cache        gateway only: cache GET/HEAD responses of these paths in the
+#                short lived zone (see roles/ooniapi_gateway defaults)
+#   cache_long   gateway only: those of its paths to cache in the long lived zone
+#                instead, for responses of immutable measurements
 
 - name: ooniauth_rule
   priority: 108
@@ -40,6 +44,7 @@
   service: oonirun
   paths:
     - "/api/v2/oonirun/*"
+  cache: true
 
 - name: oonirun_rule_host
   priority: 111
@@ -138,6 +143,10 @@
     - "/api/v1/measurement_meta"
     - "/api/v1/measurements"
     - "/api/v1/torsf_stats"
+  cache: true
+  cache_long:
+    - "/api/v1/raw_measurement"
+    - "/api/v1/measurement_meta"
 
 - name: oonimeasurements_rule_2
   priority: 142
@@ -147,12 +156,14 @@
     - "/api/v1/aggregation/*"
     - "/api/v1/observations"
     - "/api/v1/analysis"
+  cache: true
 
 - name: oonimeasurements_rule_3
   priority: 143
   service: oonimeasurements
   paths:
     - "/api/v1/detector/changepoints"
+  cache: true
 
 - name: testlists_rule
   priority: 144

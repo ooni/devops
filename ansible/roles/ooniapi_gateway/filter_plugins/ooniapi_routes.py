@@ -17,11 +17,17 @@ def _locations(routes):
             continue
         for p in r.get("paths", []):
             prefix = p.endswith("*")
+            cache = None
+            if p in r.get("cache_long", []):
+                cache = "long"
+            elif r.get("cache"):
+                cache = "short"
             out.append({
                 "route": r["name"],
                 "service": r["service"],
                 "match": "^~" if prefix else "=",
                 "path": p[:-1] if prefix else p,
+                "cache": cache,
             })
     return out
 
@@ -38,6 +44,10 @@ def ooniapi_gateway_route_problems(routes):
     locations = _locations(routes)
     problems = []
     seen = {}
+    for r in routes:
+        for p in r.get("cache_long", []):
+            if p not in r.get("paths", []):
+                problems.append(f"{r['name']}: cache_long {p} is not one of its paths")
     for loc in locations:
         if "*" in loc["path"] or "?" in loc["path"]:
             problems.append(f"{loc['route']}: {loc['path']}: only exact paths and a trailing * can be served by nginx")
