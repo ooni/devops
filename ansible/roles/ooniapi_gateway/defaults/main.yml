@@ -57,6 +57,10 @@ ooniapi_gateway_testlists_upstream: ""
 # Docker network shared by every service's containers on this host.
 ooniapi_gateway_network_name: ooniapi
 
+# Routes of the API, shared with the ALB (see the file's header); the
+# gateway's locations are generated from them in tasks/main.yml
+ooniapi_gateway_routes: "{{ lookup('ansible.builtin.file', role_path ~ '/../../../tf/modules/ooniapi_frontend/routes.yaml') | from_yaml }}"
+
 # SSH user the deploy CodeBuild job connects as. Must match
 # `deploy_ssh_user` (default "deploy") in the ooniapi_service_deployer
 # Terraform module.

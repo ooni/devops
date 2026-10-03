@@ -217,6 +217,9 @@
     mode: "0644"
   notify: reload ooniapi gateway nginx
 
+- name: Derive and check the gateway's locations
+  ansible.builtin.import_tasks: routes.yml
+
 - name: Render the gateway vhost
   ansible.builtin.template:
     src: gateway.conf.j2
