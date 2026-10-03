@@ -18,6 +18,7 @@
 # needed on top of docker compose.
 
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -36,6 +37,8 @@ SSH_OPTS = [
 # host. Must match ooniapi_gateway_staging_dir in the Ansible role.
 STAGING_DIR = "/var/lib/ooniapi/deploy-staging"
 
+log = logging.getLogger("deploy")
+
 
 def require_env(name):
     value = os.environ.get(name)
@@ -45,6 +48,9 @@ def require_env(name):
 
 
 def run(cmd, **kwargs):
+    # every remote and aws command goes through here; secret values are only
+    # ever written to files, never passed on a command line, so this is safe
+    log.info("running: %s", " ".join(cmd))
     return subprocess.run(cmd, check=True, text=True, **kwargs)
 
 
@@ -57,7 +63,9 @@ def ssh_output(user, host, remote_cmd):
 
 
 def ssh_succeeds(user, host, remote_cmd):
-    return subprocess.run(["ssh", *SSH_OPTS, f"{user}@{host}", remote_cmd]).returncode == 0
+    cmd = ["ssh", *SSH_OPTS, f"{user}@{host}", remote_cmd]
+    log.info("running: %s", " ".join(cmd))
+    return subprocess.run(cmd).returncode == 0
 
 
 def scp(user, host, local_path, remote_path):
@@ -93,14 +101,14 @@ def write_tmp(name, content, mode=0o644):
 def deploy_host(host, ctx):
     service = ctx["service"]
     user = ctx["user"]
-    print(f"=== {service}: deploying to {host} ===")
+    log.info(f"=== {service}: deploying to {host} ===")
 
     active_slot = ssh_output(
         user, host, f"cat /etc/ooniapi/{service}/active_slot 2>/dev/null || echo a"
     ).strip() or "a"
     target_slot = "b" if active_slot == "a" else "a"
     target_port = ctx["host_port_b"] if target_slot == "b" else ctx["host_port_a"]
-    print(f"{service} on {host}: active slot is {active_slot}, deploying to slot {target_slot} (port {target_port})")
+    log.info(f"{service} on {host}: active slot is {active_slot}, deploying to slot {target_slot} (port {target_port})")
 
     # compose file for the target slot
     compose_file = f"{service}-{target_slot}.yaml"
@@ -145,15 +153,16 @@ def deploy_host(host, ctx):
         f" && sudo nginx -t && sudo systemctl reload nginx")
     ssh(user, host, f"echo {target_slot} | sudo tee /etc/ooniapi/{service}/active_slot > /dev/null")
 
-    print(f"=== {service} on {host}: now serving from slot {target_slot} ===")
+    log.info(f"=== {service} on {host}: now serving from slot {target_slot} ===")
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
     with open("imagedefinitions.json") as f:
         image_tag = json.load(f)[0]["imageUri"].rsplit(":", 1)[-1]
 
     service = require_env("SERVICE_NAME")
-    print(f"Deploying {service} image tag {image_tag}")
+    log.info(f"Deploying {service} image tag {image_tag}")
 
     with open("/tmp/deploy_key", "w") as f:
         f.write(secretsmanager_get(require_env("DEPLOY_SSH_KEY_SECRET_ARN")))
