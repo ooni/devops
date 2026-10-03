@@ -284,20 +284,19 @@ locals {
       POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
       JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.value
       PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
-      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_write_url.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_ooniprobe_url.value
       ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.value
     }
     oonirun = {
       POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
       JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
       PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
-      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonirun_url.value
     }
     oonifindings = {
       POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
       JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
       PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
-      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.value
     }
     ooniauth = {
       POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
@@ -311,7 +310,7 @@ locals {
       POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
       JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
       PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
-      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_test_url.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_test_url.value
       ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.value
     }
   }

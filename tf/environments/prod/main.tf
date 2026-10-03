@@ -321,7 +321,7 @@ locals {
       POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
       JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
       PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
-      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_readonly_url.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonirun_url.value
     }
     oonifindings = {
       POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
