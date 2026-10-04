@@ -98,3 +98,9 @@ variable "autoscale_policies" {
 
   default = []
 }
+
+variable "task_role_policy" {
+  description = "IAM policy (JSON) for the AWS calls the service's own code makes, e.g. S3. Given, the task gets a task role with it, and its AWS SDK uses those credentials instead of the container host's. None: the task has no task role."
+  type        = string
+  default     = null
+}

@@ -29,11 +29,78 @@ resource "aws_iam_role" "ooniapi_service_task" {
 EOF
 }
 
+locals {
+  # The execution role only needs to read the secrets ECS injects into this
+  # task (task_secrets): every value is an SSM parameter or a Secrets
+  # Manager secret ARN.
+  task_secret_arns_secretsmanager = [for arn in values(var.task_secrets) : arn if startswith(arn, "arn:aws:secretsmanager:")]
+  task_secret_arns_ssm            = [for arn in values(var.task_secrets) : arn if startswith(arn, "arn:aws:ssm:")]
+  task_secret_statements = concat(
+    length(local.task_secret_arns_secretsmanager) == 0 ? [] : [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = local.task_secret_arns_secretsmanager
+    }],
+    length(local.task_secret_arns_ssm) == 0 ? [] : [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameters"]
+      Resource = local.task_secret_arns_ssm
+    }],
+  )
+}
+
 resource "aws_iam_role_policy" "ooniapi_service_task" {
   name = "${local.name}-task-role"
   role = aws_iam_role.ooniapi_service_task.name
 
-  policy = templatefile("${path.module}/templates/profile_policy.json", {})
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = concat([
+      {
+        Sid      = "ecsInstanceRole"
+        Effect   = "Allow"
+        Action   = ["ecs:DeregisterContainerInstance", "ecs:DiscoverPollEndpoint", "ecs:Poll", "ecs:RegisterContainerInstance", "ecs:Submit*", "ecs:StartTelemetrySession"]
+        Resource = ["*"]
+      },
+      {
+        Sid      = "CloudWatchLogsFullAccess"
+        Effect   = "Allow"
+        Action   = ["logs:*", "cloudwatch:GenerateQuery"]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ec2:Describe*", "elasticloadbalancing:DeregisterInstancesFromLoadBalancer", "elasticloadbalancing:DeregisterTargets", "elasticloadbalancing:Describe*", "elasticloadbalancing:RegisterInstancesWithLoadBalancer", "elasticloadbalancing:RegisterTargets"]
+        Resource = "*"
+      },
+    ], local.task_secret_statements)
+  })
+}
+
+# The role the service's own code gets credentials from, for the AWS calls
+# it makes. The execution role above is only used by ECS, to start the task.
+resource "aws_iam_role" "ooniapi_service_app" {
+  count = var.task_role_policy == null ? 0 : 1
+
+  name = "${local.name}-app-role"
+  tags = var.tags
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ooniapi_service_app" {
+  count = var.task_role_policy == null ? 0 : 1
+
+  name   = "${local.name}-app-role"
+  role   = aws_iam_role.ooniapi_service_app[0].name
+  policy = var.task_role_policy
 }
 
 resource "aws_cloudwatch_log_group" "ooniapi_service" {
@@ -91,6 +158,7 @@ resource "aws_ecs_task_definition" "ooniapi_service" {
     }
   ])
   execution_role_arn = aws_iam_role.ooniapi_service_task.arn
+  task_role_arn      = var.task_role_policy == null ? null : aws_iam_role.ooniapi_service_app[0].arn
   tags               = var.tags
   track_latest       = true
 }
