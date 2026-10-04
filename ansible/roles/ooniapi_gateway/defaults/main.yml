@@ -57,7 +57,9 @@ ooniapi_gateway_testlists_upstream: ""
 # Docker network shared by every service's containers on this host.
 ooniapi_gateway_network_name: ooniapi
 
-# Valkey for the services' rate limits, on the shared network as "valkey"
+# Valkey for the services' rate limits, reached on the shared network by its
+# container name: must match ooniapi_deploy_valkey_url in tf/environments
+ooniapi_gateway_valkey_name: valkey
 ooniapi_gateway_valkey_image: docker.io/valkey/valkey:8.1-alpine
 ooniapi_gateway_valkey_maxmemory: 256mb
 

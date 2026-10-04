@@ -355,6 +355,9 @@ data "dns_a_record_set" "ooniapi_deploy_host" {
 locals {
   ooniapi_deploy_host    = data.dns_a_record_set.ooniapi_deploy_host.host
   ooniapi_deploy_network = "ooniapi"
+  # the valkey container roles/ooniapi_gateway runs on that network
+  # (ooniapi_gateway_valkey_name), for the services' rate limits
+  ooniapi_deploy_valkey_url = "valkey://valkey:6379"
   # what the services there connect to from: fastpath, Postgres and the
   # ClickHouse proxy let it in, as they let in the VPC
   ooniapi_deploy_host_cidrs = [for ip in data.dns_a_record_set.ooniapi_deploy_host.addrs : "${ip}/32"]
@@ -1424,7 +1427,7 @@ module "ooniapi_oonimeasurements_deployer" {
     OTHER_COLLECTORS                = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475"]) # private IPs are not reachable from the host
     BASE_URL                        = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
-    VALKEY_URL                      = "valkey://valkey:6379" # roles/ooniapi_gateway runs it on the host
+    VALKEY_URL                      = local.ooniapi_deploy_valkey_url
     RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
     RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
     RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])
