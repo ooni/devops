@@ -297,7 +297,6 @@ locals {
       PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
     }
     ooniauth = {
-      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
       JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
       PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
       ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.value
@@ -305,7 +304,6 @@ locals {
       AWS_ACCESS_KEY_ID           = data.aws_secretsmanager_secret_version.ooniapi_user_access_key_id.secret_string
     }
     oonimeasurements = {
-      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
       JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
       PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
       CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_test_url.value
