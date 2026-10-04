@@ -77,6 +77,32 @@ resource "aws_iam_role_policy" "ooniapi_service_task" {
   })
 }
 
+# The role the service's own code gets credentials from, for the AWS calls
+# it makes. The execution role above is only used by ECS, to start the task.
+resource "aws_iam_role" "ooniapi_service_app" {
+  count = var.task_role_policy == null ? 0 : 1
+
+  name = "${local.name}-app-role"
+  tags = var.tags
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ooniapi_service_app" {
+  count = var.task_role_policy == null ? 0 : 1
+
+  name   = "${local.name}-app-role"
+  role   = aws_iam_role.ooniapi_service_app[0].name
+  policy = var.task_role_policy
+}
+
 resource "aws_cloudwatch_log_group" "ooniapi_service" {
   name = "ooni-ecs-group/${local.name}"
 }
@@ -132,6 +158,7 @@ resource "aws_ecs_task_definition" "ooniapi_service" {
     }
   ])
   execution_role_arn = aws_iam_role.ooniapi_service_task.arn
+  task_role_arn      = var.task_role_policy == null ? null : aws_iam_role.ooniapi_service_app[0].arn
   tags               = var.tags
   track_latest       = true
 }
