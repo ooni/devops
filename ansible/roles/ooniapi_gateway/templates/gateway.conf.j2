@@ -77,7 +77,11 @@ server {
   # without one. Requests with credentials never use the cache. Each cached
   # location keys on its service's $ooniapi_cache_version_<service>, the
   # image tag its blue/green deploy writes to <service>-upstream.conf, so a
-  # deploy invalidates that service's responses, and only those.
+  # deploy invalidates that service's responses, and only those. The key
+  # includes the Origin header: the services' CORS middleware answers an
+  # allowed origin with its own Access-Control-Allow-Origin, and a request
+  # without one (or with another) without CORS headers or Vary, so a
+  # response cached for one origin must not be served to another.
   proxy_cache_methods GET HEAD;
   proxy_cache_valid 200 301 302 {{ ooniapi_gateway_cache_default_valid }};
   proxy_cache_valid any 0;
@@ -93,7 +97,7 @@ server {
   ## --- generated from routes.yaml, see tasks/main.yml ---
 {% for l in ooniapi_gateway_locations %}
 {% if l.service in service_names %}
-  location {{ l.match }} {{ l.path }} { proxy_pass http://{{ l.service }};{% if l.cache %} proxy_cache ooniapi_{{ l.cache }}; proxy_cache_key "$ooniapi_cache_version_{{ l.service }}$scheme$host$request_uri";{% endif %} } # {{ l.route }}
+  location {{ l.match }} {{ l.path }} { proxy_pass http://{{ l.service }};{% if l.cache %} proxy_cache ooniapi_{{ l.cache }}; proxy_cache_key "$ooniapi_cache_version_{{ l.service }}|$http_origin|$scheme$host$request_uri";{% endif %} } # {{ l.route }}
 {% elif l.service in remote_upstreams %}
   # {{ l.service }} is not yet migrated off AWS, proxied cross-cloud until it is
   location {{ l.match }} {{ l.path }} { proxy_pass {{ remote_upstreams[l.service] }}; } # {{ l.route }}
