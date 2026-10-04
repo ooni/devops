@@ -916,6 +916,9 @@ module "ooniapi_ooniprobe" {
   }
 
   task_environment = {
+    # the legacy API host forwards some probe requests to the ALB: skip its
+    # address when reading the probe's from X-Forwarded-For
+    TRUSTED_PROXIES = jsonencode(tolist(aws_route53_record.backend-fsn-ooni-org-_A_.records))
     # hardcoded IP for fastpath2.prod.prod.ooni.io
     FASTPATH_URL          = "http://10.0.0.32:8472"
     FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
@@ -1439,6 +1442,10 @@ module "ooniapi_oonimeasurements" {
   }
 
   task_environment = {
+    # the legacy API host forwards measurement API requests to the ALB: skip
+    # its address when reading the client's from X-Forwarded-For, or every
+    # client it forwards would share one rate limit
+    TRUSTED_PROXIES = jsonencode(tolist(aws_route53_record.backend-fsn-ooni-org-_A_.records))
     # it has to be a json-compliant array
     OTHER_COLLECTORS                = jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"])
     BASE_URL                        = "https://api.ooni.io"
