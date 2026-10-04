@@ -334,9 +334,12 @@ resource "aws_codebuild_project" "deploy" {
       name  = "DEPLOY_HOST_PRIMARY"
       value = var.deploy_host_primary
     }
-    environment_variable {
-      name  = "DEPLOY_HOST_SECONDARY"
-      value = var.deploy_host_secondary
+    dynamic "environment_variable" {
+      for_each = var.deploy_host_secondary == null ? [] : [var.deploy_host_secondary]
+      content {
+        name  = "DEPLOY_HOST_SECONDARY"
+        value = environment_variable.value
+      }
     }
     environment_variable {
       name  = "DEPLOY_SSH_USER"

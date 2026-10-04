@@ -145,7 +145,7 @@ variable "deploy_host_primary" {
 }
 
 variable "deploy_host_secondary" {
-  description = "Hostname/IP of the secondary dedicated host to deploy to. Required when deploy_mode is \"blue_green\" or \"both\"."
+  description = "Hostname/IP of the secondary dedicated host to deploy to, after the primary. Optional: without it the service runs on the primary host alone, as dev does."
   type        = string
   default     = null
 }

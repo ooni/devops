@@ -5,7 +5,7 @@
 # image needs nothing beyond python3, ssh/scp and the aws cli, all of which
 # it already ships.
 #
-# For each of DEPLOY_HOST_PRIMARY/SECONDARY: find the currently idle slot
+# For DEPLOY_HOST_PRIMARY, then DEPLOY_HOST_SECONDARY if set: find the currently idle slot
 # (a/b) on that host, write that slot's secrets as individual files (picked
 # up by the compose file's file-based `secrets:` entries -- the container
 # only ever sees these mounted read-only at /run/secrets/<name>, never as
@@ -229,7 +229,11 @@ def main():
         "secrets": json.loads(secretsmanager_get(require_env("SERVICE_SECRETS_ARN"))),
     }
 
-    for host in (require_env("DEPLOY_HOST_PRIMARY"), require_env("DEPLOY_HOST_SECONDARY")):
+    # a single host is enough where downtime while it reboots is acceptable
+    hosts = [require_env("DEPLOY_HOST_PRIMARY")]
+    if os.environ.get("DEPLOY_HOST_SECONDARY"):
+        hosts.append(os.environ["DEPLOY_HOST_SECONDARY"])
+    for host in hosts:
         deploy_host(host, ctx)
 
 
