@@ -1004,6 +1004,9 @@ module "ooniapi_ooniprobe_deployer" {
   # Pre-wired for the future flip to deploy_mode = "blue_green" or "both";
   # commented out with the blue/green deploy secrets above
   # env_vars = {
+  #   # backend-fsn forwards requests to these names; skip its address in
+  #   # X-Forwarded-For, as for the ECS service
+  #   TRUSTED_PROXIES = jsonencode(tolist(aws_route53_record.backend-fsn-ooni-org-_A_.records))
   #   # hardcoded IP for fastpath2.prod.prod.ooni.io
   #   FASTPATH_URL          = "http://10.0.0.32:8472"
   #   FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
@@ -1601,6 +1604,9 @@ module "ooniapi_oonimeasurements_deployer" {
   # Pre-wired for the future flip to deploy_mode = "blue_green" or "both";
   # commented out with the blue/green deploy secrets above
   # env_vars = {
+  #   # backend-fsn forwards requests to these names; skip its address in
+  #   # X-Forwarded-For, as for the ECS service
+  #   TRUSTED_PROXIES = jsonencode(tolist(aws_route53_record.backend-fsn-ooni-org-_A_.records))
   #   # it has to be a json-compliant array
   #   OTHER_COLLECTORS                = jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"])
   #   BASE_URL                        = "https://api.ooni.io"
