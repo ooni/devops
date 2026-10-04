@@ -1416,7 +1416,7 @@ module "ooniapi_oonimeasurements_deployer" {
     OTHER_COLLECTORS                = jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"])
     BASE_URL                        = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
-    VALKEY_URL                      = local.ooniapi_valkey_url
+    VALKEY_URL                      = "valkey://valkey:6379" # roles/ooniapi_gateway runs it on the host
     RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
     RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
     RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])

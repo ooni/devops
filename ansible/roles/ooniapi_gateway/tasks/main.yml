@@ -212,6 +212,23 @@
   ansible.builtin.command: docker network create {{ ooniapi_gateway_network_name }}
   when: ooniapi_gateway_network_check.rc != 0
 
+# Rate limit counters of the services on this host (VALKEY_URL
+# valkey://valkey:6379), what ElastiCache holds for them on ECS. Reachable
+# only on the shared docker network, and kept in memory only: losing the
+# counters on a restart resets the limits, as a restart of the services
+# would with VALKEY_URL=memory.
+- name: Run valkey for the services' rate limits
+  community.docker.docker_container:
+    name: valkey
+    image: "{{ ooniapi_gateway_valkey_image }}"
+    state: started
+    restart_policy: always
+    networks:
+      - name: "{{ ooniapi_gateway_network_name }}"
+    command: >-
+      valkey-server --save "" --appendonly no
+      --maxmemory {{ ooniapi_gateway_valkey_maxmemory }} --maxmemory-policy allkeys-lru
+
 - name: Ensure sudoers.d directory exists
   ansible.builtin.file:
     path: /etc/sudoers.d
