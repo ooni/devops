@@ -163,9 +163,7 @@ module "oonipg" {
   db_allocated_storage     = "20"
   db_max_allocated_storage = null
 
-  allow_cidr_blocks = [
-    "10.0.0.0/8"
-  ]
+  allow_cidr_blocks     = concat(["10.0.0.0/8"], local.ooniapi_deploy_host_cidrs)
   allow_security_groups = [module.ooni_jumphost.ec2_sg_id]
 
   tags = merge(
@@ -350,9 +348,16 @@ resource "aws_secretsmanager_secret_version" "ooniapi_deploy_ssh_key" {
 # Where the blue/green deploy job puts the dev services: backend-hel alone.
 # The ports must match ooniapi_gateway_services in
 # ansible/host_vars/backend-hel.ooni.org/ooniapi_gateway.yml.
+data "dns_a_record_set" "ooniapi_deploy_host" {
+  host = "backend-hel.ooni.org"
+}
+
 locals {
-  ooniapi_deploy_host    = "backend-hel.ooni.org"
+  ooniapi_deploy_host    = data.dns_a_record_set.ooniapi_deploy_host.host
   ooniapi_deploy_network = "ooniapi"
+  # what the services there connect to from: fastpath, Postgres and the
+  # ClickHouse proxy let it in, as they let in the VPC
+  ooniapi_deploy_host_cidrs = [for ip in data.dns_a_record_set.ooniapi_deploy_host.addrs : "${ip}/32"]
   ooniapi_deploy_ports = {
     reverseproxy     = [18001, 18002]
     ooniprobe        = [18011, 18012]
@@ -697,7 +702,7 @@ module "ooniapi_ooniprobe_deployer" {
   # Pre-wired for the future flip to deploy_mode = "blue_green"
   env_vars = {
     FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
-    FASTPATH_URLS         = jsonencode([for h in local.fastpath_hosts : "http://${h}:8472"])
+    FASTPATH_URLS         = jsonencode(["http://fastpath.${local.environment}.ooni.io:8472"]) # private IPs are not reachable from the host
     FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
     COLLECTOR_ID          = 3 # use a different one in prod
     CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
@@ -934,7 +939,8 @@ module "ooni_clickhouse_proxy" {
     to_port   = 9002, // for several clickhouse instances
     protocol  = "tcp",
     cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, ["${module.ooni_fastpath.aws_instance_private_ip}/32", "${module.ooni_fastpath.aws_instance_public_ip}/32"],
-    ["${module.ooniapi_testlists.aws_instance_private_ip}/32", "${module.ooniapi_testlists.aws_instance_public_ip}/32"]),
+      ["${module.ooniapi_testlists.aws_instance_private_ip}/32", "${module.ooniapi_testlists.aws_instance_public_ip}/32"],
+    local.ooniapi_deploy_host_cidrs),
     }, {
     // For the prometheus proxy:
     from_port   = 9200,
@@ -1132,6 +1138,8 @@ module "ooni_fastpath" {
 
   sg_prefix = "oonifastpath"
   tg_prefix = "fstp"
+
+  extra_ingress_cidrs = local.ooniapi_deploy_host_cidrs
 
   monitoring_proxy_private_ip = module.ooni_monitoring_proxy.aws_instance_private_ip
   monitoring_proxy_public_ip  = module.ooni_monitoring_proxy.aws_instance_public_ip
@@ -1413,7 +1421,7 @@ module "ooniapi_oonimeasurements_deployer" {
   # Pre-wired for the future flip to deploy_mode = "blue_green"
   env_vars = {
     # it has to be a json-compliant array
-    OTHER_COLLECTORS                = jsonencode([for h in local.fastpath_hosts : "http://${h}:8475"])
+    OTHER_COLLECTORS                = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475"]) # private IPs are not reachable from the host
     BASE_URL                        = "https://api.${local.environment}.ooni.io"
     S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
     VALKEY_URL                      = "valkey://valkey:6379" # roles/ooniapi_gateway runs it on the host
