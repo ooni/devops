@@ -1358,7 +1358,6 @@ module "ooniapi_ooniauth" {
   service_desired_count = 2
 
   task_secrets = {
-    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
@@ -1431,7 +1430,6 @@ module "ooniapi_oonimeasurements" {
   # ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_secrets = {
-    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_url.arn
