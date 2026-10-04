@@ -1,0 +1,176 @@
+# Routes of the OONI API, the one place they are declared. Read by:
+# - Terraform, tf/modules/ooniapi_frontend: one ALB listener rule per entry
+#   (aws_lb_listener_rule.route["<name>"]), for the services on ECS.
+# - Ansible, roles/ooniapi_gateway: the nginx locations of the gateway on the
+#   Hetzner hosts, for the services deployed there blue/green.
+# Anything no route matches goes to reverseproxy, on both.
+#
+# Each entry is one ALB rule, so the ALB's limits apply: at most 5 values
+# over all its conditions. Fields:
+#   name         resource key of the rule; keep stable, renaming one makes
+#                Terraform replace the rule
+#   priority     ALB rule priority, lowest matches first. The gateway can't
+#                order its locations by it, so a prefix of one service must
+#                not cover a path of another (checked by the gateway role)
+#   service      target service (ALB target group)
+#   paths        ALB path patterns: exact, or ending in * for a prefix
+#   direct_host  route <service>.<direct domain suffix> to the service
+#   http_header  only match requests with this header and one of these values
+#                (ALB only: they only choose between ooniprobe and its legacy)
+#   legacy       ALB only: ooniprobe_legacy is being retired and does not run
+#                on the gateway, which sends these paths to ooniprobe
+#   cache        gateway only: cache GET/HEAD responses of these paths in the
+#                short lived zone (see roles/ooniapi_gateway defaults)
+#   cache_long   gateway only: those of its paths to cache in the long lived zone
+#                instead, for responses of immutable measurements
+
+- name: ooniauth_rule
+  priority: 108
+  service: ooniauth
+  paths:
+    - "/api/v2/ooniauth/*"
+    - "/api/v1/user_register"
+    - "/api/v1/user_login"
+    - "/api/v1/user_refresh_token"
+    - "/api/_/account_metadata"
+
+- name: ooniauth_rule_host
+  priority: 109
+  service: ooniauth
+  direct_host: true
+
+- name: oonirun_rule
+  priority: 110
+  service: oonirun
+  paths:
+    - "/api/v2/oonirun/*"
+  cache: true
+
+- name: oonirun_rule_host
+  priority: 111
+  service: oonirun
+  direct_host: true
+
+- name: ooniprobe_rule
+  priority: 120
+  service: ooniprobe
+  paths:
+    - "/api/v2/ooniprobe/*"
+    - "/api/v1/login"
+    - "/api/v1/register"
+    - "/api/v1/update/*"
+    - "/api/v1/check-in*"
+
+- name: ooniprobe_rule_2
+  priority: 121
+  service: ooniprobe
+  paths:
+    - "/api/v1/test-helpers*"
+    - "/api/v1/test-list/urls"
+    - "/report*"
+    - "/api/_/show_countries_prioritization"
+    - "/api/_/debug_prioritization"
+
+- name: ooniprobe_rule_3_legacy_version
+  priority: 122
+  service: ooniprobe_legacy
+  paths:
+    - "/api/v1/manifest*"
+    - "/api/v1/submit_measurement*"
+    - "/api/v1/sign_credential*"
+  http_header:
+    name: X-Protocol-Version
+    values: ["0.1.0"]
+  legacy: true
+
+- name: ooniprobe_rule_4
+  priority: 123
+  service: ooniprobe
+  paths:
+    - "/bouncer/net-tests*"
+    - "/api/v1/geolookup*"
+    - "/api/v1/collectors*"
+    - "/api/v1/test-list/tor-targets"
+    - "/api/v1/test-list/psiphon-config"
+
+- name: ooniprobe_rule_3_current_version
+  priority: 124
+  service: ooniprobe
+  paths:
+    - "/api/v1/manifest*"
+    - "/api/v1/submit_measurement*"
+    - "/api/v1/sign_credential*"
+  http_header:
+    name: X-Protocol-Version
+    values: ["*"]
+
+- name: ooniprobe_rule_host
+  priority: 125
+  service: ooniprobe
+  direct_host: true
+
+- name: ooniprobe_rule_3_no_version
+  priority: 126
+  service: ooniprobe_legacy
+  paths:
+    - "/api/v1/manifest*"
+    - "/api/v1/submit_measurement*"
+    - "/api/v1/sign_credential*"
+  legacy: true
+
+- name: oonifindings_rule
+  priority: 130
+  service: oonifindings
+  paths:
+    - "/api/v1/incidents/*"
+
+- name: oonifindings_rule_host
+  priority: 131
+  service: oonifindings
+  direct_host: true
+
+- name: oonimeasurements_rule_host
+  priority: 139
+  service: oonimeasurements
+  direct_host: true
+
+- name: oonimeasurements_rule_1
+  priority: 140
+  service: oonimeasurements
+  paths:
+    - "/api/v1/measurements/*"
+    - "/api/v1/raw_measurement"
+    - "/api/v1/measurement_meta"
+    - "/api/v1/measurements"
+    - "/api/v1/torsf_stats"
+  cache: true
+  cache_long:
+    - "/api/v1/raw_measurement"
+    - "/api/v1/measurement_meta"
+
+- name: oonimeasurements_rule_2
+  priority: 142
+  service: oonimeasurements
+  paths:
+    - "/api/v1/aggregation"
+    - "/api/v1/aggregation/*"
+    - "/api/v1/observations"
+    - "/api/v1/analysis"
+  cache: true
+
+- name: oonimeasurements_rule_3
+  priority: 143
+  service: oonimeasurements
+  paths:
+    - "/api/v1/detector/changepoints"
+  cache: true
+
+- name: testlists_rule
+  priority: 144
+  service: testlists
+  paths:
+    - "/api/_/url-submission/test-list/*"
+    - "/api/_/url-priorities/list"
+    - "/api/_/url-priorities/update"
+    - "/api/v1/url-submission/submit"
+    - "/api/v1/url-submission/update-url"

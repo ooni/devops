@@ -1,0 +1,111 @@
+---
+# Domain the gateway vhost answers on for path-based routing. Mirrors the
+# ALB's `ooniapi_frontend_main_domain_name` in
+# tf/modules/ooniapi_frontend/main.tf (e.g. "api.prod.ooni.io").
+# No default: set explicitly per host in host_vars.
+ooniapi_gateway_primary_domain: ""
+
+# Any additional hostnames that should hit the same path-routed vhost.
+# Mirrors extra entries in `ooniapi_frontend_alternative_domains` that
+# aren't handled elsewhere (e.g. "api.ooni.org" in prod).
+ooniapi_gateway_extra_server_names: []
+
+# Suffix used for the ALB's secondary, host-header-only routing rules, e.g.
+# "oonirun.prod.ooni.io". Mirrors `direct_domain_suffix` in
+# tf/modules/ooniapi_frontend/main.tf ("${stage}.ooni.io").
+# No default: set explicitly per host in host_vars.
+ooniapi_gateway_direct_domain_suffix: ""
+
+# Name of the dehydrated cert (the directory under
+# ooniapi_gateway_cert_path) that covers ooniapi_gateway_primary_domain,
+# every "<service>.{{ ooniapi_gateway_direct_domain_suffix }}" name, and
+# ooniapi_gateway_extra_server_names as SANs.
+#
+# This role does NOT manage that cert -- issuing it means extending (or
+# adding to) the `dehydrated` role's ssl_domains on this host, which in turn
+# requires DNS for every one of those names to already resolve here. That's
+# a DNS-cutover-time step, not a day-1 bootstrap step, so it's deliberately
+# left manual. See the role README notes.
+ooniapi_gateway_cert_name: "{{ ooniapi_gateway_primary_domain }}"
+ooniapi_gateway_cert_path: /var/lib/dehydrated/certs/
+
+# Flip to true only once ooniapi_gateway_cert_name actually exists on disk.
+# Until then the vhost file is rendered but not installed, so this role is
+# safe to run ahead of the real DNS cutover.
+ooniapi_gateway_cert_ready: false
+
+# Services fronted by this gateway, and the two host ports their blue/green
+# slots are bound to. host_port_a/host_port_b must match the values passed
+# to that service's ooniapi_service_deployer module invocation in Terraform.
+#
+# Example:
+# ooniapi_gateway_services:
+#   - name: reverseproxy
+#     host_port_a: 18001
+#     host_port_b: 18002
+#   - name: oonirun
+#     host_port_a: 18011
+#     host_port_b: 18012
+ooniapi_gateway_services: []
+
+# Cross-cloud passthrough for tier0 services not yet migrated off AWS
+# (currently just testlists). Set to its public hostname to proxy those
+# paths there until testlists itself is migrated; leave empty to omit
+# those routes entirely.
+ooniapi_gateway_testlists_upstream: ""
+
+# Docker network shared by every service's containers on this host.
+ooniapi_gateway_network_name: ooniapi
+
+# Valkey for the services' rate limits, reached on the shared network by its
+# container name: must match ooniapi_deploy_valkey_url in tf/environments
+ooniapi_gateway_valkey_name: valkey
+ooniapi_gateway_valkey_image: docker.io/valkey/valkey:8.1-alpine
+ooniapi_gateway_valkey_maxmemory: 256mb
+
+# Routes of the API, shared with the ALB (see the file's header); the
+# gateway's locations are generated from them in tasks/main.yml
+ooniapi_gateway_routes: "{{ lookup('ansible.builtin.file', role_path ~ '/../../../tf/modules/ooniapi_frontend/routes.yaml') | from_yaml }}"
+
+# Response caches for the routes marked cache/cache_long in routes.yaml.
+# nginx keeps an entry until it goes unused for `inactive`, expired or not,
+# so responses valid for minutes and measurements valid for a day get zones
+# of their own, and the first can't push the second out. Sized per host, as
+# if it got all the traffic (2026-10, data2 query_log and api.ooni.org):
+# - long: measurement bodies (raw_measurement, measurement_meta), valid 1 d:
+#   at most ~50K distinct a day (28K measurement_meta + 25K raw lookups) of
+#   ~76 KB (max seen ~160 KB), ~3.8 GB a day; 2x that, ~130K keys.
+# - short: lists, aggregations, oonirun (valid 10 s to 1 h): ~7.5K requests
+#   an hour of up to ~60 KB (aggregations 0.3-22 KB, lists 35-70 KB,
+#   observations ~135 KB), ~450 MB an hour if all were distinct; 4x that.
+# 1 MB of keys_zone holds ~8K keys. nginx stores responses uncompressed.
+ooniapi_gateway_cache_dir: /var/cache/nginx/ooniapi-gateway
+ooniapi_gateway_cache_zones:
+  short: {keys_zone: 8m, max_size: 2g, inactive: 1h}
+  long: {keys_zone: 16m, max_size: 8g, inactive: 1d}
+# for responses without Cache-Control, like /api/v1/aggregation's today;
+# the same as the legacy ooni-api vhost's apicache
+ooniapi_gateway_cache_default_valid: 10s
+ooniapi_gateway_nginx_user: www-data
+
+# SSH user the deploy CodeBuild job connects as. Must match
+# `deploy_ssh_user` (default "deploy") in the ooniapi_service_deployer
+# Terraform module.
+ooniapi_gateway_deploy_user: deploy
+
+# Public half of the key whose private half is in the environment's
+# oonidevops/ooniapi/deploy_ssh_key secret, which the deploy job logs in
+# with. No default: set per host once that key pair exists.
+ooniapi_gateway_deploy_ssh_public_key: ""
+
+# Private directory the deploy job scp's files into before they're
+# moved/installed into place. Must match STAGING_DIR in
+# tf/modules/ooniapi_service_deployer/files/deploy.py.
+ooniapi_gateway_staging_dir: /var/lib/ooniapi/deploy-staging
+
+# How long nginx workers left over from a reload may keep serving in-flight
+# requests (to the slot a deploy just took out of rotation) before they are
+# closed. Matches the ALB's deregistration delay on ECS (AWS default, 300 s),
+# and must match drain_timeout in ooniapi_service_deployer: a deploy waits
+# this long after the previous flip before it restarts the drained slot.
+ooniapi_gateway_drain_timeout: 300

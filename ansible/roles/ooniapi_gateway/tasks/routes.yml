@@ -1,0 +1,14 @@
+---
+# The gateway's locations are generated from routes.yaml, shared with the
+# ALB, by filter_plugins/ooniapi_routes.py, which also checks nginx can
+# serve them the way the ALB does.
+- name: Derive the gateway's locations from routes.yaml
+  ansible.builtin.set_fact:
+    ooniapi_gateway_locations: "{{ ooniapi_gateway_routes | ooniapi_gateway_locations }}"
+    ooniapi_gateway_direct_hosts: "{{ ooniapi_gateway_routes | ooniapi_gateway_direct_hosts }}"
+    ooniapi_gateway_route_problems: "{{ ooniapi_gateway_routes | ooniapi_gateway_route_problems }}"
+
+- name: Check that nginx can serve routes.yaml like the ALB does
+  ansible.builtin.assert:
+    that: ooniapi_gateway_route_problems | length == 0
+    fail_msg: "{{ ooniapi_gateway_route_problems }}"

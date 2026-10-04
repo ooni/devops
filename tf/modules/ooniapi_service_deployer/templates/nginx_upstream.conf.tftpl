@@ -1,0 +1,12 @@
+# Rendered by deploy.py on every deploy. __CACHE_VERSION__ becomes the
+# deployed image tag: it is part of the gateway's cache key for this
+# service, so the reload that puts the new slot in rotation also stops
+# serving responses cached from the old one.
+map "" $ooniapi_cache_version_${service_name} {
+    default "__CACHE_VERSION__";
+}
+
+upstream ${service_name} {
+    server 127.0.0.1:${host_port_a} __STATE_A__;
+    server 127.0.0.1:${host_port_b} __STATE_B__;
+}

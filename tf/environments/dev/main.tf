@@ -163,9 +163,7 @@ module "oonipg" {
   db_allocated_storage     = "20"
   db_max_allocated_storage = null
 
-  allow_cidr_blocks = [
-    "10.0.0.0/8"
-  ]
+  allow_cidr_blocks     = concat(["10.0.0.0/8"], local.ooniapi_deploy_host_cidrs)
   allow_security_groups = [module.ooni_jumphost.ec2_sg_id]
 
   tags = merge(
@@ -255,6 +253,127 @@ data "aws_ssm_parameter" "clickhouse_oonirun_url" {
 
 data "aws_ssm_parameter" "account_id_hashing_key" {
   name = "/oonidevops/secrets/ooni_services/account_id_hashing_key"
+}
+
+### Blue/green deploy secrets (Docker + systemd on dedicated Hetzner hosts)
+#
+# These mirror the values already passed as `task_secrets` to the ECS task
+# definitions above, but consolidated into one JSON blob per service so the
+# "blue_green" deploy_mode CodeBuild job can fetch them in a single
+# secretsmanager:GetSecretValue call and write each key into the target
+# slot's env file. Values are pulled from the same underlying data sources
+# used by the ECS `task_secrets` maps, so both deploy paths stay in sync
+# automatically.
+
+data "aws_secretsmanager_secret_version" "ooniapi_user_access_key_id" {
+  secret_id = module.ooniapi_user.aws_access_key_id_arn
+}
+
+data "aws_secretsmanager_secret_version" "ooniapi_user_secret_access_key" {
+  secret_id = module.ooniapi_user.aws_secret_access_key_arn
+}
+
+locals {
+  ooniapi_deploy_service_secrets = {
+    reverseproxy = {
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+    }
+    ooniprobe = {
+      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret_legacy.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_ooniprobe_url.value
+      ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.value
+    }
+    oonirun = {
+      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonirun_url.value
+    }
+    oonifindings = {
+      POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+    }
+    ooniauth = {
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+      ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.value
+      AWS_SECRET_ACCESS_KEY       = data.aws_secretsmanager_secret_version.ooniapi_user_secret_access_key.secret_string
+      AWS_ACCESS_KEY_ID           = data.aws_secretsmanager_secret_version.ooniapi_user_access_key_id.secret_string
+    }
+    oonimeasurements = {
+      JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.value
+      PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
+      CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_test_url.value
+      ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.value
+    }
+  }
+}
+
+resource "aws_secretsmanager_secret" "ooniapi_deploy_service_secrets" {
+  for_each = local.ooniapi_deploy_service_secrets
+
+  name = "oonidevops/ooniapi/${each.key}/service_secrets"
+  tags = local.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ooniapi_deploy_service_secrets" {
+  for_each = local.ooniapi_deploy_service_secrets
+
+  secret_id     = aws_secretsmanager_secret.ooniapi_deploy_service_secrets[each.key].id
+  secret_string = jsonencode(each.value)
+}
+
+# Shared by every service's blue/green deploy job. The private key itself is
+# generated and rotated out-of-band (see the deploy README); Terraform only
+# owns the secret container, not its value.
+resource "aws_secretsmanager_secret" "ooniapi_deploy_ssh_key" {
+  name = "oonidevops/ooniapi/deploy_ssh_key"
+  tags = local.tags
+}
+
+resource "aws_secretsmanager_secret_version" "ooniapi_deploy_ssh_key" {
+  secret_id     = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.id
+  secret_string = "REPLACE_ME: populate out-of-band with the \"deploy\" user's SSH private key"
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
+}
+
+# Where the blue/green deploy job puts the dev services: backend-hel alone.
+# The ports must match ooniapi_gateway_services in
+# ansible/host_vars/backend-hel.ooni.org/ooniapi_gateway.yml.
+data "dns_a_record_set" "ooniapi_deploy_host" {
+  host = "backend-hel.ooni.org"
+}
+
+locals {
+  ooniapi_deploy_host    = data.dns_a_record_set.ooniapi_deploy_host.host
+  ooniapi_deploy_network = "ooniapi"
+  # the valkey container roles/ooniapi_gateway runs on that network
+  # (ooniapi_gateway_valkey_name), for the services' rate limits
+  ooniapi_deploy_valkey_url = "valkey://valkey:6379"
+  # what the services there connect to from: fastpath, Postgres and the
+  # ClickHouse proxy let it in, as they let in the VPC
+  ooniapi_deploy_host_cidrs = [for ip in data.dns_a_record_set.ooniapi_deploy_host.addrs : "${ip}/32"]
+  ooniapi_deploy_ports = {
+    reverseproxy     = [18001, 18002]
+    ooniprobe        = [18011, 18012]
+    oonirun          = [18021, 18022]
+    oonifindings     = [18031, 18032]
+    ooniauth         = [18041, 18042]
+    oonimeasurements = [18051, 18052]
+  }
+}
+
+# The compose files, nginx upstream confs and deploy.py the deploy jobs copy
+# to the host
+resource "aws_s3_bucket" "ooniapi_deploy" {
+  bucket = "ooniapi-deploy-${var.aws_region}-${random_id.artifact_id.hex}"
+  tags   = local.tags
 }
 
 resource "random_id" "artifact_id" {
@@ -563,6 +682,11 @@ EOF
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
+  # the hosts, so the ALB stays current until DNS moves.
+  deploy_mode = "ecs"
+
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
   branch_name             = "feat/experiment-versions"
@@ -575,6 +699,28 @@ module "ooniapi_ooniprobe_deployer" {
 
   ecs_service_name = module.ooniapi_ooniprobe.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars = {
+    FASTPATH_URL          = "http://fastpath.${local.environment}.ooni.io:8472"
+    FASTPATH_URLS         = jsonencode(["http://fastpath.${local.environment}.ooni.io:8472"]) # private IPs are not reachable from the host
+    FAILED_REPORTS_BUCKET = aws_s3_bucket.ooniprobe_failed_reports.bucket
+    COLLECTOR_ID          = 3 # use a different one in prod
+    CONFIG_BUCKET         = aws_s3_bucket.ooni_private_config_bucket.bucket
+    TOR_TARGETS           = "tor_targets.json"
+    PSIPHON_CONFIG        = "psiphon_config.json"
+    ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
+    ANONC_MANIFEST_FILE   = "manifest.json"
+  }
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.ooniprobe)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["ooniprobe"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.ooniprobe[0]
+  host_port_b               = local.ooniapi_deploy_ports.ooniprobe[1]
 }
 
 module "ooniapi_ooniprobe" {
@@ -693,6 +839,11 @@ module "ooniapi_ooniprobe_legacy" {
 module "ooniapi_reverseproxy_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
+  # the hosts, so the ALB stays current until DNS moves.
+  deploy_mode = "ecs"
+
   service_name            = "reverseproxy"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -705,6 +856,20 @@ module "ooniapi_reverseproxy_deployer" {
 
   ecs_service_name = module.ooniapi_reverseproxy.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars = {
+    TARGET_URL = "https://backend-hel.ooni.org/"
+  }
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.reverseproxy)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["reverseproxy"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.reverseproxy[0]
+  host_port_b               = local.ooniapi_deploy_ports.reverseproxy[1]
 }
 
 module "ooniapi_reverseproxy" {
@@ -775,7 +940,8 @@ module "ooni_clickhouse_proxy" {
     to_port   = 9002, // for several clickhouse instances
     protocol  = "tcp",
     cidr_blocks = concat(module.network.vpc_subnet_private[*].cidr_block, ["${module.ooni_fastpath.aws_instance_private_ip}/32", "${module.ooni_fastpath.aws_instance_public_ip}/32"],
-    ["${module.ooniapi_testlists.aws_instance_private_ip}/32", "${module.ooniapi_testlists.aws_instance_public_ip}/32"]),
+      ["${module.ooniapi_testlists.aws_instance_private_ip}/32", "${module.ooniapi_testlists.aws_instance_public_ip}/32"],
+    local.ooniapi_deploy_host_cidrs),
     }, {
     // For the prometheus proxy:
     from_port   = 9200,
@@ -974,6 +1140,8 @@ module "ooni_fastpath" {
   sg_prefix = "oonifastpath"
   tg_prefix = "fstp"
 
+  extra_ingress_cidrs = local.ooniapi_deploy_host_cidrs
+
   monitoring_proxy_private_ip = module.ooni_monitoring_proxy.aws_instance_private_ip
   monitoring_proxy_public_ip  = module.ooni_monitoring_proxy.aws_instance_public_ip
 
@@ -1000,6 +1168,11 @@ module "fastpath_builder" {
 module "ooniapi_oonirun_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
+  # the hosts, so the ALB stays current until DNS moves.
+  deploy_mode = "ecs"
+
   service_name            = "oonirun"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -1012,6 +1185,18 @@ module "ooniapi_oonirun_deployer" {
 
   ecs_service_name = module.ooniapi_oonirun.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars                  = {}
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.oonirun)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonirun"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.oonirun[0]
+  host_port_b               = local.ooniapi_deploy_ports.oonirun[1]
 }
 
 module "ooniapi_oonirun" {
@@ -1051,6 +1236,11 @@ module "ooniapi_oonirun" {
 module "ooniapi_oonifindings_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
+  # the hosts, so the ALB stays current until DNS moves.
+  deploy_mode = "ecs"
+
   service_name            = "oonifindings"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -1063,6 +1253,18 @@ module "ooniapi_oonifindings_deployer" {
 
   ecs_service_name = module.ooniapi_oonifindings.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars                  = {}
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.oonifindings)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonifindings"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.oonifindings[0]
+  host_port_b               = local.ooniapi_deploy_ports.oonifindings[1]
 }
 
 module "ooniapi_oonifindings" {
@@ -1101,6 +1303,11 @@ module "ooniapi_oonifindings" {
 module "ooniapi_ooniauth_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
+  # the hosts, so the ALB stays current until DNS moves.
+  deploy_mode = "ecs"
+
   service_name            = "ooniauth"
   repo                    = "ooni/backend"
   branch_name             = "master"
@@ -1113,6 +1320,33 @@ module "ooniapi_ooniauth_deployer" {
 
   ecs_service_name = module.ooniapi_ooniauth.ecs_service_name
   ecs_cluster_name = module.ooniapi_cluster.cluster_name
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars = {
+    AWS_REGION           = var.aws_region
+    EMAIL_SOURCE_ADDRESS = module.ooniapi_user.email_address
+    SESSION_EXPIRY_DAYS  = 2
+    LOGIN_EXPIRY_DAYS    = 7
+    ADMIN_EMAILS = jsonencode([
+      "maja@ooni.org",
+      "arturo@ooni.org",
+      "mehul@ooni.org",
+      "norbel@ooni.org",
+      "maria@ooni.org",
+      "admin+dev@ooni.org",
+      "luis@openobservatory.org",
+      "contact@openobservatory.org"
+    ])
+  }
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.ooniauth)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["ooniauth"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.ooniauth[0]
+  host_port_b               = local.ooniapi_deploy_ports.ooniauth[1]
 }
 
 module "ooniapi_ooniauth" {
@@ -1170,6 +1404,11 @@ module "ooniapi_ooniauth" {
 module "ooniapi_oonimeasurements_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
+  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
+  # the hosts, so the ALB stays current until DNS moves.
+  deploy_mode = "ecs"
+
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
   branch_name             = "636-better-pagination"
@@ -1179,6 +1418,27 @@ module "ooniapi_oonimeasurements_deployer" {
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  # Pre-wired for the future flip to deploy_mode = "blue_green"
+  env_vars = {
+    # it has to be a json-compliant array
+    OTHER_COLLECTORS                = jsonencode(["http://fastpath.${local.environment}.ooni.io:8475"]) # private IPs are not reachable from the host
+    BASE_URL                        = "https://api.${local.environment}.ooni.io"
+    S3_BUCKET_NAME                  = "ooni-data-eu-fra-test"
+    VALKEY_URL                      = local.ooniapi_deploy_valkey_url
+    RATE_LIMITS                     = "10/minute;400000/day;200000/7day"
+    RATE_LIMITS_WHITELISTED_IPADDRS = jsonencode(["5.9.112.244"])
+    RATE_LIMITS_UNMETERED_PAGES     = jsonencode(["/metrics", "/health"])
+  }
+  secrets                   = keys(local.ooniapi_deploy_service_secrets.oonimeasurements)
+  service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonimeasurements"].arn
+  deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.oonimeasurements[0]
+  host_port_b               = local.ooniapi_deploy_ports.oonimeasurements[1]
 
   ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
   ecs_cluster_name = module.oonitier1plus_cluster.cluster_name
