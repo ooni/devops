@@ -347,6 +347,29 @@ resource "aws_secretsmanager_secret_version" "ooniapi_deploy_ssh_key" {
   }
 }
 
+# Where the blue/green deploy job puts the dev services: backend-hel alone.
+# The ports must match ooniapi_gateway_services in
+# ansible/host_vars/backend-hel.ooni.org/ooniapi_gateway.yml.
+locals {
+  ooniapi_deploy_host    = "backend-hel.ooni.org"
+  ooniapi_deploy_network = "ooniapi"
+  ooniapi_deploy_ports = {
+    reverseproxy     = [18001, 18002]
+    ooniprobe        = [18011, 18012]
+    oonirun          = [18021, 18022]
+    oonifindings     = [18031, 18032]
+    ooniauth         = [18041, 18042]
+    oonimeasurements = [18051, 18052]
+  }
+}
+
+# The compose files, nginx upstream confs and deploy.py the deploy jobs copy
+# to the host
+resource "aws_s3_bucket" "ooniapi_deploy" {
+  bucket = "ooniapi-deploy-${var.aws_region}-${random_id.artifact_id.hex}"
+  tags   = local.tags
+}
+
 resource "random_id" "artifact_id" {
   byte_length = 4
 }
@@ -686,6 +709,12 @@ module "ooniapi_ooniprobe_deployer" {
   secrets                   = keys(local.ooniapi_deploy_service_secrets.ooniprobe)
   service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["ooniprobe"].arn
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.ooniprobe[0]
+  host_port_b               = local.ooniapi_deploy_ports.ooniprobe[1]
 }
 
 module "ooniapi_ooniprobe" {
@@ -829,6 +858,12 @@ module "ooniapi_reverseproxy_deployer" {
   secrets                   = keys(local.ooniapi_deploy_service_secrets.reverseproxy)
   service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["reverseproxy"].arn
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.reverseproxy[0]
+  host_port_b               = local.ooniapi_deploy_ports.reverseproxy[1]
 }
 
 module "ooniapi_reverseproxy" {
@@ -1147,6 +1182,12 @@ module "ooniapi_oonirun_deployer" {
   secrets                   = keys(local.ooniapi_deploy_service_secrets.oonirun)
   service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonirun"].arn
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.oonirun[0]
+  host_port_b               = local.ooniapi_deploy_ports.oonirun[1]
 }
 
 module "ooniapi_oonirun" {
@@ -1209,6 +1250,12 @@ module "ooniapi_oonifindings_deployer" {
   secrets                   = keys(local.ooniapi_deploy_service_secrets.oonifindings)
   service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonifindings"].arn
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.oonifindings[0]
+  host_port_b               = local.ooniapi_deploy_ports.oonifindings[1]
 }
 
 module "ooniapi_oonifindings" {
@@ -1285,6 +1332,12 @@ module "ooniapi_ooniauth_deployer" {
   secrets                   = keys(local.ooniapi_deploy_service_secrets.ooniauth)
   service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["ooniauth"].arn
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.ooniauth[0]
+  host_port_b               = local.ooniapi_deploy_ports.ooniauth[1]
 }
 
 module "ooniapi_ooniauth" {
@@ -1371,6 +1424,12 @@ module "ooniapi_oonimeasurements_deployer" {
   secrets                   = keys(local.ooniapi_deploy_service_secrets.oonimeasurements)
   service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["oonimeasurements"].arn
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
+  deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
+  deploy_host_primary       = local.ooniapi_deploy_host
+  network_name              = local.ooniapi_deploy_network
+  container_port            = 80
+  host_port_a               = local.ooniapi_deploy_ports.oonimeasurements[0]
+  host_port_b               = local.ooniapi_deploy_ports.oonimeasurements[1]
 
   ecs_service_name = module.ooniapi_oonimeasurements.ecs_service_name
   ecs_cluster_name = module.oonitier1plus_cluster.cluster_name

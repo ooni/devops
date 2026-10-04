@@ -1,0 +1,29 @@
+# backend-hel runs the dev API services, deployed blue/green by their
+# deployers in tf/environments/dev (deploy_host_primary), behind the gateway
+# vhost of roles/ooniapi_gateway. It answers for the names the dev ALB
+# answers for; those keep pointing at the ALB until the DNS cutover.
+ooniapi_gateway_primary_domain: api.dev.ooni.io
+ooniapi_gateway_direct_domain_suffix: dev.ooni.io
+
+# testlists stays on its EC2 instance, which only serves plain HTTP: proxy it
+# over HTTPS through the dev ALB. testlists.dev.ooni.io must therefore stay on
+# the ALB at the cutover.
+ooniapi_gateway_testlists_upstream: testlists.dev.ooni.io
+
+# Must match ooniapi_deploy_ports in tf/environments/dev/main.tf
+ooniapi_gateway_services:
+  - {name: reverseproxy, host_port_a: 18001, host_port_b: 18002}
+  - {name: ooniprobe, host_port_a: 18011, host_port_b: 18012}
+  - {name: oonirun, host_port_a: 18021, host_port_b: 18022}
+  - {name: oonifindings, host_port_a: 18031, host_port_b: 18032}
+  - {name: ooniauth, host_port_a: 18041, host_port_b: 18042}
+  - {name: oonimeasurements, host_port_a: 18051, host_port_b: 18052}
+
+# The certificate for the dev names can only be issued once they resolve
+# here. At the cutover, after moving their DNS: add this line to
+# ssl_domains, run the playbook with --tags dehydrated, then set
+# ooniapi_gateway_cert_ready to true and run it again.
+#   - "api.dev.ooni.io ooniauth.dev.ooni.io ooniprobe.dev.ooni.io oonirun.dev.ooni.io oonifindings.dev.ooni.io oonimeasurements.dev.ooni.io"
+ssl_domains:
+  - "backend-hel.ooni.org"
+ooniapi_gateway_cert_ready: false

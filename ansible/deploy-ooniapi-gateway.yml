@@ -1,7 +1,15 @@
 ---
+# backend-hel runs the dev API services (host_vars/backend-hel.ooni.org/
+# ooniapi_gateway.yml). backend-fsn still serves the legacy API and gets the
+# gateway only when prod moves. nginx and dehydrated (with ssl_domains from
+# host_vars) come first: the gateway role expects both on the host.
 - name: Bootstrap the tier0 blue/green gateway on dedicated backend hosts
-  hosts: backend-fsn.ooni.org:backend-hel.ooni.org
+  hosts: backend-hel.ooni.org
   become: true
   roles:
+    - role: nginx
+      tags: nginx
+    - role: dehydrated
+      tags: dehydrated
     - role: ooniapi_gateway
       tags: ooniapi_gateway
