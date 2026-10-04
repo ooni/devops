@@ -9,6 +9,28 @@
 # Runs as root (become: true at the play level). Each deploy runs `docker
 # compose up` as root (via the scoped sudoers rule below), matching this.
 
+# The deploy job logs in as this user; it may only run what the sudoers rule
+# below allows, so it gets no groups of its own
+- name: Check the deploy user's public key is set
+  ansible.builtin.assert:
+    that: ooniapi_gateway_deploy_ssh_public_key | length > 0
+    fail_msg: >-
+      Set ooniapi_gateway_deploy_ssh_public_key for {{ inventory_hostname }}
+      to the public half of the oonidevops/ooniapi/deploy_ssh_key secret.
+
+- name: Create the deploy user
+  ansible.builtin.user:
+    name: "{{ ooniapi_gateway_deploy_user }}"
+    comment: "ooniapi blue/green deploy job"
+    shell: /bin/bash
+    create_home: true
+
+- name: Authorize the deploy job's key
+  ansible.posix.authorized_key:
+    user: "{{ ooniapi_gateway_deploy_user }}"
+    key: "{{ ooniapi_gateway_deploy_ssh_public_key }}"
+    exclusive: true
+
 - name: Ensure per-service state directories exist
   ansible.builtin.file:
     path: "/etc/ooniapi/{{ item.name }}"

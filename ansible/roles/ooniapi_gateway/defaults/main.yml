@@ -87,6 +87,11 @@ ooniapi_gateway_nginx_user: www-data
 # Terraform module.
 ooniapi_gateway_deploy_user: deploy
 
+# Public half of the key whose private half is in the environment's
+# oonidevops/ooniapi/deploy_ssh_key secret, which the deploy job logs in
+# with. No default: set per host once that key pair exists.
+ooniapi_gateway_deploy_ssh_public_key: ""
+
 # Private directory the deploy job scp's files into before they're
 # moved/installed into place. Must match STAGING_DIR in
 # tf/modules/ooniapi_service_deployer/files/deploy.py.

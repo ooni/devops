@@ -27,3 +27,9 @@ ooniapi_gateway_services:
 ssl_domains:
   - "backend-hel.ooni.org"
 ooniapi_gateway_cert_ready: false
+
+# Public half of dev's oonidevops/ooniapi/deploy_ssh_key secret (eu-central-1,
+# dev account), which the deploy jobs log in with. Generate the pair, put the
+# private key in the secret and the public key here:
+#   ssh-keygen -t ed25519 -N '' -C ooniapi-deploy-dev -f deploy_dev
+ooniapi_gateway_deploy_ssh_public_key: ""
