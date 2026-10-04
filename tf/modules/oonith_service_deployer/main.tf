@@ -4,6 +4,9 @@ data "aws_caller_identity" "current" {}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
+  # the only secret the builds read (buildspec.yml DOCKERHUB_SECRET_ID), to
+  # log in to Docker Hub
+  dockerhub_secret_name = "oonidevops/dockerhub/access_token"
 }
 
 resource "aws_iam_policy" "codebuild" {
@@ -63,6 +66,11 @@ resource "aws_iam_policy" "codebuild" {
       ]
     },
     {
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:${var.aws_region}:${local.account_id}:secret:${local.dockerhub_secret_name}-??????"
+    },
+    {
         "Effect": "Allow",
         "Action": "codestar-connections:UseConnection",
         "Resource": "${var.codestar_connection_arn}"
@@ -92,7 +100,6 @@ POLICY
   managed_policy_arns = [
     aws_iam_policy.codebuild.arn,
     "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess",
-    "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
   ]
   max_session_duration = "3600"
   name                 = "codebuild-oonith-${var.service_name}"
