@@ -169,6 +169,16 @@ resource "aws_launch_template" "container_host" {
     name = aws_iam_instance_profile.container_host.name
   }
 
+  # The instance credentials are for the host: the ECS agent and docker's
+  # log driver. Requiring IMDSv2 with a hop limit of 1 keeps them from the
+  # containers, which are a hop further away on the bridge network; tasks
+  # get credentials from their task role instead.
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
+
   network_interfaces {
     associate_public_ip_address = true
     delete_on_termination       = true

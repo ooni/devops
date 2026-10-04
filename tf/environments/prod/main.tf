@@ -870,15 +870,6 @@ locals {
   })
 }
 
-# Until the tasks use their task role, they get ooniprobe's S3 access through
-# the container host's credentials
-resource "aws_iam_role_policy" "ooniprobe_role" {
-  name = "${local.name}-task-role"
-  role = module.ooniapi_cluster.container_host_role.name
-
-  policy = local.ooniprobe_s3_policy
-}
-
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
