@@ -247,7 +247,7 @@ ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `msm_range`;
 ALTER TABLE ooni.fastpath MODIFY COLUMN `is_verified` LowCardinality(String) DEFAULT 'u';
 
 -- Changepoints
-CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints
+CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints ON CLUSTER oonidata_cluster
 (
     `uuid` UUID,
     `domain` String,
@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints
 ENGINE = MergeTree
 ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid);
 
-CREATE TABLE IF NOT EXISTS changepoint_label
+CREATE TABLE IF NOT EXISTS changepoint_label ON CLUSTER oonidata_cluster
 (
     -- Ground truth, set by a person. Represents the network state for
     -- the (probe_cc, probe_asn, resolver_asn, domain) series of the
