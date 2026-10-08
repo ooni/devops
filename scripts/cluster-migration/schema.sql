@@ -261,7 +261,7 @@ CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints
     `h` Float64,
     `state` LowCardinality(String),
     -- JSON-encoded parameters the detector was run with
-    `run_parameters` String
+    `run_parameters` String,
     `created_at` DateTime64(3, 'UTC') DEFAULT now64()
 )
 ENGINE = MergeTree
