@@ -245,3 +245,24 @@ ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `zkp_request`;
 ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `age_range`;
 ALTER TABLE ooni.fastpath DROP COLUMN IF EXISTS `msm_range`;
 ALTER TABLE ooni.fastpath MODIFY COLUMN `is_verified` LowCardinality(String) DEFAULT 'u';
+
+-- Changepoints
+CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints
+(
+    `uuid` UUID,
+    `domain` String,
+    `probe_cc` String,
+    `probe_asn` UInt32,
+    `resolver_asn` UInt32,
+    `layer` LowCardinality(String),
+    `ts_hour` DateTime64(3, 'UTC'),
+    `s_neg` Float64,
+    `s_pos` Float64,
+    `h` Float64,
+    `state` LowCardinality(String),
+    -- JSON-encoded parameters the detector was run with
+    `run_parameters` String
+    `created_at` DateTime64(3, 'UTC') DEFAULT now64()
+)
+ENGINE = MergeTree
+ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid);
