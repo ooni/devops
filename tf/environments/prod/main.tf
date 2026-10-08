@@ -519,6 +519,8 @@ module "ooni_clickhouse_proxy" {
 
   key_name      = module.adm_iam_roles.oonidevops_key_name
   instance_type = "t3a.nano"
+  # 512 MiB without swap: unattended-upgrades OOMed it (OOPRIV-140)
+  swap_size_mb = 1024
 
   name = "oonickprx"
   ingress_rules = [{
