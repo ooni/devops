@@ -49,6 +49,8 @@ services:
       - ./config/common/common.xml:/etc/clickhouse-server/config.d/common.xml:ro
       - ./config/common/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
       - ./config/ch1/node.xml:/etc/clickhouse-server/config.d/node.xml:ro
+      # Backup bucket credentials (minio in docker-compose.backup.yml)
+      - ./config/backup/s3.xml:/etc/clickhouse-server/config.d/backup_s3.xml:ro
 
   ch2:
     <<: *clickhouse-common
@@ -63,6 +65,8 @@ services:
       - ./config/common/common.xml:/etc/clickhouse-server/config.d/common.xml:ro
       - ./config/common/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
       - ./config/ch2/node.xml:/etc/clickhouse-server/config.d/node.xml:ro
+      # Backup bucket credentials (minio in docker-compose.backup.yml)
+      - ./config/backup/s3.xml:/etc/clickhouse-server/config.d/backup_s3.xml:ro
 
   ch3:
     <<: *clickhouse-common
@@ -77,6 +81,8 @@ services:
       - ./config/common/common.xml:/etc/clickhouse-server/config.d/common.xml:ro
       - ./config/common/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
       - ./config/ch3/node.xml:/etc/clickhouse-server/config.d/node.xml:ro
+      # Backup bucket credentials (minio in docker-compose.backup.yml)
+      - ./config/backup/s3.xml:/etc/clickhouse-server/config.d/backup_s3.xml:ro
 
 networks:
   chnet:

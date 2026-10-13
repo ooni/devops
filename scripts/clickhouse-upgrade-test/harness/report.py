@@ -247,6 +247,40 @@ def render_ci_step(step: dict, all_steps: list[dict] | None = None) -> str:
         lines.append("")
         return "\n".join(lines)
 
+    if "backup_name" in step:
+        # harness/backup.py's backup_step()
+        ok = step.get("ok")
+        lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
+        if ok:
+            kind = f"incremental on `{step.get('base')}`" if step.get("base") else "full"
+            lines.append(
+                f"Backup `{step['backup_name']}` ({kind}) of {step.get('tables')} table(s) taken on ch3 at "
+                f"`{step.get('version')}`; incremental for: {', '.join(step.get('incremental_tables') or []) or 'none'}. "
+                f"No `.backup` file contains the bucket secret."
+            )
+        else:
+            lines.append(f"FAILED: {step.get('error')}")
+        lines.append("")
+        return "\n".join(lines)
+
+    if "restore_of" in step:
+        # harness/backup.py's restore_check_step()
+        ok = step.get("ok")
+        lines = [f"### `{label}` -- {_fmt_bool(ok)}", ""]
+        lines.append(
+            f"Backup `{step['restore_of']}` (taken on `{step.get('backup_version')}`) restored onto a fresh "
+            f"node running `{step.get('restore_version')}`: "
+            + (f"all {step.get('tables')} table(s) match their checksums from backup time." if ok else "FAILED.")
+        )
+        if step.get("error"):
+            lines.append(f"- Error: {step['error']}")
+        for table, err in (step.get("errors") or {}).items():
+            lines.append(f"- `{table}`: restore failed: {err}")
+        for table, mm in (step.get("mismatches") or {}).items():
+            lines.append(f"- `{table}`: at backup time {mm['backup']}, restored {mm['restored']}")
+        lines.append("")
+        return "\n".join(lines)
+
     if "diffs" in step and "on_cluster_alter_ok" not in step:
         # scenarios.content_integrity_step() -- see render_content_integrity().
         return render_content_integrity(step)

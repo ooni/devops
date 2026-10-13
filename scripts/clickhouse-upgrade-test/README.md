@@ -978,6 +978,35 @@ limitation of this engine, not a gap in this test.
   structurally) and real validation is deferred to an actual CI run, same
   as every other CI-dependent change in this project.
 
+## Backup and restore checks (`staged-upgrade` job)
+
+Production backs up the cluster with ClickHouse's native `BACKUP`, from data3
+to Hetzner Object Storage (ansible role `clickhouse_backup`). The upgrade
+changes the on-disk part format twice (25.8, 26.3), so the questions are
+which backups restore where:
+
+| Step | Backup | Restored on | Question |
+|---|---|---|---|
+| `restore-base-24.8-on-26.8` | full, taken on 24.8 | 26.8.9.10 | Does an old backup restore on the new version? |
+| `restore-final-26.8-on-26.8` | incremental chain: 24.8 -> 25.3 -> 26.8 | 26.8.9.10 | Does a chain whose links span the upgrade restore? |
+| `restore-pre-25.8-on-25.3` | incremental, taken on 25.3 before the 25.8 hop | 25.3.14.14 | The rollback path: does the last pre-25.8 backup restore on the version it came from? |
+
+The opposite direction isn't checked because it doesn't work: tried by hand,
+a 24.8 server segfaulted (in `MergeTreeData::restorePartFromBackup`)
+restoring a backup taken on 26.8, whose parts have 25.8's new `.cmrk4` mark
+files. A rollback has to use a backup taken before the hop.
+
+`harness/backup.py` backs up every `ooni` table from ch3 to MinIO
+(`docker-compose.backup.yml`; MinIO Inc. stopped publishing images, so this
+uses the `pgsty/minio` community fork), recording each table's row count and
+content checksum at backup time. A restore check recreates `chr`, a
+standalone node with its own Keeper, on the requested version, restores
+every table and compares checksums. Like production, it exports the rows of
+EmbeddedRocksDB tables separately (`BACKUP` stores only their schema), takes
+bucket credentials from server config (`config/backup/s3.xml`) rather than
+from queries, and fails a backup step if any `.backup` file contains the
+secret, since an incremental backup records its `base_backup` argument there.
+
 ## What was and wasn't verified
 
 This harness has now actually run in GitHub Actions four times (see
@@ -1028,13 +1057,17 @@ not something else).
 ```
 docker-compose.yml            3-node cluster definition, per-node image tag override via env
 docker-compose.real-data.yml  Overlay: real ooni/data pipeline (postgres/valkey/api/downloader/fastpath/verify) on top of ch1/ch2/ch3
+docker-compose.backup.yml     Overlay: minio (pgsty/minio fork) to back up to + chr, a standalone node to restore onto
 config/common/                Settings shared by all nodes (remote_servers, zookeeper client, distributed_ddl)
 config/ch{1,2,3}/node.xml     Per-node macros (shard/replica) + embedded Keeper raft config
+config/backup/s3.xml          Backup bucket credentials, so BACKUP/RESTORE queries carry none
+config/restore/node.xml       chr: production macros + its own single-node Keeper
 sql/001_schema.sql            Production table DDL (ReplicatedReplacingMergeTree, ON CLUSTER) + real-data-pipeline tables
 real_data/fastpath/           fastpath config + cache dir for the real-data scenario
 real_data/data/               Downloaded real OONI measurements land here (gitignored, fetched fresh every run)
 harness/seed_data.py          Synthetic data generator (see note above on why it's synthetic)
 harness/real_data.py          Real-data end-to-end scenario (see "Real-data end-to-end scenario" above)
+harness/backup.py             Backup/restore checks (see "Backup and restore checks" above)
 harness/ch_http.py            Minimal stdlib-only ClickHouse HTTP client
 harness/compose.py            docker-compose wrapper (bring up/tear down/recreate one node at a time, multi-file overlay support)
 harness/validate.py           Cluster health checks (replication convergence, error scraping, write/read probes)

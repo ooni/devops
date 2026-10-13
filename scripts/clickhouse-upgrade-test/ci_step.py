@@ -23,6 +23,8 @@ Usage:
     python3 ci_step.py upgrade-node --node ch1 --version 25.3.14.14 --label hop-25.3-ch1
     python3 ci_step.py verify-ddl --version 25.3.14.14 --label hop-25.3-verify-ddl
     python3 ci_step.py content-integrity --label content-integrity-25.3.14.14  # run once per hop, right after that hop's verify-ddl
+    python3 ci_step.py backup --name base-24.8 --label backup-base-24.8
+    python3 ci_step.py restore-check --name base-24.8 --version 26.8.9.10 --label restore-base-24.8-on-26.8
     python3 ci_step.py report
     python3 ci_step.py teardown
 
@@ -64,6 +66,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from harness import compose, real_data, report
 from harness import availability
+from harness import backup
 from harness.scenarios import content_integrity_step, setup_step, step_ok, upgrade_node_step, verify_ddl_step
 from harness.versions import RECOMMENDED_LTS_HOPS
 
@@ -153,10 +156,29 @@ def cmd_content_integrity(args) -> int:
 
 def cmd_teardown(args) -> int:
     try:
-        compose.down(volumes=True)
+        # With the backup overlay, so minio/chr go too if a backup step ran
+        compose.down(volumes=True, files=backup.COMPOSE_FILES)
     except Exception as e:
         print(f"teardown warning (non-fatal): {e}")
     return 0
+
+
+def cmd_backup(args) -> int:
+    result = backup.backup_step(args.name, args.base, label=args.label)
+    _save_step(args.label, result)
+    ok = step_ok(result)
+    print(json.dumps(result, indent=2, default=str))
+    return 0 if ok else 1
+
+
+def cmd_restore_check(args) -> int:
+    result = backup.restore_check_step(args.name, args.version, label=args.label)
+    _save_step(args.label, result)
+    ok = step_ok(result)
+    print(json.dumps({k: v for k, v in result.items() if k != "chr_log_tail"}, indent=2, default=str))
+    if not ok and result.get("chr_log_tail"):
+        print(result["chr_log_tail"])
+    return 0 if ok else 1
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +286,24 @@ def main() -> int:
     )
     p_ci.add_argument("--label", default="content-integrity")
     p_ci.set_defaults(func=cmd_content_integrity)
+
+    p_backup = sub.add_parser(
+        "backup",
+        help="Native BACKUP of every ooni table from ch3 to minio (docker-compose.backup.yml), recording per-table checksums",
+    )
+    p_backup.add_argument("--name", required=True, help="Backup name, e.g. base-24.8")
+    p_backup.add_argument("--base", default=None, help="Earlier backup to take this one incrementally on")
+    p_backup.add_argument("--label", required=True)
+    p_backup.set_defaults(func=cmd_backup)
+
+    p_restore = sub.add_parser(
+        "restore-check",
+        help="Restore a recorded backup onto a fresh standalone node (chr) at --version and compare checksums",
+    )
+    p_restore.add_argument("--name", required=True, help="Backup to restore, as given to `backup --name`")
+    p_restore.add_argument("--version", required=True, help="ClickHouse image tag for the restore node")
+    p_restore.add_argument("--label", required=True)
+    p_restore.set_defaults(func=cmd_restore_check)
 
     p_report = sub.add_parser("report", help="Aggregate every results/steps/*.json into results/report.md + report.json")
     p_report.set_defaults(func=cmd_report)

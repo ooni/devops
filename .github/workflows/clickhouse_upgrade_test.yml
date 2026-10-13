@@ -46,7 +46,7 @@ jobs:
     # CI LADDER" section. The monthly bisection releases localized the
     # mark-file incompatibility to exactly one version boundary; re-testing
     # every one of them on every PR was no longer buying anything.
-    timeout-minutes: 60
+    timeout-minutes: 75
     defaults:
       run:
         working-directory: scripts/clickhouse-upgrade-test
@@ -92,8 +92,24 @@ jobs:
       - name: Validate docker-compose.yml
         run: docker compose config
 
+      - name: Validate docker-compose.yml + docker-compose.backup.yml
+        run: docker compose -f docker-compose.yml -f docker-compose.backup.yml config
+
       - name: Set up cluster at 24.8.6.70 (current production version) and load schema + seed data
         run: python3 ci_step.py setup --base-version 24.8.6.70 --label setup
+
+      # Backups, the way production takes them (ansible role
+      # clickhouse_backup): native BACKUP of every ooni table from ch3 (data3
+      # in production) to an S3-compatible store -- MinIO here, via the
+      # pgsty/minio community fork, Hetzner Object Storage in production.
+      # Three backups along the upgrade, one chain: a full one on 24.8, an
+      # incremental on 25.3 right before 25.8 changes the on-disk part
+      # format, and an incremental on 26.8. The restore checks after the
+      # last hop restore them onto a fresh standalone node. See
+      # harness/backup.py.
+      - name: "Backup on 24.8.6.70: full backup of every table from ch3 to MinIO"
+        run: python3 ci_step.py backup --name base-24.8 --label backup-base-24.8
+        continue-on-error: true
 
       # --- Hop 1/4: 24.8.6.70 -> 25.3.14.14 (LTS) ---
       - name: "Hop 1/4 (-> 25.3.14.14): upgrade ch1"
@@ -122,6 +138,12 @@ jobs:
       # harness/report.py's self_healed()/overall_ok()) -- it always gates.
       - name: "Hop 1/4 (-> 25.3.14.14): verify no data loss or corruption (content checksums vs. golden seed snapshot)"
         run: python3 ci_step.py content-integrity --label hop1-content-integrity
+        continue-on-error: true
+
+      # The backup a rollback would restore: the last one before 25.8's
+      # on-disk format change (see restore-pre-25.8-on-25.3 below).
+      - name: "Backup on 25.3.14.14, before the 25.8 on-disk format change (incremental)"
+        run: python3 ci_step.py backup --name pre-25.8 --base base-24.8 --label backup-pre-25.8
         continue-on-error: true
 
       # --- Hop 2/4: 25.3.14.14 -> 25.8.29.51 (LTS) -- previously this job
@@ -203,6 +225,26 @@ jobs:
       # one of these per-hop content-integrity steps failing always does.
       - name: "Hop 4/4 (-> 26.8.9.10): verify no data loss or corruption (content checksums vs. golden seed snapshot)"
         run: python3 ci_step.py content-integrity --label hop4-content-integrity
+        continue-on-error: true
+
+      - name: "Backup on 26.8.9.10 (incremental: the chain now spans 24.8, 25.3 and 26.8)"
+        run: python3 ci_step.py backup --name final-26.8 --base pre-25.8 --label backup-final-26.8
+        continue-on-error: true
+
+      # Each check restores onto a fresh standalone node (chr, own Keeper)
+      # and compares every table with checksums taken at backup time.
+      - name: "Restore the 24.8 full backup on 26.8.9.10 (old backup, new server)"
+        run: python3 ci_step.py restore-check --name base-24.8 --version 26.8.9.10 --label restore-base-24.8-on-26.8
+        continue-on-error: true
+      - name: "Restore the 24.8 -> 25.3 -> 26.8 incremental chain on 26.8.9.10"
+        run: python3 ci_step.py restore-check --name final-26.8 --version 26.8.9.10 --label restore-final-26.8-on-26.8
+        continue-on-error: true
+      # The rollback path: a backup from before 25.8 restored on the version
+      # it was taken on. Backups taken after 25.8 can't go back -- a 24.8
+      # server segfaulted restoring a 26.8 backup when tried by hand -- so
+      # this isn't checked in that direction.
+      - name: "Restore the pre-25.8 backup on 25.3.14.14 (rollback path)"
+        run: python3 ci_step.py restore-check --name pre-25.8 --version 25.3.14.14 --label restore-pre-25.8-on-25.3
         continue-on-error: true
 
       - name: Generate report
