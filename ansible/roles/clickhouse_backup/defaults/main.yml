@@ -1,0 +1,67 @@
+---
+# Back up the ooni ClickHouse database to S3-compatible object storage
+# (Cloudflare R2) with ClickHouse's native BACKUP. Deploy where the data is:
+# data3 for the replicated tables, data1 for the tables only data1 holds
+# (see deploy-clickhouse.yml and host_vars).
+# Restore and upgrade procedure: docs/Runbooks.md, "ClickHouse backup".
+
+# false stops and disables the timer, e.g. while upgrading the cluster
+clickhouse_backup_enabled: true
+# Daily, at a quiet time (UTC). A run backs up every job's tables, one job
+# after the other; a run still going (a new full backup of obs_web takes
+# more than a day) delays the next one instead of overlapping it.
+clickhouse_backup_on_calendar: "*-*-* 02:30:00"
+
+clickhouse_backup_database: ooni
+clickhouse_backup_clickhouse_url: "http://127.0.0.1:8123/"
+clickhouse_backup_clickhouse_user: "{{ clickhouse_admin_user }}"
+clickhouse_backup_clickhouse_password: "{{ clickhouse_admin_password }}"
+
+# Cloudflare R2: the endpoint names the account,
+# https://<account id>.r2.cloudflarestorage.com. One API token with Object
+# Read & Write on every bucket the jobs below use.
+clickhouse_backup_s3_endpoint: ""
+clickhouse_backup_s3_region: auto
+clickhouse_backup_s3_prefix: prod
+clickhouse_backup_s3_access_key_id: ""
+clickhouse_backup_s3_secret_access_key: ""
+
+# Query settings for ClickHouse's uploads. R2 rejects a multipart upload
+# whose parts (all but the last) differ in size, and ClickHouse grows the
+# part size as an upload goes on unless the factor is 1. R2 also allows at
+# most 10,000 parts, so with 128 MiB parts one file can reach 1.25 TiB.
+clickhouse_backup_s3_settings:
+  s3_upload_part_size_multiply_factor: 1
+  s3_min_upload_part_size: 134217728
+  s3_max_upload_part_size: 134217728
+
+# One job per bucket. A job backs up the tables matching include_tables
+# (every table if empty) minus the excludes below and its own.
+clickhouse_backup_jobs:
+  - name: measurements
+    s3_bucket: ""
+    include_tables: []
+    exclude_tables: []
+
+# A new full backup per table every this many days; incrementals in between
+clickhouse_backup_full_interval_days: 30
+# Complete chains kept per table, besides chains pinned with --keep: the
+# current one and the one before, so a month or two of restore points
+clickhouse_backup_keep_chains: 2
+# Bytes/s passed to ClickHouse as max_backup_bandwidth. On 24.8 actual
+# throughput measured at about a third of this, so 120 MB/s gives ~40 MB/s,
+# which leaves room on the 1 Gbit/s link for replication.
+clickhouse_backup_max_bandwidth: 120000000
+
+# fnmatch patterns, for every job. Materialized views' .inner tables are
+# always skipped: they're backed up with their view.
+clickhouse_backup_exclude_tables:
+  - "*_tmp"               # updater staging tables
+  - msmt_feedback_old
+  - counters_test_list    # unused materialized view, to be dropped
+  - fastpath_tuning       # experiment on data2
+
+# Results for Prometheus, read by node_exporter's textfile collector
+# (node_exporter_textfile_dir in the prometheus_node_exporter role)
+clickhouse_backup_metrics_file: "{{ node_exporter_textfile_dir | default('/var/lib/node_exporter/textfile_collector') }}/ooni_clickhouse_backup.prom"
+clickhouse_backup_state_file: /var/lib/ooni-clickhouse-backup/state.json

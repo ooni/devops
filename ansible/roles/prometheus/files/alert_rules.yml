@@ -99,9 +99,10 @@ groups:
     annotations:
       summary: 'Broken `textfile` at {{ $labels.instance }}'
 
-  # all the textfile are updated at least hourly
+  # all the textfile are updated at least hourly, except the ClickHouse
+  # backup results, which change after each backup (see ClickHouseBackupStale)
   - alert: TextfileJam
-    expr: (node_textfile_mtime - ON(instance,job) GROUP_LEFT() node_time) / -3600 > 2
+    expr: (node_textfile_mtime{file!~"ooni_clickhouse_backup.*"} - ON(instance,job) GROUP_LEFT() node_time) / -3600 > 2
     annotations:
       summary: 'Stale `textfile` at {{ $labels.instance }}'
       description: '`{{ $labels.file }}` is {{ printf "%.0f" $value }}h old.'
@@ -144,4 +145,38 @@ groups:
     expr: rate(alertmanager_notifications_failed_total[1m]) > 0
     annotations:
       summary: 'Alertmanager {{ $labels.instance }} fails {{ $labels.integration }} notifications.'
+
+# Results written by ooni-clickhouse-backup (ansible role clickhouse_backup)
+# to node_exporter's textfile directory on data1 and data3
+- name: ClickHouse backups
+  rules:
+  - alert: ClickHouseBackupFailed
+    expr: ooni_clickhouse_backup_last_attempt_failed == 1
+    annotations:
+      summary: 'ClickHouse backup of {{ $labels.table }} ({{ $labels.backup }}) failed on {{ $labels.instance }}'
+      description: 'See `journalctl --identifier ooni-clickhouse-backup` on {{ $labels.instance }}. The next daily run retries it.'
+
+  # Backups run daily; a new full backup of obs_web can take a day and a half
+  - alert: ClickHouseBackupStale
+    expr: time() - ooni_clickhouse_backup_last_success_timestamp_seconds > 3 * 86400
+    annotations:
+      summary: 'No ClickHouse backup of {{ $labels.table }} ({{ $labels.backup }}) for {{ $value | humanizeDuration }}'
+      description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on {{ $labels.instance }}.'
+
+  # The job hasn't written any result since its host was set up, or the file is gone
+  - alert: ClickHouseBackupMissing
+    expr: absent(ooni_clickhouse_backup_running{instance="data3.htz-fsn.prod.ooni.nu"}) or absent(ooni_clickhouse_backup_running{instance="data1.htz-fsn.prod.ooni.nu"})
+    for: 26h
+    annotations:
+      summary: 'No ClickHouse backup results from data1 or data3 for over a day'
+
+  # data3 takes the backups. Above half its CPUs (load per CPU > 0.5), the
+  # backup or merges are crowding the node; lower clickhouse_backup_max_bandwidth
+  # or move the backup to another replica.
+  - alert: ClickHouseBackupHostLoadHigh
+    expr: node_load5{instance="data3.htz-fsn.prod.ooni.nu"} / on (instance) count by (instance) (node_cpu_seconds_total{mode="idle", instance="data3.htz-fsn.prod.ooni.nu"}) > 0.5
+    for: 15m
+    annotations:
+      summary: 'data3 load is {{ $value | humanizePercentage }} of its CPUs'
+      description: 'Backup running: check ooni_clickhouse_backup_running on data3.'
 ...
