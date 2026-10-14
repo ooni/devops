@@ -382,14 +382,6 @@ resource "aws_route53_record" "acme-redirect-helper-ooni-io-_A_" {
   zone_id = local.dns_root_zone_ooni_io
 }
 
-resource "aws_route53_record" "api-ooni-io-_A_" {
-  name    = "api.ooni.io"
-  records = ["162.55.247.208"]
-  ttl     = "60"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
 resource "aws_route53_record" "b-collector-ooni-io-_A_" {
   name    = "b.collector.ooni.io"
   records = ["162.55.247.208"]
