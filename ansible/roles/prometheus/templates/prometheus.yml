@@ -33,22 +33,28 @@ scrape_configs:
       module:
         - "{{ bbjob.module }}"
     static_configs:
+{% if bbjob.target_groups is defined %}
+{% set bbgroups = bbjob.target_groups %}
+{% else %}
+{% set bbgroups = [{'targets': bbjob.targets}] %}
+{% endif %}
+{% for bbgroup in bbgroups %}
       - targets:
-{% for target in (bbjob.targets|sort) %}
+{% for target in (bbgroup.targets|sort) %}
         - "{{ target }}"
 {% endfor %}
-# Adds custom labels to metrics for this job
-{% if (bbjob.ignore_instance_down | default(false)) or (bbjob.labels is defined) %}
+# Adds custom labels to metrics for this job, and for this group of targets
+{% set bblabels = (bbjob.labels | default({})) | combine(bbgroup.labels | default({})) %}
+{% if (bbjob.ignore_instance_down | default(false)) or bblabels %}
         labels:
 {% if bbjob.ignore_instance_down | default(false) %}
           ignore_instance_down: "true"
 {% endif %}
-{% if bbjob.labels is defined %}
-{% for k, v in bbjob.labels.items() %}
+{% for k, v in bblabels.items() %}
           {{ k }}: "{{ v }}"
 {% endfor %}
 {% endif %}
-{% endif %}
+{% endfor %}
     relabel_configs:
       - source_labels: [__address__]
         regex: (.*)(:80)?
