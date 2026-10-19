@@ -1156,7 +1156,7 @@ module "reuploader" {
 
   first_run                = true
   service_name             = "reuploader"
-  default_docker_image_url = "ooni/reuploader:20260617-8b35a38f"
+  default_docker_image_url = "ooni/reuploader:20260625-3fd00270"
   schedule_expression      = "cron(30 0 * * ? 2000-2199)"
   stage                    = local.environment
   dns_zone_ooni_io         = local.dns_zone_ooni_io
