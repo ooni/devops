@@ -69,8 +69,10 @@ resource "aws_ecs_task_definition" "ooniapi_service" {
         }
       ],
 
+      # APP_NAME is used by the API services to tag their clickhouse queries
+      # (log_comment), so we can tell them apart in system.query_log
       environment = [
-        for k, v in var.task_environment : {
+        for k, v in merge({ APP_NAME = var.service_name }, var.task_environment) : {
           name  = k,
           value = v
         }

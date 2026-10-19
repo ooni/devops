@@ -565,7 +565,7 @@ module "ooniapi_ooniprobe_deployer" {
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
-  branch_name             = "feat/experiment-versions"
+  branch_name             = "master"
   environment             = local.environment
   trigger_path            = "ooniapi/services/ooniprobe/**"
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
@@ -986,7 +986,7 @@ module "fastpath_builder" {
 
   service_name            = "fastpath"
   repo                    = "ooni/backend"
-  branch_name             = "feat/wc-x-flags"
+  branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "fastpath/buildspec.yml"
   trigger_path            = "fastpath/**"
@@ -1150,6 +1150,7 @@ module "ooniapi_ooniauth" {
       "norbel@ooni.org",
       "maria@ooni.org",
       "admin+dev@ooni.org",
+      "aaron@openobservatory.org",
       "luis@openobservatory.org",
       "contact@openobservatory.org"
     ])
@@ -1317,7 +1318,7 @@ module "testlists_builder" {
 
   service_name            = "testlists"
   repo                    = "ooni/backend"
-  branch_name             = "fix_1238_testlists_worktree"
+  branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
   trigger_path            = "ooniapi/services/testlists/**"
