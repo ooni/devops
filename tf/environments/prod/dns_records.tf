@@ -342,14 +342,6 @@ resource "aws_route53_record" "_amazonses-ooni-io-_TXT_" {
   zone_id = local.dns_root_zone_ooni_io
 }
 
-resource "aws_route53_record" "a-collector-ooni-io-_A_" {
-  name    = "a.collector.ooni.io"
-  records = ["162.55.247.208"]
-  ttl     = "60"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
 resource "aws_route53_record" "a-echo-th-ooni-io-_A_" {
   name    = "a.echo.th.ooni.io"
   records = ["37.218.241.93"]
@@ -390,25 +382,9 @@ resource "aws_route53_record" "api-ooni-io-_A_" {
   zone_id = local.dns_root_zone_ooni_io
 }
 
-resource "aws_route53_record" "b-collector-ooni-io-_A_" {
-  name    = "b.collector.ooni.io"
-  records = ["162.55.247.208"]
-  ttl     = "60"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
 resource "aws_route53_record" "b-web-connectivity-th-ooni-io-_A_" {
   name    = "b.web-connectivity.th.ooni.io"
   records = ["37.218.245.117"]
-  ttl     = "60"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "c-collector-ooni-io-_A_" {
-  name    = "c.collector.ooni.io"
-  records = ["162.55.247.208"]
   ttl     = "60"
   type    = "A"
   zone_id = local.dns_root_zone_ooni_io
@@ -425,14 +401,6 @@ resource "aws_route53_record" "c-echo-th-ooni-io-_A_" {
 resource "aws_route53_record" "c-web-connectivity-th-ooni-io-_A_" {
   name    = "c.web-connectivity.th.ooni.io"
   records = ["37.218.245.117"]
-  ttl     = "60"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "collector-ooni-io-_A_" {
-  name    = "collector.ooni.io"
-  records = ["162.55.247.208"]
   ttl     = "60"
   type    = "A"
   zone_id = local.dns_root_zone_ooni_io
@@ -518,22 +486,6 @@ resource "aws_route53_record" "labs-ooni-io-_CNAME_" {
   zone_id = local.dns_root_zone_ooni_io
 }
 
-resource "aws_route53_record" "measurements-ooni-io-_CNAME_" {
-  name    = "measurements.ooni.io"
-  records = ["api.ooni.io"]
-  ttl     = "1800"
-  type    = "CNAME"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "measurements-beta-ooni-io-_CNAME_" {
-  name    = "measurements-beta.ooni.io"
-  records = ["api.ooni.io"]
-  ttl     = "1800"
-  type    = "CNAME"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
 resource "aws_route53_record" "msg-ooni-io-_CNAME_" {
   name    = "msg.ooni.io"
   records = ["cname.vercel-dns.com"]
@@ -586,46 +538,6 @@ resource "aws_route53_record" "prometheus-infra-ooni-io-_A_" {
   name    = "prometheus.infra.ooni.io"
   records = ["37.218.245.43"]
   ttl     = "1799"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "ps-ooni-io-_A_" {
-  name    = "ps.ooni.io"
-  records = ["162.55.247.208"]
-  ttl     = "60"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "ps1-ooni-io-_A_" {
-  name    = "ps1.ooni.io"
-  records = ["162.55.247.208"]
-  ttl     = "300"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "ps2-ooni-io-_A_" {
-  name    = "ps2.ooni.io"
-  records = ["162.55.247.208"]
-  ttl     = "300"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "ps3-ooni-io-_A_" {
-  name    = "ps3.ooni.io"
-  records = ["162.55.247.208"]
-  ttl     = "300"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "ps4-ooni-io-_A_" {
-  name    = "ps4.ooni.io"
-  records = ["162.55.247.208"]
-  ttl     = "300"
   type    = "A"
   zone_id = local.dns_root_zone_ooni_io
 }
