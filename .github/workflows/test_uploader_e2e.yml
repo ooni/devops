@@ -54,6 +54,8 @@ jobs:
         run: |
           cp backend/reuploader/src/reuploader/main.py "$RUNNER_TEMP/reuploader_new.py"
           prod_tag=$(sed -n 's/.*default_docker_image_url *= *"ooni\/reuploader:\([^"]*\)".*/\1/p' tf/environments/prod/main.tf)
+          # the image tag's commit can be on a squash-merged PR's branch only: fetch the PR heads too
+          git -C backend fetch --quiet --no-tags origin "+refs/pull/*/head:refs/remotes/origin/pr/*"
           git -C backend show "${prod_tag##*-}:reuploader/src/reuploader/main.py" > "$RUNNER_TEMP/reuploader_prod.py"
           echo "REUPLOADER_NEW=$RUNNER_TEMP/reuploader_new.py" >> "$GITHUB_ENV"
           echo "REUPLOADER_OLD=$RUNNER_TEMP/reuploader_prod.py" >> "$GITHUB_ENV"
