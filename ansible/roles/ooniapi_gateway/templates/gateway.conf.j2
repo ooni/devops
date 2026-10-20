@@ -1,0 +1,167 @@
+# Managed by ansible - roles/ooniapi_gateway/templates/gateway.conf.j2
+#
+# Single "gateway" vhost for the OONI tier0 API on this dedicated host,
+# mirroring (1:1, by design) the AWS ALB listener rules in
+# tf/modules/ooniapi_frontend/main.tf. Only rules for services actually
+# running blue/green here ({{ ooniapi_gateway_services | map(attribute='name') | join(', ') }})
+# are handled; everything unmatched falls through to "reverseproxy", exactly
+# like the ALB's default_action.
+#
+# Each service's own `<service>-upstream.conf` (the `upstream <service> {
+# ... }` block referenced below via proxy_pass) is dropped into this same
+# conf.d directory by that service's blue/green deploy job, not by this
+# role -- see ooniapi_service_deployer's buildspec_deploy.yml. A service's
+# location block here will fail nginx -t until that service has deployed at
+# least once.
+
+{% set service_names = ooniapi_gateway_services | map(attribute='name') | list %}
+
+# anonymize ipaddr (same scheme as the legacy ooni-api vhost)
+map $remote_addr $ooniapi_gateway_remote_addr_anon {
+  ~(?P<ip>\d+\.\d+\.\d+)\.    $ip.0;
+  ~(?P<ip>[^:]+:[^:]+):       $ip::;
+  default                     0.0.0.0;
+}
+
+log_format ooniapi_gateway_fmt '$ooniapi_gateway_remote_addr_anon [$time_local] '
+    '"$request" $status $body_bytes_sent rt:$request_time "$http_referer" "$http_user_agent"';
+
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name {{ ([ooniapi_gateway_primary_domain] + ooniapi_gateway_extra_server_names) | join(' ') }};
+
+  access_log syslog:server=unix:/dev/log,tag=ooniapi-gateway,severity=info ooniapi_gateway_fmt;
+  error_log syslog:server=unix:/dev/log,tag=ooniapi-gateway,severity=info;
+
+  client_max_body_size 200M; # for measurement POST, matches the legacy API vhost
+
+  ssl_certificate {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/fullchain.pem;
+  ssl_certificate_key {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/privkey.pem;
+  ssl_trusted_certificate {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/chain.pem;
+
+  # https://ssl-config.mozilla.org/#server=nginx&config=intermediate -- kept
+  # inline (rather than shared include) so this role has no dependency on
+  # how nginx itself got installed on this host.
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+  ssl_prefer_server_ciphers off;
+  ssl_session_timeout 5m;
+  ssl_session_cache shared:MozSSL:30m;
+  ssl_session_tickets off;
+  ssl_stapling on;
+  ssl_stapling_verify on;
+
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+  add_header X-Frame-Options DENY always;
+  add_header X-Content-Type-Options nosniff always;
+
+  proxy_http_version 1.1;
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_read_timeout 900;
+
+{% if 'ooniauth' in service_names %}
+  ## --- ooniauth --- (ALB priority 108)
+  location ^~ /api/v2/ooniauth/ { proxy_pass http://ooniauth; }
+  location = /api/v1/user_register { proxy_pass http://ooniauth; }
+  location = /api/v1/user_login { proxy_pass http://ooniauth; }
+  location = /api/v1/user_refresh_token { proxy_pass http://ooniauth; }
+  location = /api/_/account_metadata { proxy_pass http://ooniauth; }
+{% endif %}
+
+{% if 'oonirun' in service_names %}
+  ## --- oonirun --- (ALB priority 110)
+  location ^~ /api/v2/oonirun/ { proxy_pass http://oonirun; }
+{% endif %}
+
+{% if 'ooniprobe' in service_names %}
+  ## --- ooniprobe --- (ALB priorities 120-123)
+  location ^~ /api/v2/ooniprobe/ { proxy_pass http://ooniprobe; }
+  location = /api/v1/login { proxy_pass http://ooniprobe; }
+  location = /api/v1/register { proxy_pass http://ooniprobe; }
+  location ^~ /api/v1/update/ { proxy_pass http://ooniprobe; }
+  location ^~ /api/v1/check-in { proxy_pass http://ooniprobe; }
+  location ^~ /api/v1/test-helpers { proxy_pass http://ooniprobe; }
+  location = /api/v1/test-list/urls { proxy_pass http://ooniprobe; }
+  location ^~ /report { proxy_pass http://ooniprobe; }
+  location = /api/_/show_countries_prioritization { proxy_pass http://ooniprobe; }
+  location = /api/_/debug_prioritization { proxy_pass http://ooniprobe; }
+  location ^~ /api/v1/manifest { proxy_pass http://ooniprobe; }
+  location ^~ /api/v1/sign_credential { proxy_pass http://ooniprobe; }
+  location ^~ /api/v1/submit_measurement { proxy_pass http://ooniprobe; }
+  location ^~ /bouncer/net-tests { proxy_pass http://ooniprobe; }
+  location ^~ /api/v1/geolookup { proxy_pass http://ooniprobe; }
+  location ^~ /api/v1/collectors { proxy_pass http://ooniprobe; }
+  location = /api/v1/test-list/tor-targets { proxy_pass http://ooniprobe; }
+  location = /api/v1/test-list/psiphon-config { proxy_pass http://ooniprobe; }
+{% endif %}
+
+{% if 'oonifindings' in service_names %}
+  ## --- oonifindings --- (ALB priority 130)
+  location ^~ /api/v1/incidents/ { proxy_pass http://oonifindings; }
+{% endif %}
+
+{% if 'oonimeasurements' in service_names %}
+  ## --- oonimeasurements --- (ALB priorities 140-143)
+  location ^~ /api/v1/measurements/ { proxy_pass http://oonimeasurements; }
+  location = /api/v1/raw_measurement { proxy_pass http://oonimeasurements; }
+  location = /api/v1/measurement_meta { proxy_pass http://oonimeasurements; }
+  location = /api/v1/measurements { proxy_pass http://oonimeasurements; }
+  location = /api/v1/torsf_stats { proxy_pass http://oonimeasurements; }
+  location = /api/v1/aggregation { proxy_pass http://oonimeasurements; }
+  location ^~ /api/v1/aggregation/ { proxy_pass http://oonimeasurements; }
+  location = /api/v1/observations { proxy_pass http://oonimeasurements; }
+  location = /api/v1/analysis { proxy_pass http://oonimeasurements; }
+  location = /api/v1/detector/changepoints { proxy_pass http://oonimeasurements; }
+{% endif %}
+
+{% if ooniapi_gateway_testlists_upstream %}
+  ## --- testlists (ALB priority 144; not yet migrated off AWS, proxied
+  ## cross-cloud until it is) ---
+  location ^~ /api/_/url-submission/test-list/ { proxy_pass https://{{ ooniapi_gateway_testlists_upstream }}; }
+  location = /api/_/url-priorities/list { proxy_pass https://{{ ooniapi_gateway_testlists_upstream }}; }
+  location = /api/_/url-priorities/update { proxy_pass https://{{ ooniapi_gateway_testlists_upstream }}; }
+  location = /api/v1/url-submission/submit { proxy_pass https://{{ ooniapi_gateway_testlists_upstream }}; }
+  location = /api/v1/url-submission/update-url { proxy_pass https://{{ ooniapi_gateway_testlists_upstream }}; }
+{% endif %}
+
+  ## --- default: everything else goes to reverseproxy, same as the ALB's
+  ## default_action. Covers legacy/unmigrated paths (oonith is NOT among
+  ## them -- it's routed by host_header on *.th.ooni.org, a hostname this
+  ## vhost doesn't answer for, so it never reaches here either way). ---
+  location / {
+    proxy_pass http://reverseproxy;
+  }
+}
+
+{% for service in service_names %}
+{% if service != 'reverseproxy' %}
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name {{ service }}.{{ ooniapi_gateway_direct_domain_suffix }};
+
+  access_log syslog:server=unix:/dev/log,tag=ooniapi-gateway,severity=info ooniapi_gateway_fmt;
+  error_log syslog:server=unix:/dev/log,tag=ooniapi-gateway,severity=info;
+
+  ssl_certificate {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/fullchain.pem;
+  ssl_certificate_key {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/privkey.pem;
+  ssl_trusted_certificate {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/chain.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+
+  proxy_http_version 1.1;
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_read_timeout 900;
+
+  location / {
+    proxy_pass http://{{ service }};
+  }
+}
+{% endif %}
+{% endfor %}
