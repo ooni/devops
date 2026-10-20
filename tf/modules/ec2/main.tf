@@ -47,7 +47,7 @@ data "cloudinit_config" "ooni_ec2" {
   part {
     filename     = "init.cfg"
     content_type = "text/cloud-config"
-    content      = templatefile("${path.module}/templates/cloud-init.yml", {})
+    content      = templatefile("${path.module}/templates/cloud-init.yml", { swap_size_mb = var.swap_size_mb })
   }
 
 }
