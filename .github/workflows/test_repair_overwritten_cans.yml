@@ -1,5 +1,5 @@
 # Test scripts/repair-overwritten-cans/repair_cans.py on a bucket damaged by the uploader as it was before
-# fix_uploader_can_overwrite: see scripts/repair-overwritten-cans/README.md
+# fix_uploader_can_overwrite, and dedupe_postcans.py: see scripts/repair-overwritten-cans/README.md
 name: test repair of overwritten cans
 on:
   pull_request:
@@ -51,6 +51,10 @@ jobs:
       - name: Damage a test bucket, repair it, compare
         run: scripts/repair-overwritten-cans/test/test_repair.sh
 
+      - name: Set aside the postcans fastpath already has, reupload the rest, verify
+        if: always()
+        run: scripts/repair-overwritten-cans/test/test_dedupe.sh
+
       - name: Keep the logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -61,3 +65,6 @@ jobs:
             scripts/repair-overwritten-cans/test/work/*.json
             scripts/repair-overwritten-cans/test/work/state
             scripts/repair-overwritten-cans/test/work/logs
+            scripts/repair-overwritten-cans/test/work/dedupe/*.log
+            scripts/repair-overwritten-cans/test/work/dedupe/*.tsv
+            scripts/repair-overwritten-cans/test/work/dedupe/state*
