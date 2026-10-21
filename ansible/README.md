@@ -25,7 +25,9 @@ ansible-galaxy install -r requirements/ansible-galaxy.yml
 ```
 
 In order to gain access to machines you will have to add your public key to the
-`ssh_users` variable inside of `ansible/group_vars/all/vars.yml`.
+`ssh_users` variable inside of `ansible/group_vars/all/vars.yml`, and your username to
+`admin_usernames` or `non_admin_usernames`. Hosts with their own lists in `host_vars/`
+(e.g. the notebook server) need you added there too.
 
 It's recommended you generate an `ed25519` key using the following command:
 ```
@@ -106,7 +108,21 @@ In general there are two classes of playbooks:
 
 Some notable playbooks or roles are:
 
-The bootstrap playbook is in `playbook-bootstrap.yml` and is a playbook that should be run once when a new host is created.
+There are two bootstrap playbooks:
+
+* `playbook-bootstrap.yml`: only for a newly created host. It logs in as root (its
+  `remote_user: root` overrides `-u`) and doesn't use `become`. On a host that is already set
+  up it fails with `root@<host>: Permission denied (publickey)`, because root isn't in `AllowUsers`.
+* `deploy-bootstrap.yml`: for hosts that are already set up, including user changes. It logs
+  in as you and uses `sudo`. To apply user changes only, someone who can already log in to the
+  host runs:
+
+  ```
+  ./play -i inventory deploy-bootstrap.yml -l <inventory name> -t ssh_users
+  ```
+
+  Add `-u <your username>` if your local username (or the `User` in `~/.ssh/config`) isn't
+  your username on the host, e.g. inside a container where you are root.
 
 The nftables firewall is configured to read every `.nft` file under
 `/etc/ooni/nftables/` and `/etc/ooni/nftables/`. This allows roles to
@@ -125,7 +141,8 @@ This can be avoided by selecting only the required tags using `-t <tagname>`.
 
 Ideally the root user should be disabled after succesfully creating user accounts. See role
 [ssh_users](https://github.com/ooni/devops/blob/main/ansible/roles/ssh_users/tasks/main.yml#L62)
-which adds AllowUsers to /etc/sshd_config.d/00-ansible_system_role.conf and disables root login.
+which writes `/etc/ssh/sshd_config` with an `AllowUsers` line listing only the host's `admin_usernames`
+and `non_admin_usernames`: root, and anyone missing from those lists, can't log in.
 
 #### Roles layout
 
