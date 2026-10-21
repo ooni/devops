@@ -1,0 +1,75 @@
+# End-to-end test of the measurement uploader (ansible/roles/fastpath/templates/ooni_api_uploader.py):
+# the fastpath image production runs, a versioned S3 (MinIO) and ClickHouse 24.8, with backlogs, failover
+# to the failed-reports bucket, the reuploader, an S3 outage and overlapping runs. See tests/uploader_e2e/README.md
+name: test uploader end to end
+on:
+  pull_request:
+    paths:
+      - "ansible/roles/fastpath/templates/ooni_api_uploader.py"
+      - "ansible/roles/fastpath/templates/api-uploader.conf"
+      - "ansible/host_vars/fastpath.prod.ooni.io/vars.yml"
+      - "tests/uploader_e2e/**"
+      - ".github/workflows/test_uploader_e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ansible/roles/fastpath/templates/ooni_api_uploader.py"
+      - "ansible/roles/fastpath/templates/api-uploader.conf"
+      - "ansible/host_vars/fastpath.prod.ooni.io/vars.yml"
+      - "tests/uploader_e2e/**"
+      - ".github/workflows/test_uploader_e2e.yml"
+  workflow_dispatch:
+
+jobs:
+  uploader-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out ooni/backend for the reuploader
+        uses: actions/checkout@v4
+        with:
+          repository: ooni/backend
+          path: backend
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the test's Python dependencies
+        run: pip install boto3 requests clickhouse-driver
+
+      - name: Build the uploader's runtime (Ubuntu 22.04 packages, as on the fastpath hosts)
+        run: docker build -t ooni-uploader-e2e -f tests/uploader_e2e/Dockerfile.uploader tests/uploader_e2e
+
+      - name: Pull the fastpath image production runs
+        run: |
+          image=$(sed -n 's/^fastpath_image: *"\(.*\)"/\1/p' ansible/host_vars/fastpath.prod.ooni.io/vars.yml)
+          docker pull "$image"
+          echo "FASTPATH_IMAGE=$image" >> "$GITHUB_ENV"
+
+      - name: Get the reuploader at master and at the version production runs
+        run: |
+          cp backend/reuploader/src/reuploader/main.py "$RUNNER_TEMP/reuploader_new.py"
+          prod_tag=$(sed -n 's/.*default_docker_image_url *= *"ooni\/reuploader:\([^"]*\)".*/\1/p' tf/environments/prod/main.tf)
+          # the image tag's commit can be on a squash-merged PR's branch only: fetch the PR heads too
+          git -C backend fetch --quiet --no-tags origin "+refs/pull/*/head:refs/remotes/origin/pr/*"
+          git -C backend show "${prod_tag##*-}:reuploader/src/reuploader/main.py" > "$RUNNER_TEMP/reuploader_prod.py"
+          echo "REUPLOADER_NEW=$RUNNER_TEMP/reuploader_new.py" >> "$GITHUB_ENV"
+          echo "REUPLOADER_OLD=$RUNNER_TEMP/reuploader_prod.py" >> "$GITHUB_ENV"
+          echo "reuploader in production: $prod_tag"
+
+      - name: Run the end-to-end test
+        run: tests/uploader_e2e/scenario.sh ci
+
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uploader-e2e-logs
+          path: |
+            tests/uploader_e2e/work/logs
+            tests/uploader_e2e/work/result-*.json
+            tests/uploader_e2e/work/ledger.tsv
