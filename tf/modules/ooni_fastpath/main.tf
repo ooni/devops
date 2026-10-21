@@ -12,13 +12,13 @@ locals {
       from_port   = 8472
       to_port     = 8472
       protocol    = "tcp"
-      cidr_blocks = local.vpc_cidrs
+      cidr_blocks = concat(local.vpc_cidrs, var.extra_ingress_cidrs)
     },
     {
       from_port   = 8475 # for serving jsonl files
       to_port     = 8475
       protocol    = "tcp"
-      cidr_blocks = local.vpc_cidrs
+      cidr_blocks = concat(local.vpc_cidrs, var.extra_ingress_cidrs)
     },
     {
       from_port   = 9100

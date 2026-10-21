@@ -5,6 +5,9 @@ data "aws_caller_identity" "current" {}
 locals {
   account_id = data.aws_caller_identity.current.account_id
   env_label  = var.environment == "prod" ? "latest" : "dev"
+
+  deploy_ecs        = contains(["ecs", "both"], var.deploy_mode)
+  deploy_blue_green = contains(["blue_green", "both"], var.deploy_mode)
 }
 
 resource "aws_iam_policy" "codebuild" {
@@ -161,6 +164,222 @@ resource "aws_codebuild_project" "ooniapi" {
   }
 }
 
+## Docker Compose blue/green deploy (deploy_mode = "blue_green" or "both")
+
+resource "aws_s3_object" "compose_file" {
+  for_each = local.deploy_blue_green ? { a = var.host_port_a, b = var.host_port_b } : {}
+
+  bucket       = var.deploy_bucket
+  key          = "${var.service_name}/${var.service_name}-${each.key}.yaml"
+  content_type = "text/plain"
+
+  content = templatefile("${path.module}/templates/compose.yaml.tftpl", {
+    service_name   = var.service_name
+    slot           = each.key
+    host_port      = each.value
+    container_port = var.container_port
+    network_name   = var.network_name
+    env_vars       = var.env_vars
+    secrets        = var.secrets
+  })
+}
+
+resource "aws_s3_object" "nginx_upstream" {
+  count = local.deploy_blue_green ? 1 : 0
+
+  bucket       = var.deploy_bucket
+  key          = "${var.service_name}/${var.service_name}-upstream.conf"
+  content_type = "text/plain"
+
+  content = templatefile("${path.module}/templates/nginx_upstream.conf.tftpl", {
+    service_name = var.service_name
+    host_port_a  = var.host_port_a
+    host_port_b  = var.host_port_b
+  })
+}
+
+resource "aws_s3_object" "deploy_script" {
+  count = local.deploy_blue_green ? 1 : 0
+
+  bucket       = var.deploy_bucket
+  key          = "${var.service_name}/deploy.py"
+  content_type = "text/x-python"
+  source       = "${path.module}/files/deploy.py"
+  etag         = filemd5("${path.module}/files/deploy.py")
+}
+
+resource "aws_iam_policy" "deploy" {
+  count = local.deploy_blue_green ? 1 : 0
+
+  description = "Policy used in trust relationship with the blue/green deploy CodeBuild project"
+  name        = "codebuild-deploy-${var.service_name}-${var.aws_region}"
+  path        = "/service-role/"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = [
+          "arn:aws:logs:${var.aws_region}:${local.account_id}:log-group:/aws/codebuild/ooniapi-${var.service_name}-deploy",
+          "arn:aws:logs:${var.aws_region}:${local.account_id}:log-group:/aws/codebuild/ooniapi-${var.service_name}-deploy:*"
+        ]
+      },
+      {
+        # required for CodeBuild to read the CodePipeline BuildArtifact
+        # (imagedefinitions.json), mirrors the grant on the build role
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:GetBucketAcl",
+          "s3:GetBucketLocation"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.codepipeline_bucket}",
+          "arn:aws:s3:::${var.codepipeline_bucket}/*"
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
+        Resource = ["arn:aws:s3:::${var.deploy_bucket}/${var.service_name}/*"]
+      },
+      {
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = [
+          var.deploy_ssh_key_secret_arn,
+          var.service_secrets_arn
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "deploy" {
+  count = local.deploy_blue_green ? 1 : 0
+
+  assume_role_policy = <<POLICY
+{
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "codebuild.amazonaws.com"
+      }
+    }
+  ],
+  "Version": "2012-10-17"
+}
+POLICY
+
+  managed_policy_arns = [
+    aws_iam_policy.deploy[0].arn,
+  ]
+  max_session_duration = "3600"
+  name                 = "codebuild-deploy-ooniapi-${var.service_name}"
+  path                 = "/service-role/"
+}
+
+resource "aws_codebuild_project" "deploy" {
+  count = local.deploy_blue_green ? 1 : 0
+
+  badge_enabled          = "false"
+  build_timeout          = "20"
+  concurrent_build_limit = "1"
+  encryption_key         = "arn:aws:kms:${var.aws_region}:${local.account_id}:alias/aws/s3"
+  name                   = "ooniapi-${var.service_name}-deploy"
+  project_visibility     = "PRIVATE"
+  queued_timeout         = "480"
+  service_role           = aws_iam_role.deploy[0].arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  cache {
+    type = "NO_CACHE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0"
+    image_pull_credentials_type = "CODEBUILD"
+    type                        = "LINUX_CONTAINER"
+
+    environment_variable {
+      name  = "SERVICE_NAME"
+      value = var.service_name
+    }
+    environment_variable {
+      name  = "HOST_PORT_A"
+      value = tostring(var.host_port_a)
+    }
+    environment_variable {
+      name  = "HOST_PORT_B"
+      value = tostring(var.host_port_b)
+    }
+    environment_variable {
+      name  = "DEPLOY_BUCKET"
+      value = var.deploy_bucket
+    }
+    environment_variable {
+      name  = "DEPLOY_HOST_PRIMARY"
+      value = var.deploy_host_primary
+    }
+    dynamic "environment_variable" {
+      for_each = var.deploy_host_secondary == null ? [] : [var.deploy_host_secondary]
+      content {
+        name  = "DEPLOY_HOST_SECONDARY"
+        value = environment_variable.value
+      }
+    }
+    environment_variable {
+      name  = "DEPLOY_SSH_USER"
+      value = var.deploy_ssh_user
+    }
+    environment_variable {
+      name  = "SERVICE_SECRETS_ARN"
+      value = var.service_secrets_arn
+    }
+    environment_variable {
+      name  = "DEPLOY_SSH_KEY_SECRET_ARN"
+      value = var.deploy_ssh_key_secret_arn
+    }
+    environment_variable {
+      name  = "HEALTH_CHECK_TIMEOUT"
+      value = tostring(var.health_check_timeout)
+    }
+    environment_variable {
+      name  = "DRAIN_TIMEOUT"
+      value = tostring(var.drain_timeout)
+    }
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      status = "ENABLED"
+    }
+
+    s3_logs {
+      encryption_disabled = "false"
+      status              = "DISABLED"
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = file("${path.module}/templates/buildspec_deploy.yml")
+  }
+}
+
 resource "aws_iam_policy" "codepipeline" {
   description = "Policy used in trust relationship with CodePipeline"
   name        = "codepipeline-ooniapi-${var.service_name}"
@@ -273,24 +492,51 @@ resource "aws_codepipeline" "ooniapi" {
   }
 
   stage {
-    action {
-      category = "Deploy"
+    name = "Deploy"
 
-      configuration = {
-        ClusterName = var.ecs_cluster_name
-        ServiceName = var.ecs_service_name
+    dynamic "action" {
+      for_each = local.deploy_ecs ? [1] : []
+
+      content {
+        category = "Deploy"
+
+        configuration = {
+          ClusterName = var.ecs_cluster_name
+          ServiceName = var.ecs_service_name
+        }
+
+        input_artifacts = ["BuildArtifact"]
+        name            = "Deploy"
+        namespace       = "DeployVariables"
+        owner           = "AWS"
+        provider        = "ECS"
+        region          = var.aws_region
+        run_order       = "1"
+        version         = "1"
       }
-
-      input_artifacts = ["BuildArtifact"]
-      name            = "Deploy"
-      namespace       = "DeployVariables"
-      owner           = "AWS"
-      provider        = "ECS"
-      region          = var.aws_region
-      run_order       = "1"
-      version         = "1"
     }
 
-    name = "Deploy"
+    dynamic "action" {
+      for_each = local.deploy_blue_green ? [1] : []
+
+      content {
+        category = "Build"
+
+        configuration = {
+          ProjectName = aws_codebuild_project.deploy[0].name
+        }
+
+        # in "both" this runs once ECS has deployed, so the hosts never get a
+        # version ECS rejected; each action needs its own name and namespace
+        input_artifacts = ["BuildArtifact"]
+        name            = local.deploy_ecs ? "DeployBlueGreen" : "Deploy"
+        namespace       = local.deploy_ecs ? "DeployBlueGreenVariables" : "DeployVariables"
+        owner           = "AWS"
+        provider        = "CodeBuild"
+        region          = var.aws_region
+        run_order       = local.deploy_ecs ? "2" : "1"
+        version         = "1"
+      }
+    }
   }
 }
