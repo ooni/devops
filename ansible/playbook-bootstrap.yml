@@ -1,5 +1,8 @@
 # This playbook is to be run on hosts that don't support bootstrapping the base
 # OS setup with something other than ansible (eg. cloud-init)
+#
+# Only for a newly created host: it logs in as root, which hosts that are already set up refuse.
+# For those, use deploy-bootstrap.yml.
 - name: Bootstrap the ssh_users on target host
   hosts: all
   remote_user: root
