@@ -125,7 +125,7 @@ ssh_users:
     comment: iMAP partners (only for training by Siti/Sinar Project)
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
-  
+
   lucasdr:
     login: lucasdr
     comment: Lucas DR
