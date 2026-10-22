@@ -1,5 +1,6 @@
-# promtool unit tests for the ClickHouse backup alerts in alert_rules.yml. Test time starts at 0
-# (1970-01-01), so a timestamp N days before the test starts is -N * 86400.
+# promtool unit tests for the ClickHouse backup alerts in alert_rules.yml, and for the backup file's
+# exclusion from TextfileJam. Test time starts at 0 (1970-01-01), so a timestamp N days before the test
+# starts is -N * 86400.
 rule_files: [alert_rules.yml]
 evaluation_interval: 1m
 tests:
@@ -76,3 +77,41 @@ tests:
           - exp_labels: {instance: data3.htz-fsn.prod.ooni.nu}
             exp_annotations:
               summary: 'No ClickHouse backup results from data3.htz-fsn.prod.ooni.nu for over a week'
+
+  # HostLoadHigh: data3's 8 CPUs with a load of 5
+  - interval: 1m
+    input_series:
+      - {series: 'node_load5{instance="data3.htz-fsn.prod.ooni.nu"}', values: '5x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="0", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="1", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="2", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="3", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="4", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="5", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="6", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="7", mode="idle"}', values: '0+1x60'}
+    alert_rule_test:
+      - {eval_time: 10m, alertname: ClickHouseBackupHostLoadHigh, exp_alerts: []}
+      - eval_time: 20m
+        alertname: ClickHouseBackupHostLoadHigh
+        exp_alerts:
+          - exp_labels: {instance: data3.htz-fsn.prod.ooni.nu}
+            exp_annotations:
+              summary: 'data3 load is 62.5% of its CPUs'
+              description: 'If a backup is running (ooni_clickhouse_backup_running on data3), lower clickhouse_backup_max_bandwidth; otherwise check merges and queries.'
+
+  # TextfileJam leaves out the backup's file, which changes only once a week. node_exporter's file label
+  # is the file's full path.
+  - interval: 1m
+    input_series:
+      - {series: 'node_time{instance="data3", job="node"}', values: '0+60x240'}
+      - {series: 'node_textfile_mtime{instance="data3", job="node", file="/var/lib/node_exporter/textfile_collector/ooni_clickhouse_backup.prom"}', values: '0x240'}
+      - {series: 'node_textfile_mtime{instance="data3", job="node", file="/var/lib/node_exporter/textfile_collector/other.prom"}', values: '0x240'}
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: TextfileJam
+        exp_alerts:
+          - exp_labels: {instance: data3, job: node, file: /var/lib/node_exporter/textfile_collector/other.prom}
+            exp_annotations:
+              summary: 'Stale `textfile` at data3'
+              description: '`/var/lib/node_exporter/textfile_collector/other.prom` is 3h old.'

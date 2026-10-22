@@ -102,7 +102,7 @@ groups:
   # all the textfile are updated at least hourly, except the ClickHouse
   # backup results, which change after each backup (see ClickHouseBackupStale)
   - alert: TextfileJam
-    expr: (node_textfile_mtime{file!~"ooni_clickhouse_backup.*"} - ON(instance,job) GROUP_LEFT() node_time) / -3600 > 2
+    expr: (node_textfile_mtime{file!~".*/ooni_clickhouse_backup\\.prom"} - ON(instance,job) GROUP_LEFT() node_time) / -3600 > 2
     annotations:
       summary: 'Stale `textfile` at {{ $labels.instance }}'
       description: '`{{ $labels.file }}` is {{ printf "%.0f" $value }}h old.'
@@ -197,5 +197,5 @@ groups:
     for: 15m
     annotations:
       summary: 'data3 load is {{ $value | humanizePercentage }} of its CPUs'
-      description: 'Backup running: check ooni_clickhouse_backup_running on data3.'
+      description: 'If a backup is running (ooni_clickhouse_backup_running on data3), lower clickhouse_backup_max_bandwidth; otherwise check merges and queries.'
 ...
