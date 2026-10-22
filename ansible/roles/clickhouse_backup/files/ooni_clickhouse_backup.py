@@ -206,7 +206,12 @@ class Store:
         for page in pager.paginate(Bucket=self.bucket, Prefix=prefix):
             keys = [{"Key": o["Key"]} for o in page.get("Contents", [])]
             if keys:
-                self.s3.delete_objects(Bucket=self.bucket, Delete={"Objects": keys, "Quiet": True})
+                resp = self.s3.delete_objects(Bucket=self.bucket, Delete={"Objects": keys, "Quiet": True})
+                # a 200 response can still list keys it didn't delete
+                errors = resp.get("Errors", [])
+                if errors:
+                    e = errors[0]
+                    raise RuntimeError(f"{len(errors)} objects not deleted under {prefix}, e.g. {e.get('Key')}: {e.get('Code')} {e.get('Message')}")
                 n += len(keys)
         return n
 
@@ -233,6 +238,8 @@ def write_atomically(path: str, text: str) -> None:
     tmp = f"{path}.{os.getpid()}.tmp"
     with open(tmp, "w") as f:
         f.write(text)
+        f.flush()
+        os.fsync(f.fileno())  # or a power loss can leave an empty file behind
     os.chmod(tmp, 0o644)
     os.replace(tmp, path)
 
@@ -276,8 +283,12 @@ class Metrics:
         self.state_file = state_file
         self.state = {"tables": {}, "running": {}}
         if state_file and os.path.exists(state_file):
-            with open(state_file) as f:
-                self.state = json.load(f)
+            try:
+                with open(state_file) as f:
+                    self.state = json.load(f)
+            except ValueError as e:
+                # the results are rebuilt as tables are backed up again
+                log.warning(f"{state_file} is unreadable ({e}), starting from no results")
         self.state.setdefault("runs", {})
         self.state.setdefault("running_since", {})
 
@@ -463,7 +474,9 @@ class BackupJob:
         rows = self.ch.rows(
             "SELECT id, name FROM system.backups WHERE status = 'CREATING_BACKUP'"
         )
-        return [r for r in rows if self.store.ch_base in r["name"]]
+        # this job's bucket and prefix only: one bucket's name can begin another's
+        ours = f"{self.store.ch_base}/{self.store.prefix}/"
+        return [r for r in rows if ours in r["name"]]
 
     def wait_for_clickhouse(self) -> None:
         """At boot a missed run starts before ClickHouse accepts queries"""
@@ -564,6 +577,7 @@ class BackupJob:
                 INSERT INTO FUNCTION s3({self.store.ch_s3(key + "/data.native.zst")}, 'Native')
                 SELECT * FROM `{self.db}`.`{table}`
                 """,
+                settings=self.settings,  # R2 needs equal upload parts here too
                 timeout=3600,
             )
 

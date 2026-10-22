@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import tempfile
+import types
 import unittest
 import urllib.error
 from unittest import mock
@@ -119,6 +120,36 @@ class TestForget(unittest.TestCase):
         self.assertIn("data1/labeling_frames", self.tables())
         j.run([], False, "")
         self.assertNotIn("data1/labeling_frames", self.tables())
+
+
+class TestStoreAndState(unittest.TestCase):
+    def test_only_this_buckets_running_backups(self):
+        j = job()
+        j.store = types.SimpleNamespace(ch_base="https://r2.example/ooni-clickhouse-backup", prefix="prod")
+        j.ch = types.SimpleNamespace(rows=lambda sql: [
+            {"id": "1", "name": "S3('https://r2.example/ooni-clickhouse-backup-private/prod/ooni/msmt_feedback/a/b')"},
+            {"id": "2", "name": "S3('https://r2.example/ooni-clickhouse-backup/prod/ooni/fastpath/a/b')"},
+        ])
+        self.assertEqual([r["id"] for r in j.running_backups()], ["2"])
+
+    def test_objects_not_deleted_are_an_error(self):
+        store = backup.Store.__new__(backup.Store)
+        store.bucket, store.prefix = "b", "prod"
+        store.s3 = types.SimpleNamespace(
+            get_paginator=lambda name: types.SimpleNamespace(paginate=lambda **kw: [{"Contents": [{"Key": "prod/ooni/t/c/x"}]}]),
+            delete_objects=lambda **kw: {"Errors": [{"Key": "prod/ooni/t/c/x", "Code": "AccessDenied", "Message": "no"}]},
+        )
+        with self.assertRaisesRegex(RuntimeError, "1 objects not deleted"):
+            store.delete_prefix("prod/ooni/t/c/")
+
+    def test_an_unreadable_state_file_starts_empty(self):
+        d = tempfile.mkdtemp()
+        state = os.path.join(d, "state.json")
+        with open(state, "w") as f:
+            f.write("")  # e.g. truncated by a power loss
+        m = backup.Metrics(os.path.join(d, "out.prom"), state)
+        m.job_running("measurements", True)
+        self.assertEqual(m.state["running"], {"measurements": 1})
 
 
 class TestClickHouseErrors(unittest.TestCase):
