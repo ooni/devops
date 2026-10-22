@@ -1,7 +1,9 @@
-# promtool unit tests for the ClickHouse backup alerts in alert_rules.yml
+# promtool unit tests for the ClickHouse backup alerts in alert_rules.yml. Test time starts at 0
+# (1970-01-01), so a timestamp N days before the test starts is -N * 86400.
 rule_files: [alert_rules.yml]
 evaluation_interval: 1m
 tests:
+  # Completed and Failed
   - interval: 1m
     input_series:
       # measurements finished at t=0 after 30 min, all 14 tables backed up, 1 in full
@@ -10,17 +12,11 @@ tests:
       - {series: 'ooni_clickhouse_backup_last_run_failed_tables{instance="data3", backup="measurements"}', values: '0x180'}
       - {series: 'ooni_clickhouse_backup_last_run_tables{instance="data3", backup="measurements"}', values: '14x180'}
       - {series: 'ooni_clickhouse_backup_last_run_full_backups{instance="data3", backup="measurements"}', values: '1x180'}
-      # private finished at the same time with a table failed: fastpath, last backed up 9 days ago.
-      # Test time starts at 0 (1970-01-01), so a timestamp 9 days before it is -9 * 86400.
+      # private finished at the same time, with fastpath failed
       - {series: 'ooni_clickhouse_backup_last_run_finished_timestamp_seconds{instance="data3", backup="private"}', values: '0x180'}
       - {series: 'ooni_clickhouse_backup_last_run_duration_seconds{instance="data3", backup="private"}', values: '60x180'}
       - {series: 'ooni_clickhouse_backup_last_run_failed_tables{instance="data3", backup="private"}', values: '1x180'}
       - {series: 'ooni_clickhouse_backup_last_attempt_failed{instance="data3", backup="private", table="fastpath"}', values: '1x180'}
-      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="data3", backup="private", table="fastpath"}', values: '-777600x180'}
-      - {series: 'ooni_clickhouse_backup_running{instance="data3", backup="private"}', values: '0x180'}
-      # measurements' obs_web was also last backed up 9 days ago, but its job is still running
-      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="data3", backup="measurements", table="obs_web"}', values: '-777600x180'}
-      - {series: 'ooni_clickhouse_backup_running{instance="data3", backup="measurements"}', values: '1x180'}
     alert_rule_test:
       - eval_time: 10m
         alertname: ClickHouseBackupCompleted
@@ -40,10 +36,30 @@ tests:
             exp_annotations:
               summary: 'ClickHouse backup of fastpath (private) failed on data3'
               description: 'Nothing was deleted: the older backups of fastpath are kept. The next run retries it. See `journalctl --identifier ooni-clickhouse-backup` on data3.'
+
+  # Stale: after 8 days, unless a job on the same host is in a run started in the last 5 days
+  - interval: 1m
+    input_series:
+      # data1: nothing running; one table backed up 9 days ago, one 7 days ago
+      - {series: 'ooni_clickhouse_backup_running_since_timestamp_seconds{instance="data1", backup="data1"}', values: '0x30'}
+      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="data1", backup="data1", table="nine_days"}', values: '-777600x30'}
+      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="data1", backup="data1", table="seven_days"}', values: '-604800x30'}
+      # data3: measurements' monthly full started 2 days ago; private, waiting behind it, last ran 9 days ago
+      - {series: 'ooni_clickhouse_backup_running_since_timestamp_seconds{instance="data3", backup="measurements"}', values: '-172800x30'}
+      - {series: 'ooni_clickhouse_backup_running_since_timestamp_seconds{instance="data3", backup="private"}', values: '0x30'}
+      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="data3", backup="private", table="msmt_feedback"}', values: '-777600x30'}
+      # stuck: a run that "started" 6 days ago, after the script was killed; its table is 9 days old
+      - {series: 'ooni_clickhouse_backup_running_since_timestamp_seconds{instance="stuck", backup="measurements"}', values: '-518400x30'}
+      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="stuck", backup="measurements", table="fastpath"}', values: '-777600x30'}
+    alert_rule_test:
       - eval_time: 10m
         alertname: ClickHouseBackupStale
         exp_alerts:
-          - exp_labels: {instance: data3, backup: private, table: fastpath}
+          - exp_labels: {instance: data1, backup: data1, table: nine_days}
             exp_annotations:
-              summary: 'No ClickHouse backup of fastpath (private) for 9d 0h 10m 0s'
-              description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on data3.'
+              summary: 'No ClickHouse backup of nine_days (data1) for 9d 0h 10m 0s'
+              description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on data1.'
+          - exp_labels: {instance: stuck, backup: measurements, table: fastpath}
+            exp_annotations:
+              summary: 'No ClickHouse backup of fastpath (measurements) for 9d 0h 10m 0s'
+              description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on stuck.'

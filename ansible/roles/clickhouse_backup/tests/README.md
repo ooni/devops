@@ -8,6 +8,7 @@
 - `test_schedule.py`: which runs start a full backup and what gets pruned,
   over months of daily and weekly runs with failures, ClickHouse and the
   bucket stubbed.
+- `test_job.py`: how a job runs and what it reports, ClickHouse stubbed.
 - `test_e2e.py`: the real thing, in the containers of `compose.yml`:
   ClickHouse at production's version, MinIO standing in for R2, the script
   on Debian bookworm with its python3-boto3, as on the hosts, node_exporter,

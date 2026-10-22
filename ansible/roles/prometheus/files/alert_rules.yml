@@ -169,12 +169,14 @@ groups:
       description: 'Tables backed up: {{ with printf `ooni_clickhouse_backup_last_run_tables{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }}, in full: {{ with printf `ooni_clickhouse_backup_last_run_full_backups{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }}. Nothing to do.'
 
   # Backups run weekly, so a table's last one is normally up to a week old. Not
-  # while its job runs: on the first Sunday of a month the full backups take
-  # more than a day, and the largest tables come last.
+  # while any job on the host is in a run that started in the last 5 days: on
+  # the first Sunday of a month the full backups take more than a day, and the
+  # jobs run one after the other. A run older than that is stuck (e.g. the
+  # script was killed and left running at 1), and no longer holds the alert back.
   - alert: ClickHouseBackupStale
     expr: |
       time() - ooni_clickhouse_backup_last_success_timestamp_seconds > 8 * 86400
-        and on (instance, backup) ooni_clickhouse_backup_running == 0
+        unless on (instance) (time() - (ooni_clickhouse_backup_running_since_timestamp_seconds != 0) < 5 * 86400)
     annotations:
       summary: 'No ClickHouse backup of {{ $labels.table }} ({{ $labels.backup }}) for {{ $value | humanizeDuration }}'
       description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on {{ $labels.instance }}.'

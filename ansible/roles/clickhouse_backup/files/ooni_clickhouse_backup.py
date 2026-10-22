@@ -279,6 +279,7 @@ class Metrics:
             with open(state_file) as f:
                 self.state = json.load(f)
         self.state.setdefault("runs", {})
+        self.state.setdefault("running_since", {})
 
     def table_result(self, job: str, table: str, ok: bool, st: dict = None, duration_s: float = 0) -> None:
         entry = self.state["tables"].setdefault(f"{job}/{table}", {"job": job, "table": table})
@@ -294,6 +295,7 @@ class Metrics:
 
     def job_running(self, job: str, running: bool) -> None:
         self.state["running"][job] = 1 if running else 0
+        self.state["running_since"][job] = time.time() if running else 0
         self.save()
 
     def run_result(self, job: str, duration_s: float, tables: int, fulls: int, failed: int) -> None:
@@ -311,6 +313,12 @@ class Metrics:
         ]
         for job, v in sorted(self.state["running"].items()):
             lines.append(f'{p}running{{backup="{label_value(job)}"}} {v}')
+        lines += [
+            f"# HELP {p}running_since_timestamp_seconds When the job's current run started, 0 if none",
+            f"# TYPE {p}running_since_timestamp_seconds gauge",
+        ]
+        for job, v in sorted(self.state["running_since"].items()):
+            lines.append(f'{p}running_since_timestamp_seconds{{backup="{label_value(job)}"}} {v}')
         for name, field, help_ in self.RUN_GAUGES:
             lines += [f"# HELP {p}{name} {help_}", f"# TYPE {p}{name} gauge"]
             for job, run in sorted(self.state["runs"].items()):

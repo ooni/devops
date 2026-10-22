@@ -267,7 +267,7 @@ Alerts, in `alert_rules.yml`:
 - `ClickHouseBackupCompleted`: a job's run backed up every table. One Slack
   message per run in `#ooni-bots`, no email.
 - `ClickHouseBackupStale`: a table hasn't been backed up for 8 days (backups
-  are weekly), and its job isn't running.
+  are weekly), and no job on its host is in a run started in the last 5 days.
 - `ClickHouseBackupMissing`: data1 or data3 hasn't written results for a day.
 - `ClickHouseBackupHostLoadHigh`: data3's 5-minute load is over half its
   CPUs for 15 minutes.

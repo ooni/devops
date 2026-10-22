@@ -26,7 +26,7 @@ route "alertname=ClickHouseBackupCompleted instance=data3 backup=measurements" s
 route "alertname=ClickHouseBackupFailed instance=data3 backup=measurements table=fastpath" team-all
 
 echo "== schedule"
-python3 -m unittest test_schedule
+python3 -m unittest test_schedule test_job
 
 echo "== end to end"
 [ -n "${KEEP:-}" ] || trap 'compose down -v --remove-orphans >/dev/null 2>&1' EXIT
