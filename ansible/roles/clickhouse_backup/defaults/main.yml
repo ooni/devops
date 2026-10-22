@@ -58,7 +58,6 @@ clickhouse_backup_max_bandwidth: 50000000
 clickhouse_backup_exclude_tables:
   - "*_tmp"               # updater staging tables
   - msmt_feedback_old
-  - fastpath_tuning       # experiment on data2
 
 # Results for Prometheus, read by node_exporter's textfile collector
 # (node_exporter_textfile_dir in the prometheus_node_exporter role)
