@@ -298,6 +298,14 @@ class Metrics:
         self.state["running_since"][job] = time.time() if running else 0
         self.save()
 
+    def job_failed(self, job: str) -> None:
+        """The job couldn't start: its tables' last attempts failed"""
+        for entry in self.state["tables"].values():
+            if entry["job"] == job:
+                entry["last_attempt"] = time.time()
+                entry["last_failed"] = 1
+        self.save()
+
     def run_result(self, job: str, duration_s: float, tables: int, fulls: int, failed: int) -> None:
         self.state["runs"][job] = {
             "finished": time.time(), "duration": round(duration_s, 1),
@@ -371,6 +379,7 @@ class BackupJob:
         self.include = conf.get("include_tables", [])
         self.exclude = conf.get("exclude_tables", [])
         self.poll_s = float(conf.get("poll_interval_seconds", 30))
+        self.clickhouse_wait_s = float(conf.get("clickhouse_wait_seconds", 600))
         # Query settings for the uploads, e.g. R2 needs every part of a
         # multipart upload but the last to be the same size
         self.settings = {k: str(v) for k, v in conf.get("s3_settings", {}).items()}
@@ -435,16 +444,41 @@ class BackupJob:
         )
         return [r for r in rows if self.store.ch_base in r["name"]]
 
+    def wait_for_clickhouse(self) -> None:
+        """At boot a missed run starts before ClickHouse accepts queries"""
+        t0 = time.monotonic()
+        while True:
+            try:
+                self.ch.query("SELECT 1", timeout=30)
+                return
+            except (OSError, RuntimeError) as e:
+                if time.monotonic() - t0 >= self.clickhouse_wait_s:
+                    raise RuntimeError(f"ClickHouse not answering after {self.clickhouse_wait_s:.0f}s: {e}")
+                log.info(f"waiting for ClickHouse: {e}")
+                time.sleep(10)
+
     def wait(self, op_id: str, what: str) -> dict:
         t0 = time.monotonic()
         last_log = t0
+        failing_since = None
         while True:
-            rows = self.ch.rows(
-                f"""
-                SELECT status, error, num_files, total_size, uncompressed_size
-                FROM system.backups WHERE id = {sql_str(op_id)}
-                """
-            )
+            # A backup can run for days: retry a failed poll for a while
+            # rather than give up on a BACKUP that is still running
+            try:
+                rows = self.ch.rows(
+                    f"""
+                    SELECT status, error, num_files, total_size, uncompressed_size
+                    FROM system.backups WHERE id = {sql_str(op_id)}
+                    """
+                )
+                failing_since = None
+            except (OSError, RuntimeError) as e:
+                failing_since = failing_since or time.monotonic()
+                if time.monotonic() - failing_since > 600:
+                    raise
+                log.warning(f"{what}: polling failed, retrying: {e}")
+                time.sleep(self.poll_s)
+                continue
             if not rows:
                 raise RuntimeError(f"{what}: gone from system.backups (server restart?)")
             st = rows[0]
@@ -537,14 +571,19 @@ class BackupJob:
         return full
 
     def run(self, only: list, force_full: bool, keep: str) -> int:
-        running = self.running_backups()
-        if running:
-            for r in running:
-                log.error(f"backup {r['id']} is still running on the server")
-            log.error("not starting: wait for it to finish, or for the server to drop it")
+        try:
+            self.wait_for_clickhouse()
+            running = self.running_backups()
+            if running:
+                for r in running:
+                    log.error(f"backup {r['id']} is still running on the server")
+                raise RuntimeError("not starting: wait for it to finish, or for the server to drop it")
+            tables, failed = self.tables(only)
+        except Exception as e:
+            log.error(f"{self.name}: could not start: {e}")
+            self.metrics.job_failed(self.name)
             return 1
 
-        tables, failed = self.tables(only)
         t0, done, fulls = time.monotonic(), 0, 0
         self.metrics.job_running(self.name, True)
         try:

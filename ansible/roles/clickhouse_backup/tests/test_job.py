@@ -6,6 +6,7 @@ import os
 import tempfile
 import unittest
 import urllib.error
+from unittest import mock
 
 spec = importlib.util.spec_from_file_location(
     "backup", os.path.join(os.path.dirname(__file__), "..", "files", "ooni_clickhouse_backup.py")
@@ -73,6 +74,34 @@ class TestRunTable(unittest.TestCase):
     def test_tables_no_job_backs_up(self):
         jobs = [job("private", include=["msmt_feedback"])]
         self.assertEqual(backup.jobs_for_tables(jobs, ["fastpath"]), ([], ["fastpath"]))
+
+
+class TestClickHouseErrors(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.mkdtemp()
+        self.metrics = backup.Metrics(os.path.join(d, "out.prom"), os.path.join(d, "state.json"))
+
+    def test_waits_for_clickhouse_at_start(self):
+        j = job(metrics=self.metrics, ch=FlakyClickHouse(failures=2))
+        j.clickhouse_wait_s = 60
+        with mock.patch.object(backup.time, "sleep"):
+            j.wait_for_clickhouse()
+        self.assertEqual(j.ch.calls, 3)
+
+    def test_a_job_that_cant_start_marks_its_tables_failed(self):
+        self.metrics.table_result("measurements", "fastpath", True, {"total_size": 1, "num_files": 1})
+        self.metrics.table_result("private", "msmt_feedback", True, {"total_size": 1, "num_files": 1})
+        j = job(metrics=self.metrics, ch=FlakyClickHouse(failures=1000))
+        self.assertEqual(j.run([], False, ""), 1)
+        tables = self.metrics.state["tables"]
+        self.assertEqual(tables["measurements/fastpath"]["last_failed"], 1)
+        self.assertEqual(tables["private/msmt_feedback"]["last_failed"], 0, "another job's table")
+        self.assertNotIn("measurements", self.metrics.state["runs"], "no completed run to report")
+
+    def test_a_failed_poll_is_retried(self):
+        j = job(ch=FlakyClickHouse(failures=2))
+        self.assertEqual(j.wait("op", "obs_web")["status"], "BACKUP_CREATED")
+        self.assertEqual(j.ch.calls, 3)
 
 
 if __name__ == "__main__":
