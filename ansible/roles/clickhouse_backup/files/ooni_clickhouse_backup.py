@@ -559,6 +559,9 @@ class BackupJob:
         return 0
 
     def list(self, only: list) -> int:
+        # The listing is the command's output, so it goes to stdout with
+        # print(), to be read or piped (e.g. the latest: URL into a RESTORE);
+        # log is for what run and release report, to stderr and the journal.
         tables = only or sorted(
             n for n in self.store.subdirs(f"{self.store.prefix}/{self.db}/") if n
         )
