@@ -166,7 +166,7 @@ groups:
         and on (instance, backup) ooni_clickhouse_backup_last_run_failed_tables == 0
     annotations:
       summary: 'ClickHouse backup {{ $labels.backup }} on {{ $labels.instance }} completed in {{ $value | humanizeDuration }}'
-      description: '{{ with printf `ooni_clickhouse_backup_last_run_tables{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }} tables backed up, {{ with printf `ooni_clickhouse_backup_last_run_full_backups{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }} of them in full. Nothing to do.'
+      description: 'Tables backed up: {{ with printf `ooni_clickhouse_backup_last_run_tables{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }}, in full: {{ with printf `ooni_clickhouse_backup_last_run_full_backups{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }}. Nothing to do.'
 
   # Backups run daily; a new full backup of obs_web can take a day and a half
   - alert: ClickHouseBackupStale
