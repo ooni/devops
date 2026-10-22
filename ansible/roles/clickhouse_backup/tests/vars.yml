@@ -1,0 +1,38 @@
+# Role variables for the test environment in compose.yml, with data3's two
+# jobs: the measurement tables and the private tables, each in its own bucket.
+clickhouse_admin_user: admin
+clickhouse_admin_password: admin
+clickhouse_backup_clickhouse_url: http://clickhouse:8123/
+clickhouse_backup_s3_endpoint: http://minio:9000
+clickhouse_backup_s3_access_key_id: testkey
+clickhouse_backup_s3_secret_access_key: testsecret123
+
+test_jobs:
+  - name: measurements
+    s3_bucket: ooni-clickhouse-backup
+    include_tables: ["*"]
+    exclude_tables: [msmt_feedback, labeling_frames]
+  - name: private
+    s3_bucket: ooni-clickhouse-backup-private
+    include_tables: [msmt_feedback]
+    exclude_tables: []
+
+# data1 backs up its own labeling_frames
+clickhouse_backup_backed_up_elsewhere: [labeling_frames]
+
+# One script config per entry, in work/<name>.json
+test_configs:
+  - name: backup  # as deployed on data3
+    bandwidth: 0
+    jobs: "{{ test_jobs }}"
+    check_cluster: test_cluster
+  - name: slow  # ~1 MB/s, so a full backup can be interrupted
+    bandwidth: 3000000
+    jobs: "{{ test_jobs }}"
+  - name: broken  # its bucket doesn't exist, so every backup fails
+    bandwidth: 0
+    jobs:
+      - name: broken
+        s3_bucket: no-such-bucket
+        include_tables: [labeling_frames]
+        exclude_tables: []
