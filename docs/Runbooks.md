@@ -195,10 +195,10 @@ When a data1-only table becomes replicated, remove it from
 `clickhouse_backup_data1_tables` and data3 picks it up.
 
 - `ooni-clickhouse-backup.timer` runs `/usr/local/bin/ooni-clickhouse-backup run`
-  daily at 02:30 UTC.
-- Each table has its own chain: a full backup, then daily incrementals. A
-  table starts a new chain with its first backup of each calendar month
-  (UTC), which is the first Sunday of the month if the timer runs weekly.
+  weekly, on Sundays at 02:30 UTC (`clickhouse_backup_on_calendar`).
+- Each table has its own chain: a full backup, then weekly incrementals, each
+  on top of the one before. A table starts a new chain with its first backup
+  of each calendar month (UTC): the first Sunday of the month.
   Once a new chain is complete, older chains are deleted unless pinned.
 - EmbeddedRocksDB and Join tables (`test_groups`): `BACKUP` saves only their
   schema, so their rows are also exported to `data.native.zst` inside each
@@ -215,8 +215,7 @@ When a data1-only table becomes replicated, remove it from
 - Bandwidth is capped with `clickhouse_backup_max_bandwidth`, at 50 MB/s. A
   new full backup of everything (~5.6 TB) takes about 31 hours at that rate.
   Against MinIO in testing, 24.8 uploaded at only about a third of the cap,
-  which would make it about 4 days, longer than `ClickHouseBackupStale`'s 3:
-  check the rate of the first backups
+  which would make it about 4 days: check the rate of the first backups
   (`ooni_clickhouse_backup_last_size_bytes / ooni_clickhouse_backup_last_duration_seconds`)
   and raise the cap if they're that slow.
 
@@ -248,9 +247,10 @@ without a restart.
    ./play -i inventory deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu,data3.htz-fsn.prod.ooni.nu -t clickhouse_backup --diff
    ```
    and the alert rules with `deploy-monitoring.yml`.
-4. The timer takes the first (full) backup at its next 02:30 UTC. A full
-   backup of everything takes about 39 hours, so to have it run over a
-   weekend, deploy on Friday after 02:30 UTC. To start one now instead:
+4. The timer takes the first (full) backup at its next run, on Sunday at
+   02:30 UTC. A full backup of everything takes about 31 hours, or longer if
+   the upload rate is below the cap. To start it on deploy day instead, e.g. a
+   Friday so that it runs over the weekend:
    ```bash
    sudo systemctl start --no-block ooni-clickhouse-backup.service
    sudo journalctl -f --identifier ooni-clickhouse-backup

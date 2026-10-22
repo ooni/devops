@@ -7,10 +7,10 @@
 
 # false stops and disables the timer, e.g. while upgrading the cluster
 clickhouse_backup_enabled: true
-# Daily, at a quiet time (UTC). A run backs up every job's tables, one job
-# after the other; a run still going (a new full backup of obs_web takes
-# more than a day) delays the next one instead of overlapping it.
-clickhouse_backup_on_calendar: "*-*-* 02:30:00"
+# Weekly, on Sundays at a quiet time (UTC): a full backup of everything takes
+# more than a day. A run backs up every job's tables, one job after the other;
+# a run still going delays the next one instead of overlapping it.
+clickhouse_backup_on_calendar: "Sun *-*-* 02:30:00"
 
 clickhouse_backup_database: ooni
 clickhouse_backup_clickhouse_url: "http://127.0.0.1:8123/"
