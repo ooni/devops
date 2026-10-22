@@ -602,6 +602,13 @@ class BackupJob:
         return 0
 
 
+def jobs_for_tables(jobs: list, tables: list) -> tuple:
+    """(the jobs that back up one of tables, the tables no job backs up)"""
+    owns = lambda j, t: j.includes(t) and not j.excludes(t)
+    orphans = [t for t in tables if not any(owns(j, t) for j in jobs)]
+    return [j for j in jobs if any(owns(j, t) for t in tables)], orphans
+
+
 def job_confs(conf: dict, names: list) -> list:
     """Each job's config: the top-level keys, overridden by the job's own.
 
@@ -655,8 +662,9 @@ def main() -> int:
             job.list(args.table)
         return 0
 
-    if args.command == "run":
-        orphans = [t for t in args.table if not any(j.includes(t) and not j.excludes(t) for j in jobs)]
+    if args.command == "run" and args.table:
+        # only these tables' jobs: the others would run with no tables, and report that
+        jobs, orphans = jobs_for_tables(jobs, args.table)
         if orphans:
             ap.error(f"no job backs up: {', '.join(orphans)}")
 

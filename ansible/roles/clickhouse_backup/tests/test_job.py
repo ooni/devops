@@ -63,5 +63,17 @@ class TestRunningSince(unittest.TestCase):
         self.assertIn("measurements", m.state["running_since"])
 
 
+class TestRunTable(unittest.TestCase):
+    def test_only_the_jobs_that_back_up_the_tables(self):
+        jobs = [job("measurements", exclude=["msmt_feedback"]), job("private", include=["msmt_feedback"])]
+        selected, orphans = backup.jobs_for_tables(jobs, ["msmt_feedback"])
+        self.assertEqual([j.name for j in selected], ["private"])
+        self.assertEqual(orphans, [])
+
+    def test_tables_no_job_backs_up(self):
+        jobs = [job("private", include=["msmt_feedback"])]
+        self.assertEqual(backup.jobs_for_tables(jobs, ["fastpath"]), ([], ["fastpath"]))
+
+
 if __name__ == "__main__":
     unittest.main()
