@@ -56,9 +56,21 @@ clickhouse_backup_max_bandwidth: 50000000
 
 # fnmatch patterns, for every job. Materialized views' .inner tables are
 # always skipped: they're backed up with their view.
+# Tables that are never backed up, for every job, and why
 clickhouse_backup_exclude_tables:
   - "*_tmp"               # updater staging tables
   - msmt_feedback_old
+  - fingerprints_dns      # the hourly fingerprints updater rebuilds them
+  - fingerprints_http
+  - session_expunge       # empty, no longer used (backend #972)
+
+# The cluster whose tables are checked after each run: any table on any of its
+# nodes that no job here backs up, that isn't excluded above and that isn't in
+# clickhouse_backup_backed_up_elsewhere is reported (ClickHouseTableNotBackedUp).
+# Set on one host, the one taking most backups; empty checks nothing.
+clickhouse_backup_check_cluster: ""
+# fnmatch patterns of the tables another host backs up
+clickhouse_backup_backed_up_elsewhere: []
 
 # Results for Prometheus, read by node_exporter's textfile collector
 # (node_exporter_textfile_dir in the prometheus_node_exporter role)

@@ -153,6 +153,32 @@ class TestStoreAndState(unittest.TestCase):
         self.assertEqual(m.state["running"], {"measurements": 1})
 
 
+class TestNotBackedUp(unittest.TestCase):
+    def test_tables_no_job_covers(self):
+        jobs = [job("measurements", include=["*"], exclude=["msmt_feedback", "labeling_frames", "*_tmp"]),
+                job("private", include=["msmt_feedback"])]
+        tables = {
+            "fastpath": ["data1", "data2", "data3"],         # replicated: measurements
+            "msmt_feedback": ["data1", "data2", "data3"],    # private
+            "labeling_frames": ["data1", "data2", "data3"],  # data1 backs it up
+            "asnmeta_tmp": ["data1"],                         # excluded
+            "fingerprints_dns": ["data1", "data2"],           # excluded: rebuilt hourly
+            "made_on_data1": ["data1"],                       # nothing: data3 doesn't have it
+        }
+        missing = backup.not_backed_up(tables, "data3", jobs, ["*_tmp", "fingerprints_*"], ["labeling_frames"])
+        self.assertEqual(missing, {"made_on_data1": ["data1"]})
+
+    def test_the_metric_names_the_table_and_its_hosts(self):
+        d = tempfile.mkdtemp()
+        m = backup.Metrics(os.path.join(d, "out.prom"), os.path.join(d, "state.json"))
+        m.not_backed_up({"made_on_data1": ["data2", "data1"]})
+        with open(m.metrics_file) as f:
+            self.assertIn('ooni_clickhouse_backup_table_not_backed_up{table="made_on_data1",hosts="data1,data2"} 1', f.read())
+        m.not_backed_up({})
+        with open(m.metrics_file) as f:
+            self.assertNotIn("made_on_data1", f.read())
+
+
 class TestClickHouseErrors(unittest.TestCase):
     def setUp(self):
         d = tempfile.mkdtemp()

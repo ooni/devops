@@ -291,6 +291,7 @@ class Metrics:
                 log.warning(f"{state_file} is unreadable ({e}), starting from no results")
         self.state.setdefault("runs", {})
         self.state.setdefault("running_since", {})
+        self.state.setdefault("not_backed_up", {})
 
     def table_result(self, job: str, table: str, ok: bool, st: dict = None, duration_s: float = 0) -> None:
         entry = self.state["tables"].setdefault(f"{job}/{table}", {"job": job, "table": table})
@@ -337,6 +338,11 @@ class Metrics:
                 del self.state[part][job]
         self.save()
 
+    def not_backed_up(self, tables: dict) -> None:
+        """{table: [hosts]} of the cluster's tables that no backup covers"""
+        self.state["not_backed_up"] = tables
+        self.save()
+
     def run_result(self, job: str, duration_s: float, tables: int, fulls: int, failed: int) -> None:
         self.state["runs"][job] = {
             "finished": time.time(), "duration": round(duration_s, 1),
@@ -362,6 +368,13 @@ class Metrics:
             lines += [f"# HELP {p}{name} {help_}", f"# TYPE {p}{name} gauge"]
             for job, run in sorted(self.state["runs"].items()):
                 lines.append(f'{p}{name}{{backup="{label_value(job)}"}} {run[field]}')
+        lines += [
+            f"# HELP {p}table_not_backed_up 1 for a table on the cluster that no backup job covers or excludes",
+            f"# TYPE {p}table_not_backed_up gauge",
+        ]
+        for table, hosts in sorted(self.state["not_backed_up"].items()):
+            labels = f'table="{label_value(table)}",hosts="{label_value(",".join(sorted(hosts)))}"'
+            lines.append(f"{p}table_not_backed_up{{{labels}}} 1")
         for name, field, help_ in self.GAUGES:
             lines += [f"# HELP {p}{name} {help_}", f"# TYPE {p}{name} gauge"]
             for entry in sorted(self.state["tables"].values(), key=lambda e: (e["job"], e["table"])):
@@ -680,6 +693,47 @@ class BackupJob:
         return 0
 
 
+def not_backed_up(tables: dict, here: str, jobs: list, excluded: list, elsewhere: list) -> dict:
+    """The tables of {table: [hosts]} that no job here backs up and that
+    aren't excluded (never backed up) or backed up elsewhere (by another
+    host). A job only backs up the tables that exist on this host."""
+    match = lambda t, patterns: any(fnmatch.fnmatchcase(t, p) for p in patterns)
+    return {
+        t: hosts for t, hosts in tables.items()
+        if not (here in hosts and any(j.includes(t) and not j.excludes(t) for j in jobs))
+        and not match(t, excluded) and not match(t, elsewhere)
+    }
+
+
+def check_cluster(conf: dict, metrics: "Metrics") -> None:
+    """Report the tables on any node of the cluster that no backup covers,
+    e.g. a new table created on one node only"""
+    cluster = conf.get("check_cluster", "")
+    if not cluster:
+        return
+    jobs = [BackupJob(j, metrics) for j in job_confs(conf, [])]
+    try:
+        here = jobs[0].ch.query("SELECT hostName()").strip()
+        rows = jobs[0].ch.rows(
+            f"""
+            SELECT name, groupUniqArray(hostName()) AS hosts
+            FROM clusterAllReplicas({sql_str(cluster)}, system.tables)
+            WHERE database = {sql_str(jobs[0].db)} AND NOT is_temporary AND NOT startsWith(name, '.inner')
+            GROUP BY name
+            """
+        )
+    except Exception as e:
+        log.error(f"could not list the tables of cluster {cluster}: {e}")
+        return
+    missing = not_backed_up(
+        {r["name"]: r["hosts"] for r in rows}, here, jobs,
+        conf.get("exclude_tables", []), conf.get("backed_up_elsewhere", []),
+    )
+    for table, hosts in sorted(missing.items()):
+        log.error(f"{table} (on {', '.join(sorted(hosts))}) is in no backup job and not excluded")
+    metrics.not_backed_up(missing)
+
+
 def jobs_for_tables(jobs: list, tables: list) -> tuple:
     """(the jobs that back up one of tables, the tables no job backs up)"""
     owns = lambda j, t: j.includes(t) and not j.excludes(t)
@@ -766,6 +820,7 @@ def main() -> int:
                 rc |= job.release(args.label)
         if args.command == "run":
             metrics.forget_jobs(configured)
+            check_cluster(conf, metrics)
         return rc
 
 

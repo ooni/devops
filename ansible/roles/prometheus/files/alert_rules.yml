@@ -156,6 +156,14 @@ groups:
       summary: 'ClickHouse backup of {{ $labels.table }} ({{ $labels.backup }}) failed on {{ $labels.instance }}'
       description: 'Nothing was deleted: the older backups of {{ $labels.table }} are kept. The next run retries it. See `journalctl --identifier ooni-clickhouse-backup` on {{ $labels.instance }}.'
 
+  # A table on the cluster that no backup job covers, and that isn't excluded:
+  # e.g. a new table created on one node only (data3 checks after each run)
+  - alert: ClickHouseTableNotBackedUp
+    expr: ooni_clickhouse_backup_table_not_backed_up == 1
+    annotations:
+      summary: 'ClickHouse table {{ $labels.table }} is not backed up (on {{ $labels.hosts }})'
+      description: 'No backup job covers it and it is not excluded. Add it to a job (clickhouse_backup_data1_tables if only data1 holds its data, clickhouse_backup_private_tables if private), or to clickhouse_backup_exclude_tables if it needs no backup. See the runbook, "ClickHouse backup".'
+
   # A job's run finished with every table backed up. One Slack message per
   # job run, no email and no "resolved" message: Alertmanager routes it to
   # slack-notice. It clears an hour after the run.

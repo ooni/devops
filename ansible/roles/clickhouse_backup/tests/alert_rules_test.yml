@@ -115,3 +115,16 @@ tests:
             exp_annotations:
               summary: 'Stale `textfile` at data3'
               description: '`/var/lib/node_exporter/textfile_collector/other.prom` is 3h old.'
+
+  # TableNotBackedUp: a table no backup job covers
+  - interval: 1m
+    input_series:
+      - {series: 'ooni_clickhouse_backup_table_not_backed_up{instance="data3", table="made_on_data1", hosts="data1.htz-fsn.prod.ooni.nu"}', values: '1x30'}
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ClickHouseTableNotBackedUp
+        exp_alerts:
+          - exp_labels: {instance: data3, table: made_on_data1, hosts: data1.htz-fsn.prod.ooni.nu}
+            exp_annotations:
+              summary: 'ClickHouse table made_on_data1 is not backed up (on data1.htz-fsn.prod.ooni.nu)'
+              description: 'No backup job covers it and it is not excluded. Add it to a job (clickhouse_backup_data1_tables if only data1 holds its data, clickhouse_backup_private_tables if private), or to clickhouse_backup_exclude_tables if it needs no backup. See the runbook, "ClickHouse backup".'

@@ -128,8 +128,8 @@ def setup():
         # ~20 MB that doesn't compress: takes ~20 s to back up with work/slow.json
         "CREATE TABLE ooni.obs_web (measurement_uid String, blob String) ENGINE = MergeTree ORDER BY measurement_uid",
         "INSERT INTO ooni.obs_web SELECT toString(number), randomString(4096) FROM numbers(5000)",
-        "CREATE TABLE ooni.fingerprints_dns (name String, pattern String) ENGINE = EmbeddedRocksDB PRIMARY KEY name",
-        "INSERT INTO ooni.fingerprints_dns VALUES ('a', '1.2.3.4'), ('b', '5.6.7.8')",
+        "CREATE TABLE ooni.test_groups (name String, pattern String) ENGINE = EmbeddedRocksDB PRIMARY KEY name",
+        "INSERT INTO ooni.test_groups VALUES ('a', '1.2.3.4'), ('b', '5.6.7.8')",
         "CREATE TABLE ooni.msmt_feedback (measurement_uid String, comment String) ENGINE = MergeTree ORDER BY measurement_uid",
         "INSERT INTO ooni.msmt_feedback VALUES ('m1', 'blocked?')",
         "CREATE TABLE ooni.labeling_frames (measurement_uid String) ENGINE = MergeTree ORDER BY measurement_uid",
@@ -144,11 +144,11 @@ def test_first_run():
     r = backup("backup", "run")
     check(r.returncode == 0, "the run succeeds", r.stderr)
     for bucket, table in [(MEASUREMENTS, "fastpath"), (MEASUREMENTS, "obs_web"),
-                          (MEASUREMENTS, "fingerprints_dns"), (PRIVATE, "msmt_feedback")]:
+                          (MEASUREMENTS, "test_groups"), (PRIVATE, "msmt_feedback")]:
         c = chains(bucket, table)
         check(len(c) == 1 and all(all(b.values()) for b in c.values()), f"{table}: one complete chain in {bucket}")
-    check(any(k.endswith("/data.native.zst") for k in keys(MEASUREMENTS, "prod/ooni/fingerprints_dns/")),
-          "fingerprints_dns (EmbeddedRocksDB): its rows are exported too")
+    check(any(k.endswith("/data.native.zst") for k in keys(MEASUREMENTS, "prod/ooni/test_groups/")),
+          "test_groups (EmbeddedRocksDB): its rows are exported too")
     check(not keys(MEASUREMENTS, "prod/ooni/msmt_feedback/"), "msmt_feedback isn't in the measurements bucket")
     check(not keys(MEASUREMENTS, "prod/ooni/asnmeta_tmp/"), "asnmeta_tmp (excluded) isn't backed up")
     check(not keys(MEASUREMENTS, "prod/ooni/labeling_frames/"), "labeling_frames (data1's) isn't backed up")
@@ -193,13 +193,13 @@ def test_incremental_and_restore():
         check(digest(f"restored.fastpath_{i}") == state, f"{what} restores fastpath as it was then ({state.split()[0]} rows)")
 
     # EmbeddedRocksDB: BACKUP keeps only the schema, the rows are in data.native.zst (the runbook's steps 2 and 3)
-    c = chains(MEASUREMENTS, "fingerprints_dns")
+    c = chains(MEASUREMENTS, "test_groups")
     chain = max(ch_ for ch_, b in c.items() if any(b.values()))
-    url = backup_url(MEASUREMENTS, "fingerprints_dns", chain, max(n for n, ok in c[chain].items() if ok))
-    ch(f"RESTORE TABLE ooni.fingerprints_dns AS restored.fingerprints_dns FROM S3('{url}')")
-    ch(f"INSERT INTO restored.fingerprints_dns SELECT * FROM s3('{url}/data.native.zst', 'Native')")
-    check(digest("restored.fingerprints_dns") == digest("ooni.fingerprints_dns"),
-          "fingerprints_dns (EmbeddedRocksDB) restores with its exported rows")
+    url = backup_url(MEASUREMENTS, "test_groups", chain, max(n for n, ok in c[chain].items() if ok))
+    ch(f"RESTORE TABLE ooni.test_groups AS restored.test_groups FROM S3('{url}')")
+    ch(f"INSERT INTO restored.test_groups SELECT * FROM s3('{url}/data.native.zst', 'Native')")
+    check(digest("restored.test_groups") == digest("ooni.test_groups"),
+          "test_groups (EmbeddedRocksDB) restores with its exported rows")
 
 
 def test_failure_alert(emails_before):

@@ -205,7 +205,12 @@ When a data1-only table becomes replicated, remove it from
   backup.
 - Not backed up: `fingerprints_dns` and `fingerprints_http`, which are only on
   data1 and data2 and which the hourly updater rebuilds, and `session_expunge`,
-  which is empty and no longer used.
+  which is empty and no longer used. They're in
+  `clickhouse_backup_exclude_tables`, with the other tables that are never
+  backed up.
+- After each run, data3 lists the tables on every node of the cluster
+  (`clickhouse_backup_check_cluster`) and reports any that no job backs up and
+  that aren't excluded, e.g. a new table created on data1 only.
 - R2 rejects multipart uploads whose parts (all but the last) differ in
   size, so `clickhouse_backup_s3_settings` fixes ClickHouse's part size at
   128 MiB (`s3_upload_part_size_multiply_factor: 1`). R2 allows 10,000 parts,
@@ -264,6 +269,12 @@ Alerts, in `alert_rules.yml`:
 
 - `ClickHouseBackupFailed`: a table's last attempt failed. Nothing is
   deleted, and the next run retries it.
+- `ClickHouseTableNotBackedUp`: a table on the cluster is in no backup job and
+  not excluded. Add it to a job: replicated tables are backed up by data3's
+  `measurements` job unless they're private (`clickhouse_backup_private_tables`),
+  and a table whose data only data1 holds goes in
+  `clickhouse_backup_data1_tables`. Or, if it needs no backup, add it to
+  `clickhouse_backup_exclude_tables`.
 - `ClickHouseBackupCompleted`: a job's run backed up every table. One Slack
   message per run in `#ooni-bots`, no email.
 - `ClickHouseBackupStale`: a table hasn't been backed up for 8 days (backups
