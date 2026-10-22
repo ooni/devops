@@ -10,7 +10,7 @@
   bucket stubbed.
 - `test_e2e.py`: the real thing, in the containers of `compose.yml`:
   ClickHouse at production's version, MinIO standing in for R2, the script
-  in a Debian bookworm Python with bookworm's boto3, node_exporter,
+  on Debian bookworm with its python3-boto3, as on the hosts, node_exporter,
   Prometheus with the repo's alert rules, Alertmanager with the repo's
   routes, and a stand-in for Slack. Full and incremental backups, a
   restore, a failed run, an interrupted full, the month's new full and

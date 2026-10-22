@@ -1,7 +1,7 @@
 #!/bin/bash
 # Tests the clickhouse_backup role: renders its configs from the role's templates, checks the backup alerts
 # (promtool) and their Alertmanager routes (amtool), runs the schedule tests, then test_e2e.py against the
-# containers in compose.yml. Needs docker compose, python3 with boto3, and ansible-core. With rootless podman,
+# containers in compose.yml. Needs docker compose, python3-boto3 and ansible-core. With rootless podman,
 # point DOCKER_HOST at its socket. KEEP=1 leaves the containers running.
 set -euo pipefail
 cd "$(dirname "$0")"
