@@ -296,17 +296,28 @@ before that step, so:
 
 1. Disable the timer with `clickhouse_backup_enabled: false` (or
    `sudo systemctl stop ooni-clickhouse-backup.timer`) and check that
-   `system.backups` shows nothing running.
-2. Take a pinned backup:
+   `system.backups` shows nothing running. ClickHouse waits for running
+   backups when it stops (`shutdown_wait_backups_and_restores`, and the
+   unit's `TimeoutStopSec=infinity`), so restarting a node during a full
+   backup hangs until the backup is done, a day or more.
+2. Take a pinned backup (incrementals, minutes):
    ```bash
    sudo ooni-clickhouse-backup run --keep pre-25.8.29.51
    ```
 3. Upgrade all three nodes. Don't run backups while nodes are on different
    versions.
-4. Re-enable the timer. Once the whole upgrade is confirmed good, start
-   new chains on the new version and unpin the old ones:
+4. Once the whole upgrade is confirmed good, and with the timer still
+   disabled (once enabled, it may start a run straight away for a missed
+   Sunday), start new chains on the new version. That takes a day or more,
+   so run it as a service rather than in a shell:
    ```bash
-   sudo ooni-clickhouse-backup run --full
+   sudo systemd-run --unit=ooni-clickhouse-backup-full -p TimeoutStartSec=infinity \
+     -p SyslogIdentifier=ooni-clickhouse-backup /usr/local/bin/ooni-clickhouse-backup run --full
+   sudo journalctl -f --identifier ooni-clickhouse-backup
+   ```
+   When the journal shows `all tables backed up` for every job, unpin the
+   old chains and re-enable the timer (`clickhouse_backup_enabled: true`):
+   ```bash
    sudo ooni-clickhouse-backup release pre-25.8.29.51
    ```
 
@@ -329,9 +340,9 @@ each table. Restoring the latest incremental restores the whole chain.
    ```sql
    RESTORE TABLE ooni.obs_web FROM S3('https://<account id>.r2.cloudflarestorage.com/ooni-clickhouse-backup/prod/ooni/obs_web/<chain>/<backup>')
    ```
-3. For EmbeddedRocksDB and Join tables, load the rows too:
+3. For EmbeddedRocksDB and Join tables (`test_groups`), load the rows too:
    ```sql
-   INSERT INTO ooni.fingerprints_dns
+   INSERT INTO ooni.test_groups
    SELECT * FROM s3('<backup URL>/data.native.zst', 'Native')
    ```
 4. On the other replicas, create replicated tables with the same
