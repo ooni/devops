@@ -200,9 +200,12 @@ When a data1-only table becomes replicated, remove it from
   table starts a new chain with its first backup of each calendar month
   (UTC), which is the first Sunday of the month if the timer runs weekly.
   Once a new chain is complete, older chains are deleted unless pinned.
-- EmbeddedRocksDB and Join tables (`fingerprints_*`, `session_expunge`,
-  `test_groups`): `BACKUP` saves only their schema, so their rows are also
-  exported to `data.native.zst` inside each backup.
+- EmbeddedRocksDB and Join tables (`test_groups`): `BACKUP` saves only their
+  schema, so their rows are also exported to `data.native.zst` inside each
+  backup.
+- Not backed up: `fingerprints_dns` and `fingerprints_http`, which are only on
+  data1 and data2 and which the hourly updater rebuilds, and `session_expunge`,
+  which is empty and no longer used.
 - R2 rejects multipart uploads whose parts (all but the last) differ in
   size, so `clickhouse_backup_s3_settings` fixes ClickHouse's part size at
   128 MiB (`s3_upload_part_size_multiply_factor: 1`). R2 allows 10,000 parts,
