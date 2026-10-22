@@ -29,6 +29,8 @@ echo "== schedule"
 python3 -m unittest test_schedule test_job
 
 echo "== end to end"
-[ -n "${KEEP:-}" ] || trap 'compose down -v --remove-orphans >/dev/null 2>&1' EXIT
+# the containers' logs if it fails, then remove them, unless KEEP is set
+trap 'rc=$?; [ $rc = 0 ] || compose logs --no-color --tail=200; [ -n "${KEEP:-}" ] || compose down -v --remove-orphans >/dev/null 2>&1' EXIT
+compose down -v --remove-orphans >/dev/null 2>&1  # left from a run with KEEP=1
 compose up -d --build --quiet-pull
 python3 test_e2e.py

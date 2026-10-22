@@ -10,7 +10,7 @@ clickhouse_backup_s3_secret_access_key: testsecret123
 test_jobs:
   - name: measurements
     s3_bucket: ooni-clickhouse-backup
-    include_tables: []
+    include_tables: ["*"]
     exclude_tables: [msmt_feedback, labeling_frames]
   - name: private
     s3_bucket: ooni-clickhouse-backup-private

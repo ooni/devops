@@ -375,7 +375,8 @@ class BackupJob:
         )
         self.store = Store(conf)
         self.keep_chains = max(1, int(conf.get("keep_chains", 1)))
-        # fnmatch patterns; an empty include list means every table
+        # fnmatch patterns: "*" for every table; an empty list selects none, so
+        # emptying a host's list can't make it back up every table
         self.include = conf.get("include_tables", [])
         self.exclude = conf.get("exclude_tables", [])
         self.poll_s = float(conf.get("poll_interval_seconds", 30))
@@ -432,7 +433,7 @@ class BackupJob:
         return out, missing
 
     def includes(self, table: str) -> bool:
-        return not self.include or any(fnmatch.fnmatchcase(table, p) for p in self.include)
+        return any(fnmatch.fnmatchcase(table, p) for p in self.include)
 
     def excludes(self, table: str) -> bool:
         return any(fnmatch.fnmatchcase(table, p) for p in self.exclude)
@@ -579,6 +580,8 @@ class BackupJob:
                     log.error(f"backup {r['id']} is still running on the server")
                 raise RuntimeError("not starting: wait for it to finish, or for the server to drop it")
             tables, failed = self.tables(only)
+            if not tables and not only:
+                log.warning(f"{self.name}: no tables to back up (include_tables: {self.include})")
         except Exception as e:
             log.error(f"{self.name}: could not start: {e}")
             self.metrics.job_failed(self.name)
@@ -651,11 +654,11 @@ def jobs_for_tables(jobs: list, tables: list) -> tuple:
 def job_confs(conf: dict, names: list) -> list:
     """Each job's config: the top-level keys, overridden by the job's own.
 
-    A config without "jobs" is one job named "default". A job's
-    exclude_tables add to the top-level ones."""
+    A config without "jobs" is one job named "default", for every table. A
+    job's exclude_tables add to the top-level ones."""
     common = {k: v for k, v in conf.items() if k != "jobs"}
     out = []
-    for job in conf.get("jobs") or [{"name": "default"}]:
+    for job in conf.get("jobs") or [{"name": "default", "include_tables": ["*"]}]:
         merged = {**common, **job}
         merged["exclude_tables"] = common.get("exclude_tables", []) + job.get("exclude_tables", [])
         if not names or merged["name"] in names:

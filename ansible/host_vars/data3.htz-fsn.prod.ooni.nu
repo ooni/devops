@@ -7,7 +7,7 @@ clickhouse_base_path: /data/clickhouse
 clickhouse_backup_jobs:
   - name: measurements
     s3_bucket: ooni-clickhouse-backup
-    include_tables: []
+    include_tables: ["*"]
     exclude_tables: "{{ clickhouse_backup_private_tables + clickhouse_backup_data1_tables }}"
   - name: private
     s3_bucket: ooni-clickhouse-backup-private

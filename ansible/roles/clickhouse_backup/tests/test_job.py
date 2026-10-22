@@ -66,7 +66,7 @@ class TestRunningSince(unittest.TestCase):
 
 class TestRunTable(unittest.TestCase):
     def test_only_the_jobs_that_back_up_the_tables(self):
-        jobs = [job("measurements", exclude=["msmt_feedback"]), job("private", include=["msmt_feedback"])]
+        jobs = [job("measurements", include=["*"], exclude=["msmt_feedback"]), job("private", include=["msmt_feedback"])]
         selected, orphans = backup.jobs_for_tables(jobs, ["msmt_feedback"])
         self.assertEqual([j.name for j in selected], ["private"])
         self.assertEqual(orphans, [])
@@ -74,6 +74,19 @@ class TestRunTable(unittest.TestCase):
     def test_tables_no_job_backs_up(self):
         jobs = [job("private", include=["msmt_feedback"])]
         self.assertEqual(backup.jobs_for_tables(jobs, ["fastpath"]), ([], ["fastpath"]))
+
+
+class TestIncludeTables(unittest.TestCase):
+    def test_star_is_every_table(self):
+        self.assertTrue(job(include=["*"]).includes("fastpath"))
+
+    def test_an_empty_list_is_no_table(self):
+        # once data1's list of its own tables is emptied, data1 mustn't back up everything
+        self.assertFalse(job(include=[]).includes("msmt_feedback"))
+
+    def test_a_config_without_jobs_backs_up_every_table(self):
+        [conf] = backup.job_confs({"exclude_tables": ["*_tmp"]}, [])
+        self.assertEqual(conf["include_tables"], ["*"])
 
 
 class TestClickHouseErrors(unittest.TestCase):

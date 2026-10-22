@@ -35,12 +35,13 @@ clickhouse_backup_s3_settings:
   s3_min_upload_part_size: 134217728
   s3_max_upload_part_size: 134217728
 
-# One job per bucket. A job backs up the tables matching include_tables
-# (every table if empty) minus the excludes below and its own.
+# One job per bucket. A job backs up the tables matching include_tables ("*"
+# for every table; an empty list backs up none) minus the excludes below and
+# its own.
 clickhouse_backup_jobs:
   - name: measurements
     s3_bucket: ""
-    include_tables: []
+    include_tables: ["*"]
     exclude_tables: []
 
 # Complete chains kept per table, besides chains pinned with --keep: the

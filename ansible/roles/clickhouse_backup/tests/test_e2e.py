@@ -4,7 +4,7 @@ In order:
   2. ClickHouseBackupCompleted reaches Slack once per job, as a notice, without email
   3. a second run takes incrementals, and a restore from them returns the same rows
   4. a run whose bucket is missing fails, and ClickHouseBackupFailed reaches Slack and email
-  5. a new month's full interrupted by a ClickHouse restart deletes nothing; the next run
+  5. a new month's full interrupted by killing ClickHouse deletes nothing; the next run
      removes what it left, takes the full and prunes the oldest chain
 Prints each check; exits 1 at the first failure."""
 import json
@@ -28,9 +28,11 @@ s3 = boto3.client(
 )
 
 
-def check(ok, what):
+def check(ok, what, output=""):
     print(f"  {'ok  ' if ok else 'FAIL'} {what}")
     if not ok:
+        if output:
+            print("  the script said:\n" + output[-3000:])
         sys.exit(1)
 
 
@@ -139,7 +141,7 @@ def setup():
 def test_first_run():
     print("== 1. first run: a full backup of every table")
     r = backup("backup", "run")
-    check(r.returncode == 0, f"the run succeeds{'' if r.returncode == 0 else ': ' + r.stderr[-2000:]}")
+    check(r.returncode == 0, "the run succeeds", r.stderr)
     for bucket, table in [(MEASUREMENTS, "fastpath"), (MEASUREMENTS, "obs_web"),
                           (MEASUREMENTS, "fingerprints_dns"), (PRIVATE, "msmt_feedback")]:
         c = chains(bucket, table)
@@ -166,7 +168,7 @@ def test_incremental_and_restore():
     print("== 3. second run: incrementals, and a restore")
     ch("INSERT INTO ooni.fastpath SELECT toString(number), 'https://example.org/new', 'f' FROM numbers(200000, 1000)")
     r = backup("backup", "run")
-    check(r.returncode == 0, "the run succeeds")
+    check(r.returncode == 0, "the run succeeds", r.stderr)
     (chain, backups), = chains(MEASUREMENTS, "fastpath").items()
     check(len(backups) == 2 and all(backups.values()), f"fastpath: a full and an incremental in chain {chain}")
     latest = f"http://minio:9000/{MEASUREMENTS}/prod/ooni/fastpath/{chain}/{max(backups)}"
@@ -180,7 +182,7 @@ def test_incremental_and_restore():
 def test_failure_alert(emails_before):
     print("== 4. a run that fails: ClickHouseBackupFailed")
     r = backup("broken", "run")
-    check(r.returncode == 1, "the run exits 1")
+    check(r.returncode == 1, "the run exits 1", r.stderr)
     title = f"[FIRING] ClickHouse backup of labeling_frames (broken) failed on {DATA3}"
     msgs = wait_for(f"a Slack message: {title}", lambda: [m for m in slack() if m[0] == title])
     check("Nothing was deleted" in msgs[0][1], f"it says what was done: {msgs[0][1]!r}")
@@ -202,17 +204,20 @@ def test_interrupted_full():
                                       "--config", "/work/slow.json", "run", "--table", "obs_web"],
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     wait_for("the new full's first files", lambda: set(chains(MEASUREMENTS, "obs_web")) - {old, previous}, 60)
-    subprocess.run(COMPOSE + ["restart", "clickhouse"], check=True, capture_output=True)
-    out, _ = run.communicate(timeout=180)
-    check(run.returncode == 1, "the interrupted run exits 1")
+    # killed, not stopped: ClickHouse waits for running backups when it stops
+    # (shutdown_wait_backups_and_restores), so a clean stop would finish this one
+    subprocess.run(COMPOSE + ["kill", "clickhouse"], check=True, capture_output=True)
+    subprocess.run(COMPOSE + ["start", "clickhouse"], check=True, capture_output=True)
+    out, _ = run.communicate(timeout=900)
+    check(run.returncode == 1, "the interrupted run exits 1", out)
     c = chains(MEASUREMENTS, "obs_web")
     new = sorted(set(c) - {old, previous})
     check(new and not any(c[new[0]].values()), f"the new chain {new[0]} has no .backup")
     check(all(c[x][x] for x in (old, previous)), f"both older chains, {old} and {previous}, are still there")
 
-    wait_for("ClickHouse after the restart", lambda: ch("SELECT 1") == "1")
+    wait_for("ClickHouse after it was killed", lambda: ch("SELECT 1") == "1")
     r = backup("backup", "run", "--table", "obs_web")
-    check(r.returncode == 0, "the next run succeeds")
+    check(r.returncode == 0, "the next run succeeds", r.stderr)
     check("removed incomplete chain" in r.stderr, "it removed the interrupted full")
     c = chains(MEASUREMENTS, "obs_web")
     check(previous in c and old not in c and len(c) == 2 and all(all(b.values()) for b in c.values()),
