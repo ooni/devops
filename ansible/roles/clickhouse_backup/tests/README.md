@@ -1,6 +1,6 @@
 # Tests for the clickhouse_backup role
 
-`./run.sh` runs them all, in about seven minutes:
+`./run.sh` runs them all, in about nine minutes:
 
 - `alert_rules_test.yml`: promtool unit tests of the backup alerts in
   `roles/prometheus/files/alert_rules.yml`, then amtool checks that
@@ -13,9 +13,11 @@
   ClickHouse at production's version, MinIO standing in for R2, the script
   on Debian bookworm with its python3-boto3, as on the hosts, node_exporter,
   Prometheus with the repo's alert rules, Alertmanager with the repo's
-  routes, and a stand-in for Slack. Full and incremental backups, a
-  restore, a failed run, an interrupted full, the month's new full and
-  pruning, and the Slack messages and emails each one causes.
+  routes, and a stand-in for Slack. Full and incremental backups, and
+  restoring the full and each incremental of a chain, and an
+  EmbeddedRocksDB table with its exported rows; a failed run; an
+  interrupted full, the month's new full, pruning and restoring what's
+  left; and the Slack messages and emails each one causes.
 
 The configs are rendered from the role's templates into `work/` by
 `render.yml`, with the variables in `vars.yml`.

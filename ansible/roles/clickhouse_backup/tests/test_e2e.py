@@ -2,10 +2,11 @@
 In order:
   1. a first run takes a full backup of every table, each job to its own bucket
   2. ClickHouseBackupCompleted reaches Slack once per job, as a notice, without email
-  3. a second run takes incrementals, and a restore from them returns the same rows
+  3. two more runs take incrementals; restoring the full and each incremental returns the rows of
+     its moment, and an EmbeddedRocksDB table comes back with its exported rows
   4. a run whose bucket is missing fails, and ClickHouseBackupFailed reaches Slack and email
   5. a new month's full interrupted by killing ClickHouse deletes nothing; the next run
-     removes what it left, takes the full and prunes the oldest chain
+     removes what it left, takes the full and prunes the oldest chain, and the full restores
 Prints each check; exits 1 at the first failure."""
 import json
 import os
@@ -164,19 +165,41 @@ def test_completed_alert(emails_before):
     check(email_attempts() == emails_before, "no email sent")
 
 
+def digest(table):
+    """row count and a checksum of every row"""
+    return ch(f"SELECT count(), sum(cityHash64(*)) FROM {table}")
+
+
+def backup_url(bucket, table, chain, name):
+    return f"http://minio:9000/{bucket}/prod/ooni/{table}/{chain}/{name}"
+
+
 def test_incremental_and_restore():
-    print("== 3. second run: incrementals, and a restore")
-    ch("INSERT INTO ooni.fastpath SELECT toString(number), 'https://example.org/new', 'f' FROM numbers(200000, 1000)")
-    r = backup("backup", "run")
-    check(r.returncode == 0, "the run succeeds", r.stderr)
+    print("== 3. incrementals, and restoring each backup of a chain")
+    # fastpath as at the first run's full, then after each of two more runs
+    states = [digest("ooni.fastpath")]
+    for first in (200000, 201000):
+        ch(f"INSERT INTO ooni.fastpath SELECT toString(number), 'https://example.org/new', 'f' FROM numbers({first}, 1000)")
+        r = backup("backup", "run")
+        check(r.returncode == 0, "the run succeeds", r.stderr)
+        states.append(digest("ooni.fastpath"))
     (chain, backups), = chains(MEASUREMENTS, "fastpath").items()
-    check(len(backups) == 2 and all(backups.values()), f"fastpath: a full and an incremental in chain {chain}")
-    latest = f"http://minio:9000/{MEASUREMENTS}/prod/ooni/fastpath/{chain}/{max(backups)}"
+    names = sorted(backups)
+    check(len(names) == 3 and all(backups.values()), f"fastpath: a full and two incrementals in chain {chain}")
     ch("CREATE DATABASE restored")
-    ch(f"RESTORE TABLE ooni.fastpath AS restored.fastpath FROM S3('{latest}')")
-    digest = "SELECT count(), sum(cityHash64(measurement_uid, input, anomaly)) FROM {}"
-    check(ch(digest.format("restored.fastpath")) == ch(digest.format("ooni.fastpath")),
-          "the restored fastpath has the same rows (201000)")
+    for i, (name, state) in enumerate(zip(names, states)):
+        what = "the full" if i == 0 else f"incremental {i}"
+        ch(f"RESTORE TABLE ooni.fastpath AS restored.fastpath_{i} FROM S3('{backup_url(MEASUREMENTS, 'fastpath', chain, name)}')")
+        check(digest(f"restored.fastpath_{i}") == state, f"{what} restores fastpath as it was then ({state.split()[0]} rows)")
+
+    # EmbeddedRocksDB: BACKUP keeps only the schema, the rows are in data.native.zst (the runbook's steps 2 and 3)
+    c = chains(MEASUREMENTS, "fingerprints_dns")
+    chain = max(ch_ for ch_, b in c.items() if any(b.values()))
+    url = backup_url(MEASUREMENTS, "fingerprints_dns", chain, max(n for n, ok in c[chain].items() if ok))
+    ch(f"RESTORE TABLE ooni.fingerprints_dns AS restored.fingerprints_dns FROM S3('{url}')")
+    ch(f"INSERT INTO restored.fingerprints_dns SELECT * FROM s3('{url}/data.native.zst', 'Native')")
+    check(digest("restored.fingerprints_dns") == digest("ooni.fingerprints_dns"),
+          "fingerprints_dns (EmbeddedRocksDB) restores with its exported rows")
 
 
 def test_failure_alert(emails_before):
@@ -222,6 +245,9 @@ def test_interrupted_full():
     c = chains(MEASUREMENTS, "obs_web")
     check(previous in c and old not in c and len(c) == 2 and all(all(b.values()) for b in c.values()),
           f"it took the full and pruned {old}: chains {sorted(c)}")
+    new = max(c)
+    ch(f"RESTORE TABLE ooni.obs_web AS restored.obs_web FROM S3('{backup_url(MEASUREMENTS, 'obs_web', new, new)}')")
+    check(digest("restored.obs_web") == digest("ooni.obs_web"), f"the new full {new} restores obs_web")
 
 
 def main():
