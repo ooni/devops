@@ -14,6 +14,7 @@ spec = importlib.util.spec_from_file_location(
 )
 backup = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(backup)
+backup.log.disabled = True  # the tests check results, not log lines
 
 
 class FlakyClickHouse:
