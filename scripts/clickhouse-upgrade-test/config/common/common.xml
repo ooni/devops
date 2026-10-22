@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<!--
+  Settings shared by all three nodes. Mirrors the shape of OONI's production
+  config (ooni/devops ansible/group_vars/clickhouse/vars.yml -> idealista.clickhouse_role)
+  trimmed down to what's needed to reproduce the replication/Keeper behaviour
+  we care about for the upgrade test.
+-->
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+    <listen_host>::</listen_host>
+    <listen_try>1</listen_try>
+
+    <logger>
+        <level>information</level>
+        <console>1</console>
+    </logger>
+
+    <!-- Same three-node ensemble on every node: each ClickHouse server also
+         runs the embedded Keeper role, exactly like data1/data2/data3 in prod. -->
+    <zookeeper>
+        <node>
+            <host>ch1</host>
+            <port>9181</port>
+        </node>
+        <node>
+            <host>ch2</host>
+            <port>9181</port>
+        </node>
+        <node>
+            <host>ch3</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+
+    <!-- Distributed DDL queue, same path/profile as prod so ON CLUSTER works -->
+    <distributed_ddl>
+        <path>/clickhouse/task_queue/ddl</path>
+        <profile>default</profile>
+        <pool_size>1</pool_size>
+        <task_max_lifetime>604800</task_max_lifetime>
+        <cleanup_delay_period>60</cleanup_delay_period>
+        <max_tasks_in_queue>1000</max_tasks_in_queue>
+    </distributed_ddl>
+
+    <remote_servers>
+        <oonidata_cluster>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>ch1</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>ch2</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>ch3</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </oonidata_cluster>
+    </remote_servers>
+</clickhouse>

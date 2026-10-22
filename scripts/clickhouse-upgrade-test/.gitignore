@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+
+# Generated test output -- keep the directory (see results/.gitkeep) but not
+# whatever a local run drops into it.
+results/report.md
+results/report.json
+results/steps/

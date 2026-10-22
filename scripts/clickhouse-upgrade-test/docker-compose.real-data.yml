@@ -1,0 +1,169 @@
+# Overlay for the real-data end-to-end scenario -- layers the actual OONI
+# data pipeline (oonidata/oonipipeline, fastpath, the oonimeasurements API)
+# on top of the same ch1/ch2/ch3 cluster docker-compose.yml already defines,
+# instead of standing up its own single-node ClickHouse the way ooni/data's
+# own tests/integration/docker-compose.yml does.
+#
+# Used together with the base file, always both flags:
+#   docker compose -f docker-compose.yml -f docker-compose.real-data.yml <cmd>
+# (harness/real_data.py always passes both; there's no reason to invoke this
+# overlay alone, since it has no ClickHouse of its own -- see `chnet` below.)
+#
+# Adapted from ooni/data#160 (branch `add_end_to_end_tests`,
+# tests/integration/docker-compose.yml). Differences from that source,
+# each deliberate:
+#   - `clickhouse` (their single all-in-one node) is dropped entirely --
+#     every CLICKHOUSE_URL below points at `ch1` (this project's cluster,
+#     defined in docker-compose.yml) instead. The schema on that cluster
+#     comes from sql/001_schema.sql via harness/real_data.py, not from a
+#     docker-entrypoint-initdb.d script -- see that file's apply_schema()
+#     reuse.
+#   - Auth changed from `testuser`/`testuser` to this project's `default`
+#     user with no password (config/common/users.xml) -- ooni/data's own
+#     compose file provisions its own ClickHouse user via
+#     CLICKHOUSE_USER/CLICKHOUSE_PASSWORD env vars, which only works for a
+#     freshly-initialized official-image container, not this cluster's
+#     already-configured auth.
+#   - `fastpath2` is dropped -- grepping ooni/data's own pytest suite
+#     (tests/integration/tests/*.py) turns up no reference to it or to its
+#     port (8472); it isn't exercised by anything this job runs.
+#   - `downloader` and `verify` are built from ooni/data's own Dockerfiles,
+#     via a checkout of ooni/data into ../../external/ooni-data (see the
+#     "Checkout ooni/data" step in .github/workflows/clickhouse_upgrade_test.yml)
+#     rather than vendoring copies of their source into this repo, so this
+#     stays in sync with upstream instead of silently drifting.
+#   - Pinned to ooni/data's `add_end_to_end_tests` branch (ooni/data#160,
+#     still open as of this writing) because that branch is where the
+#     `[project.scripts] oonipipeline = ...` entry point needed for `pip
+#     install ./oonipipeline` to produce a working `oonipipeline` CLI lives
+#     -- `main` doesn't have it yet. Update the checkout ref in the
+#     workflow once #160 merges.
+#   - `postgres`/`valkey`/`api` host port mappings are dropped (8080/5432/
+#     6379) -- nothing outside the docker network needs to reach them here,
+#     unlike ooni/data's own compose file which exposes them for local
+#     interactive use.
+
+services:
+  postgres:
+    image: docker.io/library/postgres:latest
+    container_name: ooni-e2e-postgres
+    networks:
+      - chnet
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ooni
+
+  valkey:
+    image: docker.io/valkey/valkey:latest
+    container_name: ooni-e2e-valkey
+    networks:
+      - chnet
+    command: valkey-server --appendonly yes
+
+  api:
+    image: docker.io/ooni/api-oonimeasurements:latest
+    container_name: ooni-e2e-api
+    networks:
+      - chnet
+    environment:
+      VALKEY_URL: valkey://valkey:6379
+      POSTGRESQL_URL: "postgresql://postgres:postgres@postgres:5432/ooni"
+      JWT_ENCRYPTION_KEY: "0123456789abcdef"
+      PROMETHEUS_METRICS_PASSWORD: "testme"
+      CLICKHOUSE_URL: "http://default:@ch1:9000/ooni"
+      ACCOUNT_ID_HASHING_KEY: "0123456789abcdef"
+      RATE_LIMITS: "1000/minute;400000/day;200000/7day"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    depends_on:
+      ch1:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      valkey:
+        condition: service_started
+
+  # One-shot: downloads real OONI measurements (probe-cc IT,IR, 2026-01-01
+  # to 2026-01-03 -- must stay in sync with the `verify` pytest suite, which
+  # hardcodes these dates/countries/report_ids) and runs oonipipeline's
+  # observations workflow against them. Run exactly once per CI run, at
+  # BASE_VERSION, by harness/real_data.py's load_real_data_once() -- NOT
+  # repeated at every hop, per the "download once, re-verify at each hop"
+  # design (see README.md's real-data-upgrade section).
+  downloader:
+    build:
+      context: ../../external/ooni-data
+      dockerfile: Dockerfile
+    image: oonidata_image
+    container_name: ooni-e2e-downloader
+    networks:
+      - chnet
+    volumes:
+      - ./real_data/data:/data:Z
+    working_dir: /data
+    command: >
+      bash -c "oonidata sync --output-dir . --probe-cc IT,IR --start-day 2026-01-01 --end-day 2026-01-03 &&
+      oonipipeline run --create-tables --probe-cc IT,IR --workflow-name observations --start-at 2026-01-01 --end-at 2026-01-03"
+    depends_on:
+      ch1:
+        condition: service_healthy
+    environment:
+      CLICKHOUSE_URL: "http://default:@ch1:9000/ooni"
+
+  # Also one-shot (--noapi): submits the same real measurements through
+  # fastpath's own scoring/ingestion path, separately from oonipipeline's
+  # observations workflow above -- this is the "submitting it to fastpath"
+  # step the task description calls out specifically, and it's what
+  # populates ooni.fastpath (as opposed to the obs_web/obs_web_ctrl/etc.
+  # tables the downloader's oonipipeline invocation populates).
+  fastpath:
+    image: docker.io/ooni/fastpath:latest
+    container_name: ooni-e2e-fastpath
+    networks:
+      - chnet
+    volumes:
+      - ./real_data/fastpath/etc:/etc/ooni:Z
+      - ./real_data/fastpath/lib/cache:/var/lib/fastpath:Z
+    command: [ "./run_fastpath", "--debug", "--clickhouse-url",
+               "clickhouse://default:@ch1:9000/ooni",
+               "--keep-s3-cache", "--write-to-disk", "--stdout", "--ccs", "IT,IR",
+               "--start-day", "2026-01-01", "--end-day", "2026-01-03", "--noapi" ]
+    depends_on:
+      ch1:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+
+  # Runs ooni/data's own pytest suite (tests/integration/tests/*.py)
+  # against `api`. harness/real_data.py runs this once right after the
+  # initial real-data load (a sanity check that the pipeline produced
+  # queryable data at all at BASE_VERSION) and again after every hop, via
+  # `docker compose ... run --rm verify` -- run, not up, since we want a
+  # fresh container + fresh exit code every time rather than reusing
+  # whatever state a previous run left in the first `verify` container.
+  verify:
+    build:
+      context: ../../external/ooni-data/tests/integration
+      dockerfile: Dockerfile
+    image: ooni_e2e_verifier
+    networks:
+      - chnet
+    working_dir: /app
+    # Bind-mounted (in addition to the Dockerfile's own COPY at build time)
+    # so a stale cached image layer can never serve outdated test files --
+    # every `run --rm verify` sees exactly what's in the ooni/data checkout
+    # right now. Matches ooni/data's own compose file, which does the same
+    # for local-iteration reasons; here it's for CI-freshness reasons.
+    volumes:
+      - ../../external/ooni-data/tests/integration/tests:/app:Z
+    environment:
+      API_URL: http://api:80
+    command: ["pytest", "-v"]
+    depends_on:
+      api:
+        condition: service_healthy
