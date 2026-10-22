@@ -197,7 +197,8 @@ When a data1-only table becomes replicated, remove it from
 - `ooni-clickhouse-backup.timer` runs `/usr/local/bin/ooni-clickhouse-backup run`
   daily at 02:30 UTC.
 - Each table has its own chain: a full backup, then daily incrementals. A
-  table starts a new chain every `clickhouse_backup_full_interval_days` (30).
+  table starts a new chain with its first backup of each calendar month
+  (UTC), which is the first Sunday of the month if the timer runs weekly.
   Once a new chain is complete, older chains are deleted unless pinned.
 - EmbeddedRocksDB and Join tables (`fingerprints_*`, `session_expunge`,
   `test_groups`): `BACKUP` saves only their schema, so their rows are also

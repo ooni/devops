@@ -20,8 +20,10 @@ Layout in each bucket:
 
 <chain> and <backup> are UTC timestamps (20261013T023000Z). The first backup
 of a chain is a full backup; every later one is incremental on top of the
-previous one. A backup is complete once ClickHouse has written its .backup
-file, which it does last.
+previous one. A table starts a new chain at its first backup in each
+calendar month (UTC): the 1st with daily runs, the first Sunday with weekly
+ones. A backup is complete once ClickHouse has written its .backup file,
+which it does last.
 
 Why per table: a new full backup of obs_web takes more than a day at our
 bandwidth cap, so one failure shouldn't throw away the other tables' work,
@@ -334,7 +336,6 @@ class BackupJob:
             conf.get("clickhouse_password", ""),
         )
         self.store = Store(conf)
-        self.full_interval_s = float(conf.get("full_interval_days", 30)) * 86400
         self.keep_chains = max(1, int(conf.get("keep_chains", 1)))
         # fnmatch patterns; an empty include list means every table
         self.include = conf.get("include_tables", [])
@@ -461,7 +462,7 @@ class BackupJob:
             force_full
             or base is None
             or export  # tiny tables: a fresh full backup every run
-            or (now - parse_ts(base_chain)).total_seconds() >= self.full_interval_s
+            or parse_ts(base_chain).strftime("%Y%m") != now.strftime("%Y%m")
         )
         chain = ts(now) if full else base_chain
         name = ts(now)

@@ -43,8 +43,6 @@ clickhouse_backup_jobs:
     include_tables: []
     exclude_tables: []
 
-# A new full backup per table every this many days; incrementals in between
-clickhouse_backup_full_interval_days: 30
 # Complete chains kept per table, besides chains pinned with --keep: the
 # current one and the one before, so a month or two of restore points
 clickhouse_backup_keep_chains: 2
