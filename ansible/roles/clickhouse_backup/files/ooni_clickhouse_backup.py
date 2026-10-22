@@ -306,6 +306,26 @@ class Metrics:
                 entry["last_failed"] = 1
         self.save()
 
+    def forget_tables(self, job: str, tables: set) -> None:
+        """Drop the job's other tables, e.g. dropped or moved to another job,
+        so that their old results don't alert forever"""
+        for key, entry in list(self.state["tables"].items()):
+            if entry["job"] == job and entry["table"] not in tables:
+                log.info(f"{job}: {entry['table']}: no longer backed up by this job, forgetting its results")
+                del self.state["tables"][key]
+        self.save()
+
+    def forget_jobs(self, jobs: set) -> None:
+        """Drop the results of jobs that are no longer configured"""
+        for key, entry in list(self.state["tables"].items()):
+            if entry["job"] not in jobs:
+                del self.state["tables"][key]
+        for part in ("runs", "running", "running_since"):
+            for job in set(self.state[part]) - jobs:
+                log.info(f"{job}: no longer configured, forgetting its results")
+                del self.state[part][job]
+        self.save()
+
     def run_result(self, job: str, duration_s: float, tables: int, fulls: int, failed: int) -> None:
         self.state["runs"][job] = {
             "finished": time.time(), "duration": round(duration_s, 1),
@@ -601,6 +621,8 @@ class BackupJob:
         finally:
             self.metrics.job_running(self.name, False)
         self.metrics.run_result(self.name, time.monotonic() - t0, done, fulls, len(failed))
+        if not only:
+            self.metrics.forget_tables(self.name, {table for table, _ in tables})
 
         if failed:
             log.error(f"{self.name}: failed tables: {', '.join(failed)}")
@@ -698,6 +720,7 @@ def main() -> int:
         conf = json.load(f)
     metrics = Metrics(conf.get("metrics_file", ""), conf.get("state_file", ""))
     jobs = [BackupJob(j, metrics) for j in job_confs(conf, args.job)]
+    configured = {j["name"] for j in job_confs(conf, [])}
 
     if args.command == "list":
         for job in jobs:
@@ -727,6 +750,8 @@ def main() -> int:
                 rc |= job.run(args.table, args.full, args.keep)
             else:
                 rc |= job.release(args.label)
+        if args.command == "run":
+            metrics.forget_jobs(configured)
         return rc
 
 

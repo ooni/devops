@@ -89,6 +89,38 @@ class TestIncludeTables(unittest.TestCase):
         self.assertEqual(conf["include_tables"], ["*"])
 
 
+class TestForget(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.mkdtemp()
+        self.metrics = backup.Metrics(os.path.join(d, "out.prom"), os.path.join(d, "state.json"))
+        for job_, table in [("data1", "labeling_frames"), ("data1", "changepoint_label"), ("private", "msmt_feedback")]:
+            self.metrics.table_result(job_, table, True, {"total_size": 1, "num_files": 1})
+        self.metrics.job_running("old_job", False)
+
+    def tables(self):
+        return sorted(self.metrics.state["tables"])
+
+    def test_a_table_the_job_no_longer_selects(self):
+        # labeling_frames was replicated, and moved from data1's job to data3's
+        self.metrics.forget_tables("data1", {"changepoint_label"})
+        self.assertEqual(self.tables(), ["data1/changepoint_label", "private/msmt_feedback"])
+
+    def test_a_job_no_longer_configured(self):
+        self.metrics.forget_jobs({"data1"})
+        self.assertEqual(self.tables(), ["data1/changepoint_label", "data1/labeling_frames"])
+        self.assertNotIn("old_job", self.metrics.state["running"])
+
+    def test_a_run_with_table_forgets_nothing(self):
+        j = job("data1", include=["*"], metrics=self.metrics)
+        j.running_backups = lambda: []
+        j.tables = lambda only: ([("changepoint_label", "MergeTree")], [])
+        j.backup_table = lambda *a: False
+        j.run(["changepoint_label"], False, "")
+        self.assertIn("data1/labeling_frames", self.tables())
+        j.run([], False, "")
+        self.assertNotIn("data1/labeling_frames", self.tables())
+
+
 class TestClickHouseErrors(unittest.TestCase):
     def setUp(self):
         d = tempfile.mkdtemp()
