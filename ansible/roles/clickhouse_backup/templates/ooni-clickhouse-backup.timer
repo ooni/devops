@@ -1,6 +1,5 @@
 [Unit]
 Description=Back up ClickHouse tables to object storage
-Requires=ooni-clickhouse-backup.service
 
 [Timer]
 Unit=ooni-clickhouse-backup.service
