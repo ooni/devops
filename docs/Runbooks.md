@@ -209,9 +209,13 @@ When a data1-only table becomes replicated, remove it from
   so one backup file can reach 1.25 TiB.
 - Two complete chains are kept per table (`clickhouse_backup_keep_chains`),
   so a month or two of restore points.
-- Bandwidth is capped with `clickhouse_backup_max_bandwidth`. On 24.8 the
-  actual rate is about a third of the cap: 120 MB/s gives ~40 MB/s. A new
-  full backup of everything (~5.6 TB) takes about 39 hours at that rate.
+- Bandwidth is capped with `clickhouse_backup_max_bandwidth`, at 50 MB/s. A
+  new full backup of everything (~5.6 TB) takes about 31 hours at that rate.
+  Against MinIO in testing, 24.8 uploaded at only about a third of the cap,
+  which would make it about 4 days, longer than `ClickHouseBackupStale`'s 3:
+  check the rate of the first backups
+  (`ooni_clickhouse_backup_last_size_bytes / ooni_clickhouse_backup_last_duration_seconds`)
+  and raise the cap if they're that slow.
 
 Layout in the bucket:
 

@@ -46,10 +46,12 @@ clickhouse_backup_jobs:
 # Complete chains kept per table, besides chains pinned with --keep: the
 # current one and the one before, so a month or two of restore points
 clickhouse_backup_keep_chains: 2
-# Bytes/s passed to ClickHouse as max_backup_bandwidth. On 24.8 actual
-# throughput measured at about a third of this, so 120 MB/s gives ~40 MB/s,
-# which leaves room on the 1 Gbit/s link for replication.
-clickhouse_backup_max_bandwidth: 120000000
+# Bytes/s passed to ClickHouse as max_backup_bandwidth: at most 50 MB/s, 40%
+# of the 1 Gbit/s link, leaving the rest for replication and queries.
+# Against MinIO in testing, 24.8 uploaded at about a third of this value; check
+# the real rate on the first backups (ooni_clickhouse_backup_last_size_bytes /
+# ooni_clickhouse_backup_last_duration_seconds) and raise it if they're too slow.
+clickhouse_backup_max_bandwidth: 50000000
 
 # fnmatch patterns, for every job. Materialized views' .inner tables are
 # always skipped: they're backed up with their view.

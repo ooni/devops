@@ -369,7 +369,8 @@ class BackupJob:
         bw = int(conf.get("max_backup_bandwidth", 0))
         if bw:
             # A query setting, not a BACKUP setting: 24.8 rejects it inside
-            # BACKUP ... SETTINGS. Measured throughput is ~1/3 of this value.
+            # BACKUP ... SETTINGS. Against MinIO in testing, the throughput
+            # was about a third of this value.
             self.settings["max_backup_bandwidth"] = str(bw)
 
     def tables(self, only: list) -> tuple:
