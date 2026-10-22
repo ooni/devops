@@ -1,0 +1,44 @@
+# promtool unit tests for the ClickHouse backup alerts in alert_rules.yml
+rule_files: [alert_rules.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      # measurements finished at t=0 after 30 min, all 14 tables backed up, 1 in full
+      - {series: 'ooni_clickhouse_backup_last_run_finished_timestamp_seconds{instance="data3", backup="measurements"}', values: '0x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_duration_seconds{instance="data3", backup="measurements"}', values: '1800x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_failed_tables{instance="data3", backup="measurements"}', values: '0x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_tables{instance="data3", backup="measurements"}', values: '14x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_full_backups{instance="data3", backup="measurements"}', values: '1x180'}
+      # private finished at the same time with a table failed: fastpath, last backed up 4 days ago
+      - {series: 'ooni_clickhouse_backup_last_run_finished_timestamp_seconds{instance="data3", backup="private"}', values: '0x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_duration_seconds{instance="data3", backup="private"}', values: '60x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_failed_tables{instance="data3", backup="private"}', values: '1x180'}
+      - {series: 'ooni_clickhouse_backup_last_attempt_failed{instance="data3", backup="private", table="fastpath"}', values: '1x180'}
+      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="data3", backup="private", table="fastpath"}', values: '-345600x180'}
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ClickHouseBackupCompleted
+        exp_alerts:
+          - exp_labels: {instance: data3, backup: measurements}
+            exp_annotations:
+              summary: 'ClickHouse backup measurements on data3 completed in 30m 0s'
+              description: 'Tables backed up: 14, in full: 1. Nothing to do.'
+      # an hour after the run it clears
+      - eval_time: 2h
+        alertname: ClickHouseBackupCompleted
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: ClickHouseBackupFailed
+        exp_alerts:
+          - exp_labels: {instance: data3, backup: private, table: fastpath}
+            exp_annotations:
+              summary: 'ClickHouse backup of fastpath (private) failed on data3'
+              description: 'Nothing was deleted: the older backups of fastpath are kept. The next run retries it. See `journalctl --identifier ooni-clickhouse-backup` on data3.'
+      - eval_time: 10m
+        alertname: ClickHouseBackupStale
+        exp_alerts:
+          - exp_labels: {instance: data3, backup: private, table: fastpath}
+            exp_annotations:
+              summary: 'No ClickHouse backup of fastpath (private) for 4d 0h 10m 0s'
+              description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on data3.'
