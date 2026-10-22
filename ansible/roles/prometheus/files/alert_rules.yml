@@ -181,12 +181,13 @@ groups:
       summary: 'No ClickHouse backup of {{ $labels.table }} ({{ $labels.backup }}) for {{ $value | humanizeDuration }}'
       description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on {{ $labels.instance }}.'
 
-  # The job hasn't written any result since its host was set up, or the file is gone
+  # The job hasn't written any result since its host was set up, or the file is
+  # gone. Backups run weekly, so a new host has none until its first Sunday.
   - alert: ClickHouseBackupMissing
     expr: absent(ooni_clickhouse_backup_running{instance="data3.htz-fsn.prod.ooni.nu"}) or absent(ooni_clickhouse_backup_running{instance="data1.htz-fsn.prod.ooni.nu"})
-    for: 26h
+    for: 8d
     annotations:
-      summary: 'No ClickHouse backup results from data1 or data3 for over a day'
+      summary: 'No ClickHouse backup results from {{ $labels.instance }} for over a week'
 
   # data3 takes the backups. Above half its CPUs (load per CPU > 0.5), the
   # backup or merges are crowding the node; lower clickhouse_backup_max_bandwidth

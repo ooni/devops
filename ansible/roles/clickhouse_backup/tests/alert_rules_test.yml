@@ -63,3 +63,16 @@ tests:
             exp_annotations:
               summary: 'No ClickHouse backup of fastpath (measurements) for 9d 0h 10m 0s'
               description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on stuck.'
+
+  # Missing: data1 has results, data3 never wrote any; it fires after 8 days
+  - interval: 1h
+    input_series:
+      - {series: 'ooni_clickhouse_backup_running{instance="data1.htz-fsn.prod.ooni.nu", backup="data1"}', values: '0x240'}
+    alert_rule_test:
+      - {eval_time: 7d, alertname: ClickHouseBackupMissing, exp_alerts: []}
+      - eval_time: 9d
+        alertname: ClickHouseBackupMissing
+        exp_alerts:
+          - exp_labels: {instance: data3.htz-fsn.prod.ooni.nu}
+            exp_annotations:
+              summary: 'No ClickHouse backup results from data3.htz-fsn.prod.ooni.nu for over a week'
