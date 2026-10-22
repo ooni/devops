@@ -12,8 +12,10 @@ services:
       MINIO_ROOT_PASSWORD: testsecret123
     ports: ["127.0.0.1:19910:9000"]
 
+  # data3, the node the backups run against
   clickhouse:
     image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+    hostname: data3
     environment:
       CLICKHOUSE_USER: admin
       CLICKHOUSE_PASSWORD: admin
@@ -24,6 +26,20 @@ services:
       nofile: 262144
     mem_limit: 2g
     ports: ["127.0.0.1:19911:8123"]
+
+  # another node of the cluster, where a table nobody backs up gets created
+  clickhouse2:
+    image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+    hostname: data1
+    environment:
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: admin
+    volumes:
+      - ./clickhouse.xml:/etc/clickhouse-server/config.d/test.xml:ro,z
+    ulimits:
+      nofile: 262144
+    mem_limit: 1g
+    ports: ["127.0.0.1:19912:8123"]
 
   runner:
     build: {context: ., dockerfile: runner.Dockerfile}

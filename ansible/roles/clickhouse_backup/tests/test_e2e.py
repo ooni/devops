@@ -4,8 +4,9 @@ In order:
   2. ClickHouseBackupCompleted reaches Slack once per job, as a notice, without email
   3. two more runs take incrementals; restoring the full and each incremental returns the rows of
      its moment, and an EmbeddedRocksDB table comes back with its exported rows
-  4. a run whose bucket is missing fails, and ClickHouseBackupFailed reaches Slack and email
-  5. a new month's full interrupted by killing ClickHouse deletes nothing; the next run
+  4. a table created on the cluster's other node only: ClickHouseTableNotBackedUp names it
+  5. a run whose bucket is missing fails, and ClickHouseBackupFailed reaches Slack and email
+  6. a new month's full interrupted by killing ClickHouse deletes nothing; the next run
      removes what it left, takes the full and prunes the oldest chain, and the full restores
 Prints each check; exits 1 at the first failure."""
 import json
@@ -42,8 +43,9 @@ def http(url, data=None):
         return r.read().decode()
 
 
-def ch(sql):
-    return http("http://127.0.0.1:19911/?user=admin&password=admin", sql.encode()).strip()
+def ch(sql, port=19911):
+    """a query on data3, or with port=19912 on the cluster's other node, data1"""
+    return http(f"http://127.0.0.1:{port}/?user=admin&password=admin", sql.encode()).strip()
 
 
 def backup(config, *args):
@@ -113,6 +115,7 @@ def months_ago(n):
 def setup():
     print("== waiting for the services")
     wait_for("ClickHouse", lambda: ch("SELECT 1") == "1")
+    wait_for("ClickHouse's other node", lambda: ch("SELECT 1", port=19912) == "1")
     wait_for("MinIO", lambda: http("http://127.0.0.1:19910/minio/health/live") == "")
     wait_for("Prometheus", lambda: "Ready" in http("http://127.0.0.1:19990/-/ready"))
     wait_for("Alertmanager", lambda: "OK" in http("http://127.0.0.1:19993/-/ready"))
@@ -137,6 +140,7 @@ def setup():
         "CREATE TABLE ooni.asnmeta_tmp (asn UInt32) ENGINE = MergeTree ORDER BY asn",  # excluded: *_tmp
     ]:
         ch(sql)
+    ch("CREATE DATABASE ooni", port=19912)
 
 
 def test_first_run():
@@ -165,6 +169,7 @@ def test_completed_alert(emails_before):
     check(email_attempts() == emails_before, "no email sent")
 
 
+
 def digest(table):
     """row count and a checksum of every row"""
     return ch(f"SELECT count(), sum(cityHash64(*)) FROM {table}")
@@ -176,6 +181,8 @@ def backup_url(bucket, table, chain, name):
 
 def test_incremental_and_restore():
     print("== 3. incrementals, and restoring each backup of a chain")
+    # for step 4: a table created on data1 alone, which no job backs up
+    ch("CREATE TABLE ooni.made_on_data1 (x UInt8) ENGINE = MergeTree ORDER BY x", port=19912)
     # fastpath as at the first run's full, then after each of two more runs
     states = [digest("ooni.fastpath")]
     for first in (200000, 201000):
@@ -202,8 +209,17 @@ def test_incremental_and_restore():
           "test_groups (EmbeddedRocksDB) restores with its exported rows")
 
 
+def test_not_backed_up_alert():
+    print("== 4. a table no backup covers: ClickHouseTableNotBackedUp")
+    title = "[FIRING] ClickHouse table made_on_data1 is not backed up (on data1)"
+    msgs = wait_for(f"a Slack message: {title}", lambda: [m for m in slack() if m[0] == title])
+    check("Add it to a job" in msgs[0][1], f"it says what to do: {msgs[0][1][:90]!r}...")
+    others = [t for t, _ in slack() if "is not backed up" in t and t != title]
+    check(not others, f"no other table is reported (labeling_frames is data1's, asnmeta_tmp excluded): {others}")
+
+
 def test_failure_alert(emails_before):
-    print("== 4. a run that fails: ClickHouseBackupFailed")
+    print("== 5. a run that fails: ClickHouseBackupFailed")
     r = backup("broken", "run")
     check(r.returncode == 1, "the run exits 1", r.stderr)
     title = f"[FIRING] ClickHouse backup of labeling_frames (broken) failed on {DATA3}"
@@ -214,7 +230,7 @@ def test_failure_alert(emails_before):
 
 
 def test_interrupted_full():
-    print("== 5. a new month's full, interrupted, then completed")
+    print("== 6. a new month's full, interrupted, then completed")
     (chain, backups), = chains(MEASUREMENTS, "obs_web").items()
     full = f"prod/ooni/obs_web/{chain}/{min(backups)}/"
     old, previous = months_ago(2), months_ago(1)
@@ -256,6 +272,7 @@ def main():
     test_first_run()
     test_completed_alert(emails_before)
     test_incremental_and_restore()
+    test_not_backed_up_alert()
     test_failure_alert(emails_before)
     test_interrupted_full()
     print("PASS")

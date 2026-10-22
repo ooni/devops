@@ -10,12 +10,14 @@
   bucket stubbed.
 - `test_job.py`: how a job runs and what it reports, ClickHouse stubbed.
 - `test_e2e.py`: the real thing, in the containers of `compose.yml`:
-  ClickHouse at production's version, MinIO standing in for R2, the script
+  two ClickHouse nodes at production's version (`data3`, where the backups
+  run, and `data1`, in one test cluster), MinIO standing in for R2, the script
   on Debian bookworm with its python3-boto3, as on the hosts, node_exporter,
   Prometheus with the repo's alert rules, Alertmanager with the repo's
   routes, and a stand-in for Slack. Full and incremental backups, and
   restoring the full and each incremental of a chain, and an
-  EmbeddedRocksDB table with its exported rows; a failed run; an
+  EmbeddedRocksDB table with its exported rows; a table created on `data1`
+  only, which ClickHouseTableNotBackedUp must name; a failed run; an
   interrupted full, the month's new full, pruning and restoring what's
   left; and the Slack messages and emails each one causes.
 
