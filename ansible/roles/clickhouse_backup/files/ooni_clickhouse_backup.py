@@ -45,6 +45,8 @@ Commands:
 After each table, the result goes to a Prometheus textfile (metrics_file in
 the config) for node_exporter: last success and attempt per table, whether
 the last attempt failed, its duration and size, and whether a job is running.
+At the end of a run, each job's result: when it finished, how long it took,
+and how many tables it backed up, as full backups and in all, and failed.
 
 Monitor with:  sudo journalctl -f --identifier ooni-clickhouse-backup
 """
@@ -261,6 +263,14 @@ class Metrics:
          "Files in the table's last successful backup"),
     ]
 
+    RUN_GAUGES = [
+        ("last_run_finished_timestamp_seconds", "finished", "When the job's last run finished"),
+        ("last_run_duration_seconds", "duration", "How long the job's last run took"),
+        ("last_run_tables", "tables", "Tables the job's last run backed up"),
+        ("last_run_full_backups", "fulls", "Tables the job's last run backed up in full"),
+        ("last_run_failed_tables", "failed", "Tables whose backup failed in the job's last run"),
+    ]
+
     def __init__(self, metrics_file: str = "", state_file: str = ""):
         self.metrics_file = metrics_file
         self.state_file = state_file
@@ -268,6 +278,7 @@ class Metrics:
         if state_file and os.path.exists(state_file):
             with open(state_file) as f:
                 self.state = json.load(f)
+        self.state.setdefault("runs", {})
 
     def table_result(self, job: str, table: str, ok: bool, st: dict = None, duration_s: float = 0) -> None:
         entry = self.state["tables"].setdefault(f"{job}/{table}", {"job": job, "table": table})
@@ -285,6 +296,13 @@ class Metrics:
         self.state["running"][job] = 1 if running else 0
         self.save()
 
+    def run_result(self, job: str, duration_s: float, tables: int, fulls: int, failed: int) -> None:
+        self.state["runs"][job] = {
+            "finished": time.time(), "duration": round(duration_s, 1),
+            "tables": tables, "fulls": fulls, "failed": failed,
+        }
+        self.save()
+
     def render(self) -> str:
         p = "ooni_clickhouse_backup_"
         lines = [
@@ -293,6 +311,10 @@ class Metrics:
         ]
         for job, v in sorted(self.state["running"].items()):
             lines.append(f'{p}running{{backup="{label_value(job)}"}} {v}')
+        for name, field, help_ in self.RUN_GAUGES:
+            lines += [f"# HELP {p}{name} {help_}", f"# TYPE {p}{name} gauge"]
+            for job, run in sorted(self.state["runs"].items()):
+                lines.append(f'{p}{name}{{backup="{label_value(job)}"}} {run[field]}')
         for name, field, help_ in self.GAUGES:
             lines += [f"# HELP {p}{name} {help_}", f"# TYPE {p}{name} gauge"]
             for entry in sorted(self.state["tables"].values(), key=lambda e: (e["job"], e["table"])):
@@ -450,7 +472,8 @@ class BackupJob:
             n = self.store.delete_prefix(f"{tprefix}{chain}/")
             log.info(f"{table}: pruned chain {chain} ({n} objects)")
 
-    def backup_table(self, table: str, engine: str, force_full: bool, keep: str) -> None:
+    def backup_table(self, table: str, engine: str, force_full: bool, keep: str) -> bool:
+        """Back up one table; True if that was a full backup"""
         chains = self.store.chains(self.db, table)
         self.cleanup_incomplete(table, chains)
         chains = self.store.chains(self.db, table)
@@ -502,6 +525,7 @@ class BackupJob:
             self.store.put_empty(f"{self.store.table_prefix(self.db, table)}{chain}/KEEP-{keep}")
             log.info(f"{table}: chain {chain} pinned as {keep}")
         self.prune(table)
+        return full
 
     def run(self, only: list, force_full: bool, keep: str) -> int:
         running = self.running_backups()
@@ -512,17 +536,20 @@ class BackupJob:
             return 1
 
         tables, failed = self.tables(only)
+        t0, done, fulls = time.monotonic(), 0, 0
         self.metrics.job_running(self.name, True)
         try:
             for table, engine in tables:
                 try:
-                    self.backup_table(table, engine, force_full, keep)
+                    fulls += self.backup_table(table, engine, force_full, keep)
+                    done += 1
                 except Exception as e:
                     log.error(f"{self.name}: {table}: backup failed: {e}")
                     self.metrics.table_result(self.name, table, False)
                     failed.append(table)
         finally:
             self.metrics.job_running(self.name, False)
+        self.metrics.run_result(self.name, time.monotonic() - t0, done, fulls, len(failed))
 
         if failed:
             log.error(f"{self.name}: failed tables: {', '.join(failed)}")

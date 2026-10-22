@@ -154,7 +154,19 @@ groups:
     expr: ooni_clickhouse_backup_last_attempt_failed == 1
     annotations:
       summary: 'ClickHouse backup of {{ $labels.table }} ({{ $labels.backup }}) failed on {{ $labels.instance }}'
-      description: 'See `journalctl --identifier ooni-clickhouse-backup` on {{ $labels.instance }}. The next daily run retries it.'
+      description: 'Nothing was deleted: the older backups of {{ $labels.table }} are kept. The next run retries it. See `journalctl --identifier ooni-clickhouse-backup` on {{ $labels.instance }}.'
+
+  # A job's run finished with every table backed up. One Slack message per
+  # job run, no email and no "resolved" message: Alertmanager routes it to
+  # slack-notice. It clears an hour after the run.
+  - alert: ClickHouseBackupCompleted
+    expr: |
+      ooni_clickhouse_backup_last_run_duration_seconds
+        and on (instance, backup) (time() - ooni_clickhouse_backup_last_run_finished_timestamp_seconds < 3600)
+        and on (instance, backup) ooni_clickhouse_backup_last_run_failed_tables == 0
+    annotations:
+      summary: 'ClickHouse backup {{ $labels.backup }} on {{ $labels.instance }} completed in {{ $value | humanizeDuration }}'
+      description: '{{ with printf `ooni_clickhouse_backup_last_run_tables{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }} tables backed up, {{ with printf `ooni_clickhouse_backup_last_run_full_backups{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }} of them in full. Nothing to do.'
 
   # Backups run daily; a new full backup of obs_web can take a day and a half
   - alert: ClickHouseBackupStale

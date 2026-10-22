@@ -255,7 +255,10 @@ After each table, the script writes its result to
 (metrics `ooni_clickhouse_backup_*`, labels `backup` = job and `table`).
 Alerts, in `alert_rules.yml`:
 
-- `ClickHouseBackupFailed`: a table's last attempt failed.
+- `ClickHouseBackupFailed`: a table's last attempt failed. Nothing is
+  deleted, and the next run retries it.
+- `ClickHouseBackupCompleted`: a job's run backed up every table. One Slack
+  message per run in `#ooni-bots`, no email.
 - `ClickHouseBackupStale`: a table hasn't been backed up for 3 days.
 - `ClickHouseBackupMissing`: data1 or data3 hasn't written results for a day.
 - `ClickHouseBackupHostLoadHigh`: data3's 5-minute load is over half its
