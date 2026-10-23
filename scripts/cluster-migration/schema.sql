@@ -53,7 +53,7 @@ ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/ooni/asnmeta', '{repl
 ORDER BY (asn, changed)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS changepoint_label ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS ooni.changepoint_label ON CLUSTER oonidata_cluster
 (
     -- Ground truth, set by a person. Represents the network state for
     -- the (probe_cc, probe_asn, resolver_asn, domain) series of the
@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS changepoint_label ON CLUSTER oonidata_cluster
     `first_ok_time` Nullable(DateTime64(3, 'UTC'))
 )
 ENGINE = MergeTree
-ORDER BY (changepoint_id, created_at, id);
+ORDER BY (changepoint_id, created_at, id)
+SETTINGS index_granularity = 8192;
 
 CREATE TABLE ooni.citizenlab ON CLUSTER oonidata_cluster
 (
