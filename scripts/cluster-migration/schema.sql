@@ -1,6 +1,11 @@
 -- The tables and views of the ooni database, as production has them (dumped from every replica on
--- 2026-10-20 after asnmeta was made replicated again on data1, OOPRIV-181). Run on a new cluster with
---   clickhouse-client --multiquery < schema.sql
+-- 2026-10-20 after asnmeta was made replicated again on data1, OOPRIV-181). Create the database on every
+-- node, then load this file into it:
+--   clickhouse-client -q "CREATE DATABASE IF NOT EXISTS ooni ON CLUSTER oonidata_cluster"
+--   clickhouse-client --database ooni --multiquery < schema.sql
+-- Any database name works, e.g. for CI: ON CLUSTER creates each table in the client's database on every
+-- node, and the Keeper paths include {database}, so a second database on the same cluster doesn't share
+-- production's replicas.
 -- Where the replicas differ, this is the definition of the replica that holds the data:
 --   event_detector_cusums, labeling_frames: data1 (the only replica with rows, and with their newer columns)
 --   fastpath: data1 and data3 (data2 alone has deduplicate_merge_projection_mode = 'rebuild')
@@ -10,9 +15,7 @@
 -- msmt_feedback), session_expunge (unused since backend #972) and the leftover inner table of the dropped
 -- counters_test_list view.
 
-CREATE DATABASE IF NOT EXISTS ooni ON CLUSTER oonidata_cluster;
-
-CREATE TABLE IF NOT EXISTS ooni.analysis_web_measurement ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS analysis_web_measurement ON CLUSTER oonidata_cluster
 (
     `domain` String,
     `input` String,
@@ -54,7 +57,7 @@ PRIMARY KEY measurement_uid
 ORDER BY (measurement_uid, measurement_start_time, probe_cc, probe_asn, domain)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.asnmeta ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS asnmeta ON CLUSTER oonidata_cluster
 (
     `asn` UInt32,
     `org_name` String,
@@ -67,7 +70,7 @@ ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/asnmeta', 
 ORDER BY (asn, changed)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.changepoint_label ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS changepoint_label ON CLUSTER oonidata_cluster
 (
     -- Ground truth, set by a person. Represents the network state for
     -- the (probe_cc, probe_asn, resolver_asn, domain) series of the
@@ -90,7 +93,7 @@ ENGINE = MergeTree
 ORDER BY (changepoint_id, created_at, id)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.citizenlab ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS citizenlab ON CLUSTER oonidata_cluster
 (
     `domain` String,
     `url` String,
@@ -101,7 +104,7 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/c
 ORDER BY (domain, url, cc, category_code)
 SETTINGS index_granularity = 4;
 
-CREATE TABLE IF NOT EXISTS ooni.event_detector_changepoints ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS event_detector_changepoints ON CLUSTER oonidata_cluster
 (
     `probe_asn` UInt32,
     `probe_cc` String,
@@ -125,7 +128,7 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/e
 ORDER BY (probe_asn, probe_cc, ts, domain)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.event_detector_cusums ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS event_detector_cusums ON CLUSTER oonidata_cluster
 (
     `probe_asn` UInt32,
     `probe_cc` String,
@@ -156,7 +159,7 @@ ENGINE = ReplacingMergeTree(ts)
 ORDER BY (probe_asn, probe_cc, domain)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.event_detector_v2_changepoints ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints ON CLUSTER oonidata_cluster
 (
     `uuid` UUID,
     `domain` String,
@@ -177,7 +180,7 @@ ENGINE = MergeTree
 ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.fastpath ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS fastpath ON CLUSTER oonidata_cluster
 (
     `measurement_uid` String,
     `report_id` String,
@@ -223,7 +226,7 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/f
 ORDER BY (measurement_start_time, report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.faulty_measurements ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
 (
     `ts` DateTime64(3, 'UTC') DEFAULT now64(),
     `type` String,
@@ -238,7 +241,7 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/f
 ORDER BY (ts, type, probe_cc, probe_asn, uid)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.fingerprints_dns ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS fingerprints_dns ON CLUSTER oonidata_cluster
 (
     `name` String,
     `scope` Enum8('nat' = 1, 'isp' = 2, 'prod' = 3, 'inst' = 4, 'vbw' = 5, 'fp' = 6),
@@ -255,7 +258,7 @@ CREATE TABLE IF NOT EXISTS ooni.fingerprints_dns ON CLUSTER oonidata_cluster
 ENGINE = EmbeddedRocksDB
 PRIMARY KEY name;
 
-CREATE TABLE IF NOT EXISTS ooni.fingerprints_http ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS fingerprints_http ON CLUSTER oonidata_cluster
 (
     `name` String,
     `scope` Enum8('nat' = 1, 'isp' = 2, 'prod' = 3, 'inst' = 4, 'vbw' = 5, 'fp' = 6, 'injb' = 7, 'prov' = 8),
@@ -272,7 +275,7 @@ CREATE TABLE IF NOT EXISTS ooni.fingerprints_http ON CLUSTER oonidata_cluster
 ENGINE = EmbeddedRocksDB
 PRIMARY KEY name;
 
-CREATE TABLE IF NOT EXISTS ooni.jsonl ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS jsonl ON CLUSTER oonidata_cluster
 (
     `report_id` String,
     `input` String,
@@ -287,7 +290,7 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/j
 ORDER BY (report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.labeling_frames ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS labeling_frames ON CLUSTER oonidata_cluster
 (
     `measurement_uid` String,
     `blocked_fastpath` Bool,
@@ -303,7 +306,7 @@ ENGINE = MergeTree
 ORDER BY (stratum, measurement_uid)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.msmt_feedback ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS msmt_feedback ON CLUSTER oonidata_cluster
 (
     `measurement_uid` String,
     `account_id` String,
@@ -315,7 +318,7 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/m
 ORDER BY (measurement_uid, account_id, update_time)
 SETTINGS index_granularity = 4;
 
-CREATE TABLE IF NOT EXISTS ooni.obs_http_middlebox ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS obs_http_middlebox ON CLUSTER oonidata_cluster
 (
     `measurement_uid` String,
     `observation_idx` UInt16,
@@ -371,7 +374,7 @@ PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.obs_openvpn ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS obs_openvpn ON CLUSTER oonidata_cluster
 (
     `anomaly` Int8,
     `bootstrap_time` Float32,
@@ -410,7 +413,7 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/o
 ORDER BY (measurement_start_time, report_id, input)
 SETTINGS index_granularity = 8;
 
-CREATE TABLE IF NOT EXISTS ooni.obs_web ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS obs_web ON CLUSTER oonidata_cluster
 (
     `measurement_uid` String,
     `observation_idx` UInt16,
@@ -517,7 +520,7 @@ PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time, probe_cc, probe_asn)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.obs_web_ctrl ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS obs_web_ctrl ON CLUSTER oonidata_cluster
 (
     `measurement_uid` String,
     `observation_idx` UInt16,
@@ -558,14 +561,14 @@ PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time, hostname)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE IF NOT EXISTS ooni.test_groups ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS test_groups ON CLUSTER oonidata_cluster
 (
     `test_name` String,
     `test_group` String
 )
 ENGINE = Join(ANY, LEFT, test_name);
 
-CREATE TABLE IF NOT EXISTS ooni.url_priorities ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS url_priorities ON CLUSTER oonidata_cluster
 (
     `sign` Int8,
     `category_code` String,
@@ -580,7 +583,7 @@ SETTINGS index_granularity = 1024;
 
 -- Its rows are in a hidden table, .inner_id.<the view's UUID>. The Keeper path keeps production's name
 -- for it, so a replica added later joins production's table whatever UUID its view gets.
-CREATE MATERIALIZED VIEW IF NOT EXISTS ooni.counters_asn_test_list ON CLUSTER oonidata_cluster
+CREATE MATERIALIZED VIEW IF NOT EXISTS counters_asn_test_list ON CLUSTER oonidata_cluster
 (
     `week` DateTime,
     `probe_cc` String,
@@ -597,8 +600,8 @@ AS SELECT
     probe_asn,
     input,
     count() AS msmt_cnt
-FROM ooni.fastpath
-INNER JOIN ooni.citizenlab ON fastpath.input = citizenlab.url
+FROM fastpath
+INNER JOIN citizenlab ON fastpath.input = citizenlab.url
 WHERE (measurement_start_time < now()) AND (measurement_start_time > (now() - toIntervalDay(8))) AND (test_name = 'web_connectivity')
 GROUP BY
     week,
