@@ -1,4 +1,4 @@
-CREATE TABLE analysis_web_measurement ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS ooni.analysis_web_measurement ON CLUSTER oonidata_cluster
 (
     `domain` String,
     `input` String,
@@ -24,7 +24,15 @@ CREATE TABLE analysis_web_measurement ON CLUSTER oonidata_cluster
     `tcp_ok` Float32,
     `tls_blocked` Float32,
     `tls_down` Float32,
-    `tls_ok` Float32
+    `tls_ok` Float32,
+    `top_dns_rule_id` LowCardinality(String),
+    `top_tcp_rule_id` LowCardinality(String),
+    `top_tls_rule_id` LowCardinality(String),
+    `probe_id` FixedString(64),
+    `analysis_rules_version` UInt16,
+    INDEX measurement_start_time_idx measurement_start_time TYPE minmax GRANULARITY 2,
+    INDEX probe_cc_idx probe_cc TYPE minmax GRANULARITY 1,
+    INDEX probe_asn_idx probe_asn TYPE minmax GRANULARITY 1
 )
 ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/analysis_web_measurement/{shard}', '{replica}')
 PARTITION BY substring(measurement_uid, 1, 6)
