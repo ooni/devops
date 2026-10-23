@@ -288,3 +288,15 @@ CREATE TABLE IF NOT EXISTS ooni.labeling_frames ON CLUSTER oonidata_cluster
 ENGINE = MergeTree
 ORDER BY (stratum, measurement_uid)
 SETTINGS index_granularity = 8192;
+
+CREATE TABLE IF NOT EXISTS ooni.msmt_feedback ON CLUSTER oonidata_cluster
+(
+    `measurement_uid` String,
+    `account_id` String,
+    `status` String,
+    `update_time` DateTime64(3) DEFAULT now64(),
+    `comment` String
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/msmt_feedback_new/{shard}', '{replica}')
+ORDER BY (measurement_uid, account_id, update_time)
+SETTINGS index_granularity = 4;
