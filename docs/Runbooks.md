@@ -345,7 +345,9 @@ each table. Restoring the latest incremental restores the whole chain.
    CREATE DATABASE IF NOT EXISTS ooni
    ```
 2. Restore tables before the materialized views that read from them, on
-   one node. A replicated table that still exists makes `RESTORE` fail with
+   one node, and a view's `TO` table before the view: while a view exists
+   without its table, every insert into the view's source fails (fastpath's,
+   for `counters_asn_test_list`). A replicated table that still exists makes `RESTORE` fail with
    `REPLICA_ALREADY_EXISTS`: drop it (`DROP TABLE ... SYNC`) or restore on
    another server.
    ```sql
