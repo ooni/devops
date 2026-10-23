@@ -142,8 +142,7 @@ ENGINE = ReplacingMergeTree(ts)
 ORDER BY (probe_asn, probe_cc, domain)
 SETTINGS index_granularity = 8192;
 
--- Changepoints
-CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS ooni.event_detector_v2_changepoints ON CLUSTER oonidata_cluster
 (
     `uuid` UUID,
     `domain` String,
@@ -161,7 +160,8 @@ CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints ON CLUSTER oonidata_cl
     `created_at` DateTime64(3, 'UTC') DEFAULT now64()
 )
 ENGINE = MergeTree
-ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid);
+ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid)
+SETTINGS index_granularity = 8192;
 
 CREATE TABLE ooni.fastpath ON CLUSTER oonidata_cluster
 (
