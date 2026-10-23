@@ -502,3 +502,44 @@ PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time, probe_cc, probe_asn)
 SETTINGS index_granularity = 8192;
+
+CREATE TABLE IF NOT EXISTS ooni.obs_web_ctrl ON CLUSTER oonidata_cluster
+(
+    `measurement_uid` String,
+    `observation_idx` UInt16,
+    `input` Nullable(String),
+    `report_id` String,
+    `ooni_run_link_id` String DEFAULT '',
+    `measurement_start_time` DateTime64(3, 'UTC'),
+    `software_name` String,
+    `software_version` String,
+    `test_name` String,
+    `test_version` String,
+    `bucket_date` String,
+    `hostname` String,
+    `created_at` Nullable(DateTime64(3, 'UTC')),
+    `ip` String,
+    `port` Nullable(UInt16),
+    `ip_asn` Nullable(UInt32),
+    `ip_as_org_name` Nullable(String),
+    `ip_as_cc` Nullable(String),
+    `ip_cc` Nullable(String),
+    `ip_is_bogon` Nullable(UInt8),
+    `dns_failure` Nullable(String),
+    `dns_success` Nullable(UInt8),
+    `tcp_failure` Nullable(String),
+    `tcp_success` Nullable(UInt8),
+    `tls_failure` Nullable(String),
+    `tls_success` Nullable(UInt8),
+    `tls_server_name` Nullable(String),
+    `http_request_url` Nullable(String),
+    `http_failure` Nullable(String),
+    `http_success` Nullable(UInt8),
+    `http_response_body_length` Nullable(Int32),
+    INDEX measurement_start_time_idx measurement_start_time TYPE minmax GRANULARITY 2
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/obs_web_ctrl/{shard}', '{replica}')
+PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
+PRIMARY KEY (measurement_uid, observation_idx)
+ORDER BY (measurement_uid, observation_idx, measurement_start_time, hostname)
+SETTINGS index_granularity = 8192;
