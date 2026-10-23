@@ -550,3 +550,16 @@ CREATE TABLE IF NOT EXISTS ooni.test_groups ON CLUSTER oonidata_cluster
     `test_group` String
 )
 ENGINE = Join(ANY, LEFT, test_name);
+
+CREATE TABLE IF NOT EXISTS ooni.url_priorities ON CLUSTER oonidata_cluster
+(
+    `sign` Int8,
+    `category_code` String,
+    `cc` String,
+    `domain` String,
+    `url` String,
+    `priority` Int32
+)
+ENGINE = ReplicatedCollapsingMergeTree('/clickhouse/{cluster}/tables/ooni/url_priorities/{shard}', '{replica}', sign)
+ORDER BY (category_code, cc, domain, url, priority)
+SETTINGS index_granularity = 1024;
