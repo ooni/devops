@@ -49,6 +49,12 @@ server {
         proxy_buffering off;
     }
 
+    # Data dump shared with Fariba
+    location = /fariba/analysis_web_measurement_dns.csv.lz4 {
+        alias /mnt/data/fariba/analysis_web_measurement_dns.csv.lz4;
+        default_type application/octet-stream;
+    }
+
     # Handler for clickhouse
     location /click {
         if ($request_method = 'OPTIONS') {
