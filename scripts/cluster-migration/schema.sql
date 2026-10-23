@@ -258,7 +258,7 @@ CREATE TABLE IF NOT EXISTS ooni.fingerprints_http ON CLUSTER oonidata_cluster
 ENGINE = EmbeddedRocksDB
 PRIMARY KEY name;
 
-CREATE TABLE ooni.jsonl ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS ooni.jsonl ON CLUSTER oonidata_cluster
 (
     `report_id` String,
     `input` String,
