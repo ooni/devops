@@ -163,7 +163,7 @@ ENGINE = MergeTree
 ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE ooni.fastpath ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS ooni.fastpath ON CLUSTER oonidata_cluster
 (
     `measurement_uid` String,
     `report_id` String,
@@ -176,9 +176,9 @@ CREATE TABLE ooni.fastpath ON CLUSTER oonidata_cluster
     `filename` String,
     `scores` String,
     `platform` String,
-    `anomaly` String,
-    `confirmed` String,
-    `msm_failure` String,
+    `anomaly` LowCardinality(String),
+    `confirmed` LowCardinality(String),
+    `msm_failure` LowCardinality(String),
     `domain` String,
     `software_name` String,
     `software_version` String,
@@ -200,43 +200,14 @@ CREATE TABLE ooni.fastpath ON CLUSTER oonidata_cluster
     `test_helper_address` LowCardinality(String),
     `test_helper_type` LowCardinality(String),
     `ooni_run_link_id` Nullable(UInt64),
+    `is_verified` LowCardinality(String) DEFAULT 'u',
     INDEX fastpath_rid_idx report_id TYPE minmax GRANULARITY 1,
-    INDEX measurement_uid_idx measurement_uid TYPE minmax GRANULARITY 8
+    INDEX measurement_uid_idx measurement_uid TYPE minmax GRANULARITY 8,
+    INDEX input_bloom_idx input TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/fastpath/{shard}', '{replica}', update_time)
 ORDER BY (measurement_start_time, report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
-
--- Anonymous Credentials fields
-ALTER TABLE ooni.fastpath
-    ADD COLUMN IF NOT EXISTS `is_verified` Int8;
-
-ALTER TABLE ooni.fastpath
-    ADD COLUMN IF NOT EXISTS `nym` Nullable(String);
-
-ALTER TABLE ooni.fastpath
-    ADD COLUMN IF NOT EXISTS `zkp_request` Nullable(String);
-
-ALTER TABLE ooni.fastpath
-    ADD COLUMN IF NOT EXISTS `age_range` Nullable(String);
-
-ALTER TABLE ooni.fastpath
-    ADD COLUMN IF NOT EXISTS `msm_range` Nullable(String);
-
-ALTER TABLE ooni.fastpath
-    DROP COLUMN IF EXISTS nym;
-
-ALTER TABLE ooni.fastpath
-    DROP COLUMN IF EXISTS zkp_request;
-
-ALTER TABLE ooni.fastpath
-    DROP COLUMN IF EXISTS age_range;
-
-ALTER TABLE ooni.fastpath
-    DROP COLUMN IF EXISTS msm_range;
-
-ALTER TABLE ooni.fastpath
-    MODIFY COLUMN `is_verified` LowCardinality(String) DEFAULT 'u';
 
 -- faulty measurements
 CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
