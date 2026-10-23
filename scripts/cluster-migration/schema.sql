@@ -272,3 +272,19 @@ CREATE TABLE IF NOT EXISTS ooni.jsonl ON CLUSTER oonidata_cluster
 ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/jsonl/{shard}', '{replica}', update_time)
 ORDER BY (report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
+
+CREATE TABLE IF NOT EXISTS ooni.labeling_frames ON CLUSTER oonidata_cluster
+(
+    `measurement_uid` String,
+    `blocked_fastpath` Bool,
+    `blocked_analysis` Bool,
+    `stratum` LowCardinality(String),
+    `test_name` LowCardinality(String),
+    `day` DateTime('UTC'),
+    `fastpath_query` LowCardinality(String),
+    `analysis_query` LowCardinality(String),
+    `failed_fastpath` Bool
+)
+ENGINE = MergeTree
+ORDER BY (stratum, measurement_uid)
+SETTINGS index_granularity = 8192;
