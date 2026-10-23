@@ -563,3 +563,29 @@ CREATE TABLE IF NOT EXISTS ooni.url_priorities ON CLUSTER oonidata_cluster
 ENGINE = ReplicatedCollapsingMergeTree('/clickhouse/{cluster}/tables/ooni/url_priorities/{shard}', '{replica}', sign)
 ORDER BY (category_code, cc, domain, url, priority)
 SETTINGS index_granularity = 1024;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS ooni.counters_asn_test_list ON CLUSTER oonidata_cluster
+(
+    `week` DateTime,
+    `probe_cc` String,
+    `probe_asn` UInt64,
+    `input` String,
+    `msmt_cnt` UInt64
+)
+ENGINE = ReplicatedSummingMergeTree('/clickhouse/{cluster}/tables/ooni/.inner_id.6a72ceec-7e0e-4b65-a3ab-da2809202114/{shard}', '{replica}')
+ORDER BY (probe_cc, probe_asn, input)
+SETTINGS index_granularity = 8192
+AS SELECT
+    toStartOfWeek(measurement_start_time) AS week,
+    probe_cc,
+    probe_asn,
+    input,
+    count() AS msmt_cnt
+FROM ooni.fastpath
+INNER JOIN ooni.citizenlab ON fastpath.input = citizenlab.url
+WHERE (measurement_start_time < now()) AND (measurement_start_time > (now() - toIntervalDay(8))) AND (test_name = 'web_connectivity')
+GROUP BY
+    week,
+    probe_cc,
+    probe_asn,
+    input;
