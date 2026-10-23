@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS ooni.analysis_web_measurement ON CLUSTER oonidata_clu
     INDEX probe_cc_idx probe_cc TYPE minmax GRANULARITY 1,
     INDEX probe_asn_idx probe_asn TYPE minmax GRANULARITY 1
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/analysis_web_measurement/{shard}', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/analysis_web_measurement/{shard}', '{replica}')
 PARTITION BY substring(measurement_uid, 1, 6)
 PRIMARY KEY measurement_uid
 ORDER BY (measurement_uid, measurement_start_time, probe_cc, probe_asn, domain)
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS ooni.asnmeta ON CLUSTER oonidata_cluster
     `aut_name` String,
     `source` String
 )
-ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/ooni/asnmeta', '{replica}')
+ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/asnmeta', '{replica}')
 ORDER BY (asn, changed)
 SETTINGS index_granularity = 8192;
 
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS ooni.citizenlab ON CLUSTER oonidata_cluster
     `cc` FixedString(32),
     `category_code` String
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/citizenlab', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/citizenlab', '{replica}')
 ORDER BY (domain, url, cc, category_code)
 SETTINGS index_granularity = 4;
 
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS ooni.event_detector_changepoints ON CLUSTER oonidata_
     `h` Nullable(Float32),
     `block_type` String
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/event_detector_changepoints/{shard}', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/event_detector_changepoints/{shard}', '{replica}')
 ORDER BY (probe_asn, probe_cc, ts, domain)
 SETTINGS index_granularity = 8192;
 
@@ -219,7 +219,7 @@ CREATE TABLE IF NOT EXISTS ooni.fastpath ON CLUSTER oonidata_cluster
     INDEX measurement_uid_idx measurement_uid TYPE minmax GRANULARITY 8,
     INDEX input_bloom_idx input TYPE bloom_filter(0.01) GRANULARITY 1
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/fastpath/{shard}', '{replica}', update_time)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/fastpath/{shard}', '{replica}', update_time)
 ORDER BY (measurement_start_time, report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
@@ -234,7 +234,7 @@ CREATE TABLE IF NOT EXISTS ooni.faulty_measurements ON CLUSTER oonidata_cluster
     -- JSON-encoded details about the anomaly
     `details` String
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/faulty_measurements/{shard}', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/faulty_measurements/{shard}', '{replica}')
 ORDER BY (ts, type, probe_cc, probe_asn, uid)
 SETTINGS index_granularity = 8192;
 
@@ -283,7 +283,7 @@ CREATE TABLE IF NOT EXISTS ooni.jsonl ON CLUSTER oonidata_cluster
     `source` String,
     `update_time` DateTime64(3) MATERIALIZED now64()
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/jsonl/{shard}', '{replica}', update_time)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/jsonl/{shard}', '{replica}', update_time)
 ORDER BY (report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS ooni.msmt_feedback ON CLUSTER oonidata_cluster
     `update_time` DateTime64(3) DEFAULT now64(),
     `comment` String
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/msmt_feedback_new/{shard}', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/msmt_feedback_new/{shard}', '{replica}')
 ORDER BY (measurement_uid, account_id, update_time)
 SETTINGS index_granularity = 4;
 
@@ -365,7 +365,7 @@ CREATE TABLE IF NOT EXISTS ooni.obs_http_middlebox ON CLUSTER oonidata_cluster
     `hfm_success` Nullable(UInt8),
     `probe_id` FixedString(64)
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/obs_http_middlebox/{shard}', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/obs_http_middlebox/{shard}', '{replica}')
 PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time)
@@ -406,7 +406,7 @@ CREATE TABLE IF NOT EXISTS ooni.obs_openvpn ON CLUSTER oonidata_cluster
     `test_start_time` DateTime,
     `transport` String
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/obs_openvpn/{shard}', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/obs_openvpn/{shard}', '{replica}')
 ORDER BY (measurement_start_time, report_id, input)
 SETTINGS index_granularity = 8;
 
@@ -511,7 +511,7 @@ CREATE TABLE IF NOT EXISTS ooni.obs_web ON CLUSTER oonidata_cluster
     INDEX probe_cc_idx probe_cc TYPE minmax GRANULARITY 1,
     INDEX probe_asn_idx probe_asn TYPE minmax GRANULARITY 1
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/obs_web_repl/{shard}', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/obs_web_repl/{shard}', '{replica}')
 PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time, probe_cc, probe_asn)
@@ -552,7 +552,7 @@ CREATE TABLE IF NOT EXISTS ooni.obs_web_ctrl ON CLUSTER oonidata_cluster
     `http_response_body_length` Nullable(Int32),
     INDEX measurement_start_time_idx measurement_start_time TYPE minmax GRANULARITY 2
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/obs_web_ctrl/{shard}', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/obs_web_ctrl/{shard}', '{replica}')
 PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time, hostname)
@@ -574,10 +574,12 @@ CREATE TABLE IF NOT EXISTS ooni.url_priorities ON CLUSTER oonidata_cluster
     `url` String,
     `priority` Int32
 )
-ENGINE = ReplicatedCollapsingMergeTree('/clickhouse/{cluster}/tables/ooni/url_priorities/{shard}', '{replica}', sign)
+ENGINE = ReplicatedCollapsingMergeTree('/clickhouse/{cluster}/tables/{database}/url_priorities/{shard}', '{replica}', sign)
 ORDER BY (category_code, cc, domain, url, priority)
 SETTINGS index_granularity = 1024;
 
+-- Its rows are in a hidden table, .inner_id.<the view's UUID>. The Keeper path keeps production's name
+-- for it, so a replica added later joins production's table whatever UUID its view gets.
 CREATE MATERIALIZED VIEW IF NOT EXISTS ooni.counters_asn_test_list ON CLUSTER oonidata_cluster
 (
     `week` DateTime,
@@ -586,7 +588,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS ooni.counters_asn_test_list ON CLUSTER oo
     `input` String,
     `msmt_cnt` UInt64
 )
-ENGINE = ReplicatedSummingMergeTree('/clickhouse/{cluster}/tables/ooni/.inner_id.6a72ceec-7e0e-4b65-a3ab-da2809202114/{shard}', '{replica}')
+ENGINE = ReplicatedSummingMergeTree('/clickhouse/{cluster}/tables/{database}/.inner_id.6a72ceec-7e0e-4b65-a3ab-da2809202114/{shard}', '{replica}')
 ORDER BY (probe_cc, probe_asn, input)
 SETTINGS index_granularity = 8192
 AS SELECT
