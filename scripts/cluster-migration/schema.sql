@@ -4,7 +4,7 @@
 --   clickhouse-client --database ooni --multiquery < schema.sql
 -- Any database name works, e.g. for CI: ON CLUSTER creates each table in the client's database on every
 -- node, and the Keeper paths include {database}, so a second database on the same cluster doesn't share
--- production's replicas.
+-- production's replicas. A change to an existing cluster also goes in migrations/: see its README.
 -- Where the replicas differ, this is the definition of the replica that holds the data:
 --   fastpath: data1 and data3 (data2 alone has deduplicate_merge_projection_mode = 'rebuild')
 -- changepoint_label is not replicated: ON CLUSTER creates an empty local table on each node, as
