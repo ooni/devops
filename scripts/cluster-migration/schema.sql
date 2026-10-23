@@ -543,3 +543,10 @@ PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time, hostname)
 SETTINGS index_granularity = 8192;
+
+CREATE TABLE IF NOT EXISTS ooni.test_groups ON CLUSTER oonidata_cluster
+(
+    `test_name` String,
+    `test_group` String
+)
+ENGINE = Join(ANY, LEFT, test_name);
