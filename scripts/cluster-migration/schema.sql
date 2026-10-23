@@ -87,17 +87,6 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/citizen
 ORDER BY (domain, url, cc, category_code)
 SETTINGS index_granularity = 4;
 
-CREATE TABLE ooni.citizenlab_flip ON CLUSTER oonidata_cluster
-(
-    `domain` String,
-    `url` String,
-    `cc` FixedString(32),
-    `category_code` String
-)
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/citizenlab_flip/{shard}', '{replica}')
-ORDER BY (domain, url, cc, category_code)
-SETTINGS index_granularity = 4;
-
 CREATE TABLE IF NOT EXISTS event_detector_changepoints ON CLUSTER oonidata_cluster
 (
     `probe_asn` UInt32,
