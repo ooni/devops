@@ -1,0 +1,22 @@
+<clickhouse>
+    <!-- keep the test server small -->
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <trace_log remove="1"/>
+    <remote_servers>
+        <oonidata_cluster>
+            <shard>
+                <replica><host>clickhouse</host><port>9000</port><user>admin</user><password>admin</password></replica>
+            </shard>
+        </oonidata_cluster>
+    </remote_servers>
+    <macros><cluster>oonidata_cluster</cluster><shard>01</shard><replica>clickhouse</replica></macros>
+    <keeper_server>
+        <tcp_port>9181</tcp_port>
+        <server_id>1</server_id>
+        <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+        <raft_configuration><server><id>1</id><hostname>clickhouse</hostname><port>9234</port></server></raft_configuration>
+    </keeper_server>
+    <zookeeper><node><host>clickhouse</host><port>9181</port></node></zookeeper>
+</clickhouse>

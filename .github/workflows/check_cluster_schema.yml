@@ -1,0 +1,16 @@
+# Checks that scripts/cluster-migration/schema.sql and its migrations give the same tables
+on:
+  pull_request:
+    paths:
+      - "scripts/cluster-migration/schema.sql"
+      - "scripts/cluster-migration/migrations/**"
+      - "scripts/cluster-migration/test/**"
+      - ".github/workflows/check_cluster_schema.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare schema.sql with the migrations
+        run: scripts/cluster-migration/test/check.sh
