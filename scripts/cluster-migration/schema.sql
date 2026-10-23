@@ -224,6 +224,23 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/faulty_
 ORDER BY (ts, type, probe_cc, probe_asn, uid)
 SETTINGS index_granularity = 8192;
 
+CREATE TABLE IF NOT EXISTS ooni.fingerprints_dns ON CLUSTER oonidata_cluster
+(
+    `name` String,
+    `scope` Enum8('nat' = 1, 'isp' = 2, 'prod' = 3, 'inst' = 4, 'vbw' = 5, 'fp' = 6),
+    `other_names` String,
+    `location_found` String,
+    `pattern_type` Enum8('full' = 1, 'prefix' = 2, 'contains' = 3, 'regexp' = 4),
+    `pattern` String,
+    `confidence_no_fp` UInt8,
+    `expected_countries` String,
+    `source` String,
+    `exp_url` String,
+    `notes` String
+)
+ENGINE = EmbeddedRocksDB
+PRIMARY KEY name;
+
 CREATE TABLE ooni.jsonl ON CLUSTER oonidata_cluster
 (
     `report_id` String,
