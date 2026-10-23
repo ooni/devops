@@ -356,3 +356,42 @@ PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx)
 ORDER BY (measurement_uid, observation_idx, measurement_start_time)
 SETTINGS index_granularity = 8192;
+
+CREATE TABLE IF NOT EXISTS ooni.obs_openvpn ON CLUSTER oonidata_cluster
+(
+    `anomaly` Int8,
+    `bootstrap_time` Float32,
+    `confirmed` Int8,
+    `error` String,
+    `failure` String,
+    `input` String,
+    `last_handshake_transaction_id` Int32,
+    `measurement_start_time` DateTime,
+    `measurement_uid` String,
+    `minivpn_version` String,
+    `obfs4_version` String,
+    `obfuscation` String,
+    `platform` String,
+    `probe_asn` Int32,
+    `probe_cc` String,
+    `probe_network_name` String,
+    `provider` String,
+    `remote` String,
+    `report_id` String,
+    `resolver_asn` Int32,
+    `resolver_ip` String,
+    `resolver_network_name` String,
+    `software_name` String,
+    `software_version` String,
+    `success` Int8,
+    `success_handshake` Int8,
+    `success_icmp` Int8,
+    `success_urlgrab` Int8,
+    `tcp_connect_status_success` Int8,
+    `test_runtime` Float32,
+    `test_start_time` DateTime,
+    `transport` String
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/obs_openvpn/{shard}', '{replica}')
+ORDER BY (measurement_start_time, report_id, input)
+SETTINGS index_granularity = 8;
