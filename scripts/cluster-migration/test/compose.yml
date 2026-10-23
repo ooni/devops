@@ -1,0 +1,11 @@
+# A one-node oonidata_cluster with Keeper, at production's ClickHouse version, for check.sh
+name: cluster-schema-check
+services:
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+    hostname: clickhouse
+    environment: {CLICKHOUSE_USER: admin, CLICKHOUSE_PASSWORD: admin}
+    volumes:
+      - ./clickhouse.xml:/etc/clickhouse-server/config.d/cluster.xml:ro,z
+    ulimits: {nofile: 262144}
+    mem_limit: 2g

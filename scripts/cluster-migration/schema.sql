@@ -5,7 +5,7 @@
 --   clickhouse-client --database ooni --multiquery < schema.sql
 -- Any database name works, e.g. for CI: ON CLUSTER creates each table in the client's database on every
 -- node, and the Keeper paths include {database}, so a second database on the same cluster doesn't share
--- production's replicas.
+-- production's replicas. A change to an existing cluster also goes in migrations/: see its README.
 -- Where the replicas differ, this is the definition of the replica that holds the data:
 --   event_detector_cusums, labeling_frames: data1 (the only replica with rows, and with their newer columns)
 --   fastpath: data1 and data3 (data2 alone has deduplicate_merge_projection_mode = 'rebuild')
@@ -581,9 +581,7 @@ ENGINE = ReplicatedCollapsingMergeTree('/clickhouse/{cluster}/tables/{database}/
 ORDER BY (category_code, cc, domain, url, priority)
 SETTINGS index_granularity = 1024;
 
--- Its rows are in a hidden table, .inner_id.<the view's UUID>. The Keeper path keeps production's name
--- for it, so a replica added later joins production's table whatever UUID its view gets.
-CREATE MATERIALIZED VIEW IF NOT EXISTS counters_asn_test_list ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS counters_asn_test_list_data ON CLUSTER oonidata_cluster
 (
     `week` DateTime,
     `probe_cc` String,
@@ -591,9 +589,18 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS counters_asn_test_list ON CLUSTER oonidat
     `input` String,
     `msmt_cnt` UInt64
 )
-ENGINE = ReplicatedSummingMergeTree('/clickhouse/{cluster}/tables/{database}/.inner_id.6a72ceec-7e0e-4b65-a3ab-da2809202114/{shard}', '{replica}')
-ORDER BY (probe_cc, probe_asn, input)
-SETTINGS index_granularity = 8192
+ENGINE = ReplicatedSummingMergeTree('/clickhouse/{cluster}/tables/{database}/counters_asn_test_list_data/{shard}', '{replica}')
+ORDER BY (probe_cc, probe_asn, input, week)
+SETTINGS index_granularity = 8192;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS counters_asn_test_list ON CLUSTER oonidata_cluster TO counters_asn_test_list_data
+(
+    `week` DateTime,
+    `probe_cc` String,
+    `probe_asn` UInt64,
+    `input` String,
+    `msmt_cnt` UInt64
+)
 AS SELECT
     toStartOfWeek(measurement_start_time) AS week,
     probe_cc,
