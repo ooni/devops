@@ -40,6 +40,19 @@ PRIMARY KEY measurement_uid
 ORDER BY (measurement_uid, measurement_start_time, probe_cc, probe_asn, domain)
 SETTINGS index_granularity = 8192;
 
+CREATE TABLE IF NOT EXISTS ooni.asnmeta ON CLUSTER oonidata_cluster
+(
+    `asn` UInt32,
+    `org_name` String,
+    `cc` String,
+    `changed` Date,
+    `aut_name` String,
+    `source` String
+)
+ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/ooni/asnmeta', '{replica}')
+ORDER BY (asn, changed)
+SETTINGS index_granularity = 8192;
+
 CREATE TABLE IF NOT EXISTS changepoint_label ON CLUSTER oonidata_cluster
 (
     -- Ground truth, set by a person. Represents the network state for
