@@ -209,8 +209,7 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/fastpat
 ORDER BY (measurement_start_time, report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
--- faulty measurements
-CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS ooni.faulty_measurements ON CLUSTER oonidata_cluster
 (
     `ts` DateTime64(3, 'UTC') DEFAULT now64(),
     `type` String,
@@ -222,7 +221,8 @@ CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
     `details` String
 )
 ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/faulty_measurements/{shard}', '{replica}')
-ORDER BY (ts, type, probe_cc, probe_asn, uid);
+ORDER BY (ts, type, probe_cc, probe_asn, uid)
+SETTINGS index_granularity = 8192;
 
 CREATE TABLE ooni.jsonl ON CLUSTER oonidata_cluster
 (
