@@ -1,3 +1,17 @@
+-- The tables and views of the ooni database, as production has them (dumped from every replica on
+-- 2026-10-20 after asnmeta was made replicated again on data1, OOPRIV-181). Run on a new cluster with
+--   clickhouse-client --multiquery < schema.sql
+-- Where the replicas differ, this is the definition of the replica that holds the data:
+--   event_detector_cusums, labeling_frames: data1 (the only replica with rows, and with their newer columns)
+--   fastpath: data1 and data3 (data2 alone has deduplicate_merge_projection_mode = 'rebuild')
+-- event_detector_cusums, event_detector_v2_changepoints, labeling_frames and changepoint_label are not
+-- replicated: ON CLUSTER creates an empty local table on each node, as production has them.
+-- Not included: the updaters' *_tmp tables (recreated on every run), msmt_feedback_old (superseded by
+-- msmt_feedback), session_expunge (unused since backend #972) and the leftover inner table of the dropped
+-- counters_test_list view.
+
+CREATE DATABASE IF NOT EXISTS ooni ON CLUSTER oonidata_cluster;
+
 CREATE TABLE IF NOT EXISTS ooni.analysis_web_measurement ON CLUSTER oonidata_cluster
 (
     `domain` String,
