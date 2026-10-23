@@ -1,17 +1,173 @@
-CREATE TABLE ooni.jsonl ON CLUSTER oonidata_cluster
+CREATE TABLE analysis_web_measurement ON CLUSTER oonidata_cluster
 (
-    `report_id` String,
+    `domain` String,
     `input` String,
-    `s3path` String,
-    `linenum` Int32,
+    `test_name` String,
+    `probe_asn` UInt32,
+    `probe_as_org_name` String,
+    `probe_cc` String,
+    `resolver_asn` UInt32,
+    `resolver_as_cc` String,
+    `network_type` String,
+    `measurement_start_time` DateTime64(3, 'UTC'),
     `measurement_uid` String,
-    `date` Date,
-    `source` String,
-    `update_time` DateTime64(3) MATERIALIZED now64()
+    `ooni_run_link_id` String,
+    `top_probe_analysis` Nullable(String),
+    `top_dns_failure` Nullable(String),
+    `top_tcp_failure` Nullable(String),
+    `top_tls_failure` Nullable(String),
+    `dns_blocked` Float32,
+    `dns_down` Float32,
+    `dns_ok` Float32,
+    `tcp_blocked` Float32,
+    `tcp_down` Float32,
+    `tcp_ok` Float32,
+    `tls_blocked` Float32,
+    `tls_down` Float32,
+    `tls_ok` Float32
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/jsonl/{shard}', '{replica}', update_time)
-ORDER BY (report_id, input, measurement_uid)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/analysis_web_measurement/{shard}', '{replica}')
+PARTITION BY substring(measurement_uid, 1, 6)
+PRIMARY KEY measurement_uid
+ORDER BY (measurement_uid, measurement_start_time, probe_cc, probe_asn, domain)
 SETTINGS index_granularity = 8192;
+
+CREATE TABLE IF NOT EXISTS changepoint_label ON CLUSTER oonidata_cluster
+(
+    -- Ground truth, set by a person. Represents the network state for
+    -- the (probe_cc, probe_asn, resolver_asn, domain) series of the
+    -- changepoint it labels
+    `id` UUID,
+    -- UUID in event_detector_v2_changepoints (foreign key)
+    `changepoint_id` UUID,
+    `created_at` DateTime64(3, 'UTC') DEFAULT now64(),
+    `author` String,
+    -- blocked, ok or undecided
+    `verdict` LowCardinality(String),
+    -- Additional context the author might share
+    `notes` String,
+    `last_ok_time` Nullable(DateTime64(3, 'UTC')),
+    `first_block_time` Nullable(DateTime64(3, 'UTC')),
+    `last_block_time` Nullable(DateTime64(3, 'UTC')),
+    `first_ok_time` Nullable(DateTime64(3, 'UTC'))
+)
+ENGINE = MergeTree
+ORDER BY (changepoint_id, created_at, id);
+
+CREATE TABLE ooni.citizenlab ON CLUSTER oonidata_cluster
+(
+    `domain` String,
+    `url` String,
+    `cc` FixedString(32),
+    `category_code` String
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/citizenlab/{shard}', '{replica}')
+ORDER BY (domain, url, cc, category_code)
+SETTINGS index_granularity = 4;
+
+CREATE TABLE ooni.citizenlab_flip ON CLUSTER oonidata_cluster
+(
+    `domain` String,
+    `url` String,
+    `cc` FixedString(32),
+    `category_code` String
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/citizenlab_flip/{shard}', '{replica}')
+ORDER BY (domain, url, cc, category_code)
+SETTINGS index_granularity = 4;
+
+CREATE TABLE IF NOT EXISTS event_detector_changepoints ON CLUSTER oonidata_cluster
+(
+    `probe_asn` UInt32,
+    `probe_cc` String,
+    `domain` String,
+    `ts` DateTime64(3, 'UTC'),
+    `count_isp_resolver` Nullable(UInt32),
+    `count_other_resolver` Nullable(UInt32),
+    `count` Nullable(UInt32),
+    `dns_isp_blocked` Nullable(float),
+    `dns_other_blocked` Nullable(float),
+    `tcp_blocked` Nullable(float),
+    `tls_blocked` Nullable(float),
+    `last_ts` DateTime64(3, 'UTC'),
+    `dns_isp_blocked_obs_w_sum` Nullable(float),
+    `dns_isp_blocked_w_sum` Nullable(float),
+    `dns_isp_blocked_s_pos` Nullable(float),
+    `dns_isp_blocked_s_neg` Nullable(float),
+    `dns_other_blocked_obs_w_sum` Nullable(float),
+    `dns_other_blocked_w_sum` Nullable(float),
+    `dns_other_blocked_s_pos` Nullable(float),
+    `dns_other_blocked_s_neg` Nullable(float),
+    `tcp_blocked_obs_w_sum` Nullable(float),
+    `tcp_blocked_w_sum` Nullable(float),
+    `tcp_blocked_s_pos` Nullable(float),
+    `tcp_blocked_s_neg` Nullable(float),
+    `tls_blocked_obs_w_sum` Nullable(float),
+    `tls_blocked_w_sum` Nullable(float),
+    `tls_blocked_s_pos` Nullable(float),
+    `tls_blocked_s_neg` Nullable(float),
+    `change_dir` Nullable(Int8),
+    `s_pos` Nullable(float),
+    `s_neg` Nullable(float),
+    `current_mean` Nullable(float),
+    `h` Nullable(float)
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/event_detector_changepoints/{shard}', '{replica}')
+PARTITION BY toYYYYMM(ts)
+ORDER BY (probe_asn, probe_cc, ts, domain)
+SETTINGS index_granularity = 8192;
+
+ALTER TABLE event_detector_changepoints ON CLUSTER oonidata_cluster
+    ADD COLUMN `block_type` String;
+
+CREATE TABLE IF NOT EXISTS event_detector_cusums ON CLUSTER oonidata_cluster
+(
+    `probe_asn` UInt32,
+    `probe_cc` String,
+    `domain` String,
+    `ts` DateTime64(3, 'UTC'),
+    `dns_isp_blocked_obs_w_sum` Nullable(Float64),
+    `dns_isp_blocked_w_sum` Nullable(Float64),
+    `dns_isp_blocked_s_pos` Nullable(Float64),
+    `dns_isp_blocked_s_neg` Nullable(Float64),
+    `dns_other_blocked_obs_w_sum` Nullable(Float64),
+    `dns_other_blocked_w_sum` Nullable(Float64),
+    `dns_other_blocked_s_pos` Nullable(Float64),
+    `dns_other_blocked_s_neg` Nullable(Float64),
+    `tcp_blocked_obs_w_sum` Nullable(Float64),
+    `tcp_blocked_w_sum` Nullable(Float64),
+    `tcp_blocked_s_pos` Nullable(Float64),
+    `tcp_blocked_s_neg` Nullable(Float64),
+    `tls_blocked_obs_w_sum` Nullable(Float64),
+    `tls_blocked_w_sum` Nullable(Float64),
+    `tls_blocked_s_pos` Nullable(Float64),
+    `tls_blocked_s_neg` Nullable(Float64)
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/event_detector_cusums/{shard}', '{replica}')
+PARTITION BY toYYYYMM(ts)
+ORDER BY (probe_asn, probe_cc, domain)
+SETTINGS index_granularity = 8192;
+
+-- Changepoints
+CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints ON CLUSTER oonidata_cluster
+(
+    `uuid` UUID,
+    `domain` String,
+    `probe_cc` String,
+    `probe_asn` UInt32,
+    `resolver_asn` UInt32,
+    `layer` LowCardinality(String),
+    `ts_hour` DateTime64(3, 'UTC'),
+    `s_neg` Float64,
+    `s_pos` Float64,
+    `h` Float64,
+    `state` LowCardinality(String),
+    -- JSON-encoded parameters the detector was run with
+    `run_parameters` String,
+    `created_at` DateTime64(3, 'UTC') DEFAULT now64()
+)
+ENGINE = MergeTree
+ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid);
 
 CREATE TABLE ooni.fastpath ON CLUSTER oonidata_cluster
 (
@@ -57,149 +213,6 @@ ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/fastpat
 ORDER BY (measurement_start_time, report_id, input, measurement_uid)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE ooni.citizenlab ON CLUSTER oonidata_cluster
-(
-    `domain` String,
-    `url` String,
-    `cc` FixedString(32),
-    `category_code` String
-)
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/citizenlab/{shard}', '{replica}')
-ORDER BY (domain, url, cc, category_code)
-SETTINGS index_granularity = 4;
-
-CREATE TABLE ooni.citizenlab_flip ON CLUSTER oonidata_cluster
-(
-    `domain` String,
-    `url` String,
-    `cc` FixedString(32),
-    `category_code` String
-)
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/citizenlab_flip/{shard}', '{replica}')
-ORDER BY (domain, url, cc, category_code)
-SETTINGS index_granularity = 4;
-
-CREATE TABLE analysis_web_measurement ON CLUSTER oonidata_cluster
-(
-    `domain` String,
-    `input` String,
-    `test_name` String,
-    `probe_asn` UInt32,
-    `probe_as_org_name` String,
-    `probe_cc` String,
-    `resolver_asn` UInt32,
-    `resolver_as_cc` String,
-    `network_type` String,
-    `measurement_start_time` DateTime64(3, 'UTC'),
-    `measurement_uid` String,
-    `ooni_run_link_id` String,
-    `top_probe_analysis` Nullable(String),
-    `top_dns_failure` Nullable(String),
-    `top_tcp_failure` Nullable(String),
-    `top_tls_failure` Nullable(String),
-    `dns_blocked` Float32,
-    `dns_down` Float32,
-    `dns_ok` Float32,
-    `tcp_blocked` Float32,
-    `tcp_down` Float32,
-    `tcp_ok` Float32,
-    `tls_blocked` Float32,
-    `tls_down` Float32,
-    `tls_ok` Float32
-)
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/analysis_web_measurement/{shard}', '{replica}')
-PARTITION BY substring(measurement_uid, 1, 6)
-PRIMARY KEY measurement_uid
-ORDER BY (measurement_uid, measurement_start_time, probe_cc, probe_asn, domain)
-SETTINGS index_granularity = 8192;
-
-CREATE TABLE IF NOT EXISTS event_detector_changepoints ON CLUSTER oonidata_cluster
-(
-    `probe_asn` UInt32,
-    `probe_cc` String,
-    `domain` String,
-    `ts` DateTime64(3, 'UTC'),
-    `count_isp_resolver` Nullable(UInt32),
-    `count_other_resolver` Nullable(UInt32),
-    `count` Nullable(UInt32),
-    `dns_isp_blocked` Nullable(float),
-    `dns_other_blocked` Nullable(float),
-    `tcp_blocked` Nullable(float),
-    `tls_blocked` Nullable(float),
-    `last_ts` DateTime64(3, 'UTC'),
-    `dns_isp_blocked_obs_w_sum` Nullable(float),
-    `dns_isp_blocked_w_sum` Nullable(float),
-    `dns_isp_blocked_s_pos` Nullable(float),
-    `dns_isp_blocked_s_neg` Nullable(float),
-    `dns_other_blocked_obs_w_sum` Nullable(float),
-    `dns_other_blocked_w_sum` Nullable(float),
-    `dns_other_blocked_s_pos` Nullable(float),
-    `dns_other_blocked_s_neg` Nullable(float),
-    `tcp_blocked_obs_w_sum` Nullable(float),
-    `tcp_blocked_w_sum` Nullable(float),
-    `tcp_blocked_s_pos` Nullable(float),
-    `tcp_blocked_s_neg` Nullable(float),
-    `tls_blocked_obs_w_sum` Nullable(float),
-    `tls_blocked_w_sum` Nullable(float),
-    `tls_blocked_s_pos` Nullable(float),
-    `tls_blocked_s_neg` Nullable(float),
-    `change_dir` Nullable(Int8),
-    `s_pos` Nullable(float),
-    `s_neg` Nullable(float),
-    `current_mean` Nullable(float),
-    `h` Nullable(float)
-)
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/event_detector_changepoints/{shard}', '{replica}')
-PARTITION BY toYYYYMM(ts)
-ORDER BY (probe_asn, probe_cc, ts, domain)
-SETTINGS index_granularity = 8192;
-
-CREATE TABLE IF NOT EXISTS event_detector_cusums ON CLUSTER oonidata_cluster
-(
-    `probe_asn` UInt32,
-    `probe_cc` String,
-    `domain` String,
-    `ts` DateTime64(3, 'UTC'),
-    `dns_isp_blocked_obs_w_sum` Nullable(Float64),
-    `dns_isp_blocked_w_sum` Nullable(Float64),
-    `dns_isp_blocked_s_pos` Nullable(Float64),
-    `dns_isp_blocked_s_neg` Nullable(Float64),
-    `dns_other_blocked_obs_w_sum` Nullable(Float64),
-    `dns_other_blocked_w_sum` Nullable(Float64),
-    `dns_other_blocked_s_pos` Nullable(Float64),
-    `dns_other_blocked_s_neg` Nullable(Float64),
-    `tcp_blocked_obs_w_sum` Nullable(Float64),
-    `tcp_blocked_w_sum` Nullable(Float64),
-    `tcp_blocked_s_pos` Nullable(Float64),
-    `tcp_blocked_s_neg` Nullable(Float64),
-    `tls_blocked_obs_w_sum` Nullable(Float64),
-    `tls_blocked_w_sum` Nullable(Float64),
-    `tls_blocked_s_pos` Nullable(Float64),
-    `tls_blocked_s_neg` Nullable(Float64)
-)
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/event_detector_cusums/{shard}', '{replica}')
-PARTITION BY toYYYYMM(ts)
-ORDER BY (probe_asn, probe_cc, domain)
-SETTINGS index_granularity = 8192;
-
-ALTER TABLE event_detector_changepoints ON CLUSTER oonidata_cluster
-    ADD COLUMN `block_type` String;
-
--- faulty measurements
-CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
-(
-    `ts` DateTime64(3, 'UTC') DEFAULT now64(),
-    `type` String,
-    `uid` UUID DEFAULT generateUUIDv4(),
-    -- geoip lookup result for the probe IP
-    `probe_cc` String,
-    `probe_asn` UInt32,
-    -- JSON-encoded details about the anomaly
-    `details` String
-)
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/faulty_measurements/{shard}', '{replica}')
-ORDER BY (ts, type, probe_cc, probe_asn, uid);
-
 -- Anonymous Credentials fields
 ALTER TABLE ooni.fastpath
     ADD COLUMN IF NOT EXISTS `is_verified` Int8;
@@ -231,45 +244,32 @@ ALTER TABLE ooni.fastpath
 ALTER TABLE ooni.fastpath
     MODIFY COLUMN `is_verified` LowCardinality(String) DEFAULT 'u';
 
--- Changepoints
-CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints ON CLUSTER oonidata_cluster
+-- faulty measurements
+CREATE TABLE IF NOT EXISTS faulty_measurements ON CLUSTER oonidata_cluster
 (
-    `uuid` UUID,
-    `domain` String,
+    `ts` DateTime64(3, 'UTC') DEFAULT now64(),
+    `type` String,
+    `uid` UUID DEFAULT generateUUIDv4(),
+    -- geoip lookup result for the probe IP
     `probe_cc` String,
     `probe_asn` UInt32,
-    `resolver_asn` UInt32,
-    `layer` LowCardinality(String),
-    `ts_hour` DateTime64(3, 'UTC'),
-    `s_neg` Float64,
-    `s_pos` Float64,
-    `h` Float64,
-    `state` LowCardinality(String),
-    -- JSON-encoded parameters the detector was run with
-    `run_parameters` String,
-    `created_at` DateTime64(3, 'UTC') DEFAULT now64()
+    -- JSON-encoded details about the anomaly
+    `details` String
 )
-ENGINE = MergeTree
-ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid);
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/faulty_measurements/{shard}', '{replica}')
+ORDER BY (ts, type, probe_cc, probe_asn, uid);
 
-CREATE TABLE IF NOT EXISTS changepoint_label ON CLUSTER oonidata_cluster
+CREATE TABLE ooni.jsonl ON CLUSTER oonidata_cluster
 (
-    -- Ground truth, set by a person. Represents the network state for
-    -- the (probe_cc, probe_asn, resolver_asn, domain) series of the
-    -- changepoint it labels
-    `id` UUID,
-    -- UUID in event_detector_v2_changepoints (foreign key)
-    `changepoint_id` UUID,
-    `created_at` DateTime64(3, 'UTC') DEFAULT now64(),
-    `author` String,
-    -- blocked, ok or undecided
-    `verdict` LowCardinality(String),
-    -- Additional context the author might share
-    `notes` String,
-    `last_ok_time` Nullable(DateTime64(3, 'UTC')),
-    `first_block_time` Nullable(DateTime64(3, 'UTC')),
-    `last_block_time` Nullable(DateTime64(3, 'UTC')),
-    `first_ok_time` Nullable(DateTime64(3, 'UTC'))
+    `report_id` String,
+    `input` String,
+    `s3path` String,
+    `linenum` Int32,
+    `measurement_uid` String,
+    `date` Date,
+    `source` String,
+    `update_time` DateTime64(3) MATERIALIZED now64()
 )
-ENGINE = MergeTree
-ORDER BY (changepoint_id, created_at, id);
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/jsonl/{shard}', '{replica}', update_time)
+ORDER BY (report_id, input, measurement_uid)
+SETTINGS index_granularity = 8192;
