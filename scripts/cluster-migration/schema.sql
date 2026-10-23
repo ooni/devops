@@ -300,3 +300,59 @@ CREATE TABLE IF NOT EXISTS ooni.msmt_feedback ON CLUSTER oonidata_cluster
 ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/msmt_feedback_new/{shard}', '{replica}')
 ORDER BY (measurement_uid, account_id, update_time)
 SETTINGS index_granularity = 4;
+
+CREATE TABLE IF NOT EXISTS ooni.obs_http_middlebox ON CLUSTER oonidata_cluster
+(
+    `measurement_uid` String,
+    `observation_idx` UInt16,
+    `input` Nullable(String),
+    `report_id` String,
+    `ooni_run_link_id` String DEFAULT '',
+    `measurement_start_time` DateTime64(3, 'UTC'),
+    `software_name` String,
+    `software_version` String,
+    `test_name` String,
+    `test_version` String,
+    `bucket_date` String,
+    `probe_asn` UInt32,
+    `probe_cc` String,
+    `probe_as_org_name` String,
+    `probe_as_cc` String,
+    `probe_as_name` String,
+    `network_type` String,
+    `platform` String,
+    `origin` String,
+    `engine_name` String,
+    `engine_version` String,
+    `architecture` String,
+    `resolver_ip` String,
+    `resolver_asn` UInt32,
+    `resolver_cc` String,
+    `resolver_as_org_name` String,
+    `resolver_as_cc` String,
+    `resolver_is_scrubbed` UInt8,
+    `resolver_asn_probe` UInt32,
+    `resolver_as_org_name_probe` String,
+    `created_at` Nullable(DateTime64(3, 'UTC')),
+    `hirl_sent_0` Nullable(String),
+    `hirl_sent_1` Nullable(String),
+    `hirl_sent_2` Nullable(String),
+    `hirl_sent_3` Nullable(String),
+    `hirl_sent_4` Nullable(String),
+    `hirl_received_0` Nullable(String),
+    `hirl_received_1` Nullable(String),
+    `hirl_received_2` Nullable(String),
+    `hirl_received_3` Nullable(String),
+    `hirl_received_4` Nullable(String),
+    `hirl_failure` Nullable(String),
+    `hirl_success` Nullable(UInt8),
+    `hfm_diff` Nullable(String),
+    `hfm_failure` Nullable(String),
+    `hfm_success` Nullable(UInt8),
+    `probe_id` FixedString(64)
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/obs_http_middlebox/{shard}', '{replica}')
+PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
+PRIMARY KEY (measurement_uid, observation_idx)
+ORDER BY (measurement_uid, observation_idx, measurement_start_time)
+SETTINGS index_granularity = 8192;
