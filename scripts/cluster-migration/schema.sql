@@ -76,14 +76,14 @@ ENGINE = MergeTree
 ORDER BY (changepoint_id, created_at, id)
 SETTINGS index_granularity = 8192;
 
-CREATE TABLE ooni.citizenlab ON CLUSTER oonidata_cluster
+CREATE TABLE IF NOT EXISTS ooni.citizenlab ON CLUSTER oonidata_cluster
 (
     `domain` String,
     `url` String,
     `cc` FixedString(32),
     `category_code` String
 )
-ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/citizenlab/{shard}', '{replica}')
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/ooni/citizenlab', '{replica}')
 ORDER BY (domain, url, cc, category_code)
 SETTINGS index_granularity = 4;
 
