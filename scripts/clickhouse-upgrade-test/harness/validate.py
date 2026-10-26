@@ -1,0 +1,425 @@
+"""
+Cluster health / correctness checks used before, during, and after each
+upgrade step.
+"""
+from __future__ import annotations
+
+import time
+import uuid
+
+from .ch_http import ChNode, ClickHouseError
+
+TABLES = ["citizenlab", "fastpath", "analysis_web_measurement", "obs_web"]
+
+
+def wait_until_up(node: ChNode, timeout: float = 90.0) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if node.ping():
+            return True
+        time.sleep(2)
+    return False
+
+
+def wait_all_up(nodes: list[ChNode], timeout: float = 90.0) -> dict[str, bool]:
+    return {n.name: wait_until_up(n, timeout=timeout) for n in nodes}
+
+
+def get_versions(nodes: list[ChNode]) -> dict[str, str | None]:
+    out = {}
+    for n in nodes:
+        try:
+            out[n.name] = n.version()
+        except Exception:
+            out[n.name] = None
+    return out
+
+
+def cluster_replica_count(node: ChNode) -> int:
+    """How many replicas does system.clusters see as reachable for oonidata_cluster?"""
+    rows = node.query_rows(
+        "SELECT count() AS c FROM system.clusters WHERE cluster = 'oonidata_cluster'"
+    )
+    return int(rows[0]["c"]) if rows else 0
+
+
+def replicas_readonly_status(node: ChNode) -> list[dict]:
+    """Per-table replication state as seen from this node."""
+    return node.query_rows(
+        "SELECT database, table, is_readonly, is_session_expired, "
+        "future_parts, parts_to_check, queue_size, absolute_delay "
+        "FROM system.replicas WHERE database = 'ooni'"
+    )
+
+
+def row_counts(node: ChNode) -> dict[str, int | None]:
+    out = {}
+    for t in TABLES:
+        try:
+            out[t] = int(node.query_scalar(f"SELECT count() FROM ooni.{t}"))
+        except Exception:
+            out[t] = None
+    return out
+
+
+def row_counts_all_nodes(nodes: list[ChNode]) -> dict[str, dict[str, int | None]]:
+    return {n.name: row_counts(n) for n in nodes}
+
+
+def counts_converged(counts_by_node: dict[str, dict[str, int | None]]) -> bool:
+    """True if every table has the same non-None row count on every node."""
+    node_names = list(counts_by_node.keys())
+    if not node_names:
+        return False
+    for t in TABLES:
+        values = {counts_by_node[n].get(t) for n in node_names}
+        if len(values) != 1 or None in values:
+            return False
+    return True
+
+
+# --- content-level (not just row-count) integrity -------------------------
+#
+# Row counts matching across nodes proves replication caught up, but not
+# that the bytes are actually the same -- e.g. an upgrade that silently
+# rewrote a column's serialized values while leaving row count untouched
+# would sail through counts_converged(). harness/real_data.py's
+# golden-snapshot mechanism already checksums real-data tables the same
+# way for the separate real-data-upgrade job; table_snapshot() below is
+# the same idiom (`sum(cityHash64(toString(tuple(*))))`, ClickHouse's own
+# way to checksum a whole table without listing columns by hand -- variadic
+# + order-independent, so a MergeTree re-merge triggered by an upgrade
+# can't cause a false mismatch just because row order changed) applied to
+# this harness's synthetic TABLES, for the fast staged/direct scenarios
+# that previously only ever checked row counts.
+#
+# Bugfix, round 1 (CI run 97445863954): the column list is wrapped in
+# `tuple(...)`, not hashed bare. cityHash64() (like most ClickHouse scalar
+# functions) propagates NULL -- if ANY argument is NULL, the whole call
+# returns NULL for that row. fastpath/analysis_web_measurement/obs_web
+# each have at least one Nullable column that this harness's own synthetic
+# seed data (harness/seed_data.py) sets to NULL on *every* row (fastpath's
+# `ooni_run_link_id`, analysis_web_measurement's `top_dns_failure` et al.),
+# so every row's hash -- and therefore sum() over the whole table -- came
+# back NULL for all three of those tables, while citizenlab (whose columns
+# are all non-nullable) checksummed fine. That's not a cosmetic gap: a
+# NULL checksum trivially "matches" another NULL checksum, so real data
+# corruption in any of these tables would have gone completely undetected.
+# `tuple(...)` was meant to fix this -- a Tuple value is not itself
+# Nullable even when its elements are, so cityHash64() should get one
+# well-defined (non-NULL) argument per row regardless of how many
+# underlying columns are NULL. This is what ClickHouse's own docs suggest
+# (https://clickhouse.com/docs/sql-reference/functions/hash-functions:
+# "Hash of NULL is NULL. To get a non-NULL hash of a Nullable column, wrap
+# it in a tuple") -- but the docs' own example only tries this against a
+# literal `tuple(NULL)`, not a real Nullable column read from storage.
+#
+# Bugfix, round 2 (CI run 97476149999): `cityHash64(tuple(...))` fails
+# outright -- not NULL, an exception -- the moment a wrapped column is
+# Nullable AND actually holds NULL in a real (non-constant) column read
+# from a table: `Code: 48. DB::Exception: Method getDataAt is not
+# supported for Nullable(UInt64) in case if value is NULL`. This is a
+# real ClickHouse bug (github.com/ClickHouse/ClickHouse/issues/51541,
+# open since 22.9) in cityHash64's own internal handling of Nullable
+# columns -- confirmed reproducible against ClickHouse 24.5.1.1 (via
+# chdb) with the identical error text and error code as CI run
+# 97476149999 saw against our actual 24.8.6.70, i.e. this affects every
+# version this harness runs against, not a fluke of one release.
+#
+# Fixed for real this time by wrapping in `toString(...)` as well:
+# `cityHash64(toString(tuple(...)))`. This sidesteps the bug entirely
+# rather than relying on a ClickHouse-version-specific fix landing: once
+# the tuple is rendered to a plain String, cityHash64 never touches the
+# original Nullable columns' underlying storage at all, so the buggy
+# code path is never reached, regardless of ClickHouse version. Verified
+# (via chdb) that this doesn't just avoid the crash but stays
+# cross-version stable, which matters since this checksum has to compare
+# equal across nodes on *different* ClickHouse versions during a mixed
+# rollout: the same row (Float64s, DateTime64s, and NULLs included)
+# renders to byte-identical text and hashes to the identical UInt64 on
+# both ClickHouse 24.5.1.1 and 26.7.2.1.
+#
+# citizenlab gets exactly one new row per upgrade step from
+# probe_write_then_read() below (domain `probe-<uuid>.example.test`) --
+# those are *expected* new writes made *during* the rollout, already
+# separately proven to replicate by that same probe's own read-back check.
+# They're excluded here so this checksum stays scoped to "did the
+# pre-existing seed data survive untouched", which is the question a
+# golden-snapshot-vs-final diff actually needs to answer; the probe
+# rows would otherwise make every snapshot after the first hop look like
+# a "mismatch" against the initial one for a completely expected reason.
+_PROBE_DOMAIN_FILTER = " WHERE domain NOT LIKE 'probe-%.example.test'"
+
+# scenarios.verify_ddl_step() runs `ALTER TABLE ooni.citizenlab ON CLUSTER
+# ... ADD COLUMN IF NOT EXISTS test_marker_<version> String DEFAULT ''`
+# once per hop, to prove ON CLUSTER DDL still propagates mid-rollout. That's
+# a real, useful check on its own -- but it means citizenlab's column set
+# literally grows over the course of a rollout (4 extra columns by the end
+# of scenario_staged_lts()'s 4 hops), all backfilled with the same constant
+# default on every row, old and new. cityHash64(*) hashes over whatever
+# columns exist AT QUERY TIME, so a naive `SELECT ... cityHash64(toString(tuple(*))) ...`
+# taken after those ALTERs will never match the golden snapshot taken
+# before any of them ran -- not because any row's real data changed, but
+# because there are simply more (constant-valued) columns to hash now.
+# Confirmed exactly this way in CI run 96419815217: citizenlab mismatched
+# on every node with row_count identical (132 == 132), and all 3 nodes
+# agreed with each other on the new checksum -- a schema-drift false
+# positive, not real corruption (real corruption would disagree
+# node-to-node, or move the row count). Excluding these columns from the
+# checksum -- rather than everything skating through undetected -- is what
+# lets this check still catch a genuine change to a real column's data.
+DDL_VERIFY_MARKER_PREFIX = "test_marker_"
+
+
+def _content_columns(node: ChNode, table: str) -> list[str]:
+    """Column list for `table`'s content checksum: the same columns a bare
+    `SELECT *` would expand to (ClickHouse excludes ALIAS/MATERIALIZED
+    columns from `*` by default -- e.g. fastpath/jsonl's `update_time
+    DateTime64(3) MATERIALIZED now64()`, their ReplacingMergeTree version
+    column), minus verify_ddl_step()'s DDL_VERIFY_MARKER_PREFIX-prefixed
+    probe columns (see module comment above). Queried fresh each time
+    rather than hardcoded, since the schema itself is exactly what a real
+    (non-test) `ALTER TABLE` during a rollout could legitimately add to --
+    this only needs to ignore the specific columns *this harness's own* DDL
+    check adds, not resist arbitrary schema drift in general."""
+    rows = node.query_rows(
+        f"SELECT name FROM system.columns WHERE database = 'ooni' AND table = '{table}' "
+        f"AND name NOT LIKE '{DDL_VERIFY_MARKER_PREFIX}%' "
+        f"AND default_kind NOT IN ('ALIAS', 'MATERIALIZED') ORDER BY name"
+    )
+    return [r["name"] for r in rows]
+
+
+def table_snapshot(node: ChNode) -> dict[str, dict]:
+    """Row count + content checksum per table, citizenlab's probe-tagged
+    rows and every table's DDL-verification marker columns excluded (see
+    module comment above)."""
+    out = {}
+    for t in TABLES:
+        where = _PROBE_DOMAIN_FILTER if t == "citizenlab" else ""
+        try:
+            columns = ", ".join(_content_columns(node, t))
+            row = node.query_rows(
+                f"SELECT count() AS cnt, sum(cityHash64(toString(tuple({columns})))) AS checksum FROM ooni.{t}{where}"
+            )[0]
+            out[t] = {"row_count": int(row["cnt"]), "checksum": str(row["checksum"])}
+        except Exception as e:
+            out[t] = {"row_count": None, "checksum": None, "error": str(e)}
+    return out
+
+
+def table_snapshot_all_nodes(nodes: list[ChNode]) -> dict[str, dict]:
+    return {n.name: table_snapshot(n) for n in nodes}
+
+
+def snapshots_converged(snapshot_by_node: dict[str, dict]) -> bool:
+    """True if every table has the same (row_count, checksum) on every
+    node -- the content-level equivalent of counts_converged()."""
+    node_names = list(snapshot_by_node.keys())
+    if not node_names:
+        return False
+    for t in TABLES:
+        values = {
+            (snapshot_by_node[n][t].get("row_count"), snapshot_by_node[n][t].get("checksum"))
+            for n in node_names
+        }
+        if len(values) != 1 or (None, None) in values:
+            return False
+    return True
+
+
+def wait_for_convergence(nodes: list[ChNode], timeout: float = 120.0, interval: float = 3.0):
+    """Poll row counts on all nodes until they match (replication caught up)."""
+    deadline = time.time() + timeout
+    last = None
+    while time.time() < deadline:
+        last = row_counts_all_nodes(nodes)
+        if counts_converged(last):
+            return True, last
+        time.sleep(interval)
+    return False, last
+
+
+def probe_write_then_read(write_node: ChNode, read_nodes: list[ChNode], timeout: float = 60.0) -> dict:
+    """
+    Insert one uniquely identifiable row on `write_node`, then poll every
+    node in `read_nodes` until the row shows up (or timeout). This is the
+    most direct evidence of whether replication is actually working end to
+    end during a mixed-version state, independent of aggregate row counts.
+    """
+    probe_id = f"probe-{uuid.uuid4().hex[:12]}"
+    result = {"probe_id": probe_id, "write_node": write_node.name, "write_ok": False, "read_back": {}}
+    try:
+        write_node.execute(
+            "INSERT INTO ooni.citizenlab (domain, url, cc, category_code) VALUES "
+            f"('{probe_id}.example.test', 'https://{probe_id}.example.test/', 'ZZ', 'PROBE')"
+        )
+        result["write_ok"] = True
+    except ClickHouseError as e:
+        result["write_error"] = str(e)
+        return result
+
+    deadline = time.time() + timeout
+    pending = {n.name: n for n in read_nodes}
+    while pending and time.time() < deadline:
+        for name in list(pending):
+            n = pending[name]
+            try:
+                c = n.query_scalar(
+                    f"SELECT count() FROM ooni.citizenlab WHERE domain = '{probe_id}.example.test'"
+                )
+                if c and int(c) > 0:
+                    result["read_back"][name] = True
+                    del pending[name]
+            except ClickHouseError:
+                pass
+        if pending:
+            time.sleep(2)
+    for name in pending:
+        result["read_back"][name] = False
+    result["fully_replicated"] = len(pending) == 0
+    return result
+
+
+# --- error-code classification -------------------------------------------
+#
+# Forcibly killing/recreating a peer container -- exactly what
+# `docker compose up --no-deps --force-recreate` does to simulate an
+# in-place node upgrade -- severs any in-flight connections the other two
+# nodes had open to it. ClickHouse reliably logs NETWORK / CANNOT_READ_ALL_
+# DATA / REPLICA-session-class errors on the *surviving* nodes when that
+# happens, even when the container comes back on the exact same version.
+# That's a side effect of the bounce itself, not evidence of a version
+# incompatibility -- and it self-heals, which is exactly what the
+# write-then-read-back probe and row-count convergence checks (run right
+# after) are there to confirm.
+#
+# Genuine cross-version incompatibility shows up differently: checksum
+# mismatches, an unsupported/unknown data-part format version, "too old
+# software version" errors, corrupted data. Those only fire for an actual
+# data-format/version reason, never from a plain socket bounce, so they're
+# treated as hard failures that gate a hop.
+TRANSIENT_ERROR_NAME_PATTERNS = [
+    "%NETWORK%",
+    "%CANNOT_READ_ALL_DATA%",
+    "%UNFINISHED%",
+    "%REPLICA%",
+    "%SOCKET%",
+    "%CONNECTION%",
+    "%TIMEOUT%",
+    "%ALL_CONNECTION_TRIES_FAILED%",
+]
+HARD_ERROR_NAME_PATTERNS = [
+    "%CHECKSUM%",
+    "%UNKNOWN_FORMAT%",
+    "%TOO_OLD%",
+    "%NOT_ENOUGH_SPACE%",
+    "%CORRUPTED%",
+    "%INCOMPATIBLE%",
+    # Added after ooni/devops#477 CI run 32122682392: the 25.7.8.71 ->
+    # 25.8.29.51 mark-file/part-format incompatibility logs this code on the
+    # lagging replica while it's stuck retrying a GET_PART fetch it can't
+    # parse (missing columns_substreams.txt). It wasn't in this list
+    # originally, so error_snapshot()'s system.errors query never selected
+    # it at all -- the step still correctly failed via row-count convergence
+    # and replication_queue_problems() (a separate, unfiltered check against
+    # system.replication_queue), but the report's "Version-incompatibility
+    # errors logged" line said "none", which undersold the real cause.
+    "%NO_FILE_IN_DATA_PART%",
+]
+_ALL_WATCHED_PATTERNS = TRANSIENT_ERROR_NAME_PATTERNS + HARD_ERROR_NAME_PATTERNS
+
+
+def _classify(name: str) -> str:
+    for p in TRANSIENT_ERROR_NAME_PATTERNS:
+        if p.strip("%") in name:
+            return "transient"
+    return "hard"
+
+
+def error_snapshot(node: ChNode) -> dict[str, dict]:
+    """
+    Current cumulative system.errors rows for the watched error codes, keyed
+    by name. `value` is a monotonic counter since server start -- meaningless
+    read in isolation, but diffing two snapshots taken before/after a step
+    (see new_errors_since()) tells you exactly how many *new* occurrences
+    happened during that specific step. A `last_error_time > now() -
+    INTERVAL n MINUTE` window can't do that reliably across a multi-step CI
+    job: an error logged during hop 1 is still "recent" by the time hop 4
+    runs, so it keeps getting re-reported as if it just happened.
+    """
+    like_clauses = " OR ".join(f"name LIKE '{p}'" for p in _ALL_WATCHED_PATTERNS)
+    try:
+        rows = node.query_rows(
+            f"SELECT name, value, last_error_message, last_error_time "
+            f"FROM system.errors WHERE {like_clauses}"
+        )
+    except ClickHouseError:
+        return {}
+    return {r["name"]: r for r in rows}
+
+
+def new_errors_since(node: ChNode, baseline: dict[str, dict]) -> list[dict]:
+    """
+    Diff a fresh error snapshot against `baseline` (captured before the step
+    started). Returns only error codes whose counter increased during this
+    step, each tagged 'transient' or 'hard' per the pattern lists above --
+    it's this classification, not raw presence of an error, that
+    scenarios._hop_ok() gates a hop's pass/fail on.
+    """
+    current = error_snapshot(node)
+    out = []
+    for name, row in current.items():
+        before_value = int(baseline.get(name, {}).get("value", 0) or 0)
+        after_value = int(row.get("value", 0) or 0)
+        if after_value > before_value:
+            out.append({
+                "name": name,
+                "value": after_value,
+                "new_since_step_start": after_value - before_value,
+                "last_error_message": row.get("last_error_message", ""),
+                "last_error_time": row.get("last_error_time"),
+                "kind": _classify(name),
+            })
+    return out
+
+
+def recent_replication_errors(node: ChNode, since_minutes: int = 30) -> list[dict]:
+    """
+    Standalone (non-diffed) view for ad-hoc health snapshots -- e.g.
+    full_health_snapshot() below -- where there's no "before" baseline to
+    diff against. NOT used to decide hop pass/fail; see new_errors_since().
+    """
+    try:
+        return node.query_rows(
+            f"""
+            SELECT name, value, last_error_message, last_error_time
+            FROM system.errors
+            WHERE last_error_time > now() - INTERVAL {since_minutes} MINUTE
+              AND ({" OR ".join(f"name LIKE '{p}'" for p in _ALL_WATCHED_PATTERNS)})
+            ORDER BY last_error_time DESC
+            """
+        )
+    except ClickHouseError:
+        return []
+
+
+def replication_queue_problems(node: ChNode) -> list[dict]:
+    try:
+        return node.query_rows(
+            "SELECT database, table, node_name, type, num_tries, last_exception "
+            "FROM system.replication_queue WHERE num_tries > 2"
+        )
+    except ClickHouseError:
+        return []
+
+
+def full_health_snapshot(nodes: list[ChNode]) -> dict:
+    return {
+        "versions": get_versions(nodes),
+        "up": {n.name: n.ping() for n in nodes},
+        "row_counts": row_counts_all_nodes(nodes),
+        "replicas": {n.name: replicas_readonly_status(n) for n in nodes},
+        "errors": {n.name: recent_replication_errors(n) for n in nodes},
+        "queue_problems": {n.name: replication_queue_problems(n) for n in nodes},
+    }

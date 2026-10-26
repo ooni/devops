@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!--
+  chr: a standalone node backups are restored onto (docker-compose.backup.yml).
+  It runs its own single-node Keeper, so restoring replicated tables never
+  touches the ZooKeeper paths of the ch1/ch2/ch3 cluster, the same
+  situation as restoring onto a freshly built server after losing the
+  cluster. Macros match production's, since the replicated tables' Keeper
+  paths use {cluster} and {shard}.
+-->
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+    <listen_host>::</listen_host>
+    <listen_try>1</listen_try>
+
+    <logger>
+        <level>information</level>
+        <console>1</console>
+    </logger>
+
+    <macros>
+        <shard>01</shard>
+        <replica>01</replica>
+        <cluster>oonidata_cluster</cluster>
+    </macros>
+
+    <zookeeper>
+        <node>
+            <host>chr</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+
+    <keeper_server>
+        <tcp_port>9181</tcp_port>
+        <server_id>1</server_id>
+        <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+        <coordination_settings>
+            <operation_timeout_ms>10000</operation_timeout_ms>
+            <session_timeout_ms>30000</session_timeout_ms>
+            <raft_logs_level>information</raft_logs_level>
+        </coordination_settings>
+        <raft_configuration>
+            <server>
+                <id>1</id>
+                <hostname>chr</hostname>
+                <port>9234</port>
+            </server>
+        </raft_configuration>
+    </keeper_server>
+</clickhouse>
