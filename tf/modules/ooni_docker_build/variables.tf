@@ -30,8 +30,9 @@ variable "repo" {
   default = "ooni/backend"
 }
 
-variable "trigger_path" {
-  description = "path filter for push changes which trigger the codepipeline eg. ooniapi/services/oonirun/**"
+variable "trigger_paths" {
+  description = "path filters for push changes which trigger the codepipeline, e.g. [\"ooniapi/services/oonirun/**\", \"ooniapi/common/**\"]"
+  type        = list(string)
 }
 
 variable "environment" {
