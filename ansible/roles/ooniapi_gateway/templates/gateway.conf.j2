@@ -1,0 +1,141 @@
+# Managed by ansible - roles/ooniapi_gateway/templates/gateway.conf.j2
+#
+# Single "gateway" vhost for the OONI tier0 API on this dedicated host. Its
+# locations are generated from tf/modules/ooniapi_frontend/routes.yaml, which
+# the AWS ALB's listener rules are generated from too, so both route alike.
+# Only routes of services running blue/green here
+# ({{ ooniapi_gateway_services | map(attribute='name') | join(', ') }}) and of
+# those proxied cross-cloud are handled; everything unmatched falls through
+# to "reverseproxy", exactly like the ALB's default_action.
+#
+# Each service's own `<service>-upstream.conf` (the `upstream <service> {
+# ... }` block referenced below via proxy_pass) is dropped into this same
+# conf.d directory by that service's blue/green deploy job, not by this
+# role -- see ooniapi_service_deployer's buildspec_deploy.yml. A service's
+# location block here will fail nginx -t until that service has deployed at
+# least once.
+
+{% set service_names = ooniapi_gateway_services | map(attribute='name') | list %}
+
+# anonymize ipaddr (same scheme as the legacy ooni-api vhost)
+map $remote_addr $ooniapi_gateway_remote_addr_anon {
+  ~(?P<ip>\d+\.\d+\.\d+)\.    $ip.0;
+  ~(?P<ip>[^:]+:[^:]+):       $ip::;
+  default                     0.0.0.0;
+}
+
+log_format ooniapi_gateway_fmt '$ooniapi_gateway_remote_addr_anon $upstream_cache_status [$time_local] '
+    '"$request" $status $body_bytes_sent rt:$request_time "$http_referer" "$http_user_agent"';
+
+# response caches, see ooniapi_gateway_cache_zones in defaults/main.yml
+{% for name, zone in ooniapi_gateway_cache_zones.items() %}
+proxy_cache_path {{ ooniapi_gateway_cache_dir }}/{{ name }} levels=1:2 keys_zone=ooniapi_{{ name }}:{{ zone.keys_zone }}
+                 max_size={{ zone.max_size }} inactive={{ zone.inactive }} use_temp_path=off;
+{% endfor %}
+
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name {{ ([ooniapi_gateway_primary_domain] + ooniapi_gateway_extra_server_names) | join(' ') }};
+
+  access_log syslog:server=unix:/dev/log,tag=ooniapi_gateway,severity=info ooniapi_gateway_fmt;
+  error_log syslog:server=unix:/dev/log,tag=ooniapi_gateway,severity=info;
+
+  client_max_body_size 200M; # for measurement POST, matches the legacy API vhost
+
+  ssl_certificate {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/fullchain.pem;
+  ssl_certificate_key {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/privkey.pem;
+  ssl_trusted_certificate {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/chain.pem;
+
+  # https://ssl-config.mozilla.org/#server=nginx&config=intermediate -- kept
+  # inline (rather than shared include) so this role has no dependency on
+  # how nginx itself got installed on this host.
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+  ssl_prefer_server_ciphers off;
+  ssl_session_timeout 5m;
+  ssl_session_cache shared:MozSSL:30m;
+  ssl_session_tickets off;
+  ssl_stapling on;
+  ssl_stapling_verify on;
+
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+  add_header X-Frame-Options DENY always;
+  add_header X-Content-Type-Options nosniff always;
+
+  proxy_http_version 1.1;
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_read_timeout 900;
+
+  # caching, for the locations of routes marked cache/cache_long in
+  # routes.yaml (proxy_cache is off elsewhere). Responses are cached as long
+  # as their Cache-Control allows (nginx skips no-cache, private, max-age=0
+  # and those setting cookies), or ooniapi_gateway_cache_default_valid
+  # without one. Requests with credentials never use the cache. Each cached
+  # location keys on its service's $ooniapi_cache_version_<service>, the
+  # image tag its blue/green deploy writes to <service>-upstream.conf, so a
+  # deploy invalidates that service's responses, and only those. The key
+  # includes the Origin header: the services' CORS middleware answers an
+  # allowed origin with its own Access-Control-Allow-Origin, and a request
+  # without one (or with another) without CORS headers or Vary, so a
+  # response cached for one origin must not be served to another.
+  proxy_cache_methods GET HEAD;
+  proxy_cache_valid 200 301 302 {{ ooniapi_gateway_cache_default_valid }};
+  proxy_cache_valid any 0;
+  proxy_cache_lock on;
+  proxy_cache_lock_timeout 30s;
+  proxy_cache_lock_age 30s;
+  proxy_cache_use_stale error timeout invalid_header updating;
+  proxy_cache_bypass $http_authorization;
+  proxy_no_cache $http_authorization;
+  add_header X-Cache-Status $upstream_cache_status always;
+
+{% set remote_upstreams = {'testlists': 'https://' ~ ooniapi_gateway_testlists_upstream} if ooniapi_gateway_testlists_upstream else {} %}
+  ## --- generated from routes.yaml, see tasks/main.yml ---
+{% for l in ooniapi_gateway_locations %}
+{% if l.service in service_names %}
+  location {{ l.match }} {{ l.path }} { proxy_pass http://{{ l.service }};{% if l.cache %} proxy_cache ooniapi_{{ l.cache }}; proxy_cache_key "$ooniapi_cache_version_{{ l.service }}|$http_origin|$scheme$host$request_uri";{% endif %} } # {{ l.route }}
+{% elif l.service in remote_upstreams %}
+  # {{ l.service }} is not yet migrated off AWS, proxied cross-cloud until it is
+  location {{ l.match }} {{ l.path }} { proxy_pass {{ remote_upstreams[l.service] }}; } # {{ l.route }}
+{% endif %}
+{% endfor %}
+
+  ## --- default: everything else goes to reverseproxy, same as the ALB's
+  ## default_action. Covers legacy/unmigrated paths (oonith is NOT among
+  ## them -- it's routed by host_header on *.th.ooni.org, a hostname this
+  ## vhost doesn't answer for, so it never reaches here either way). ---
+  location / {
+    proxy_pass http://reverseproxy;
+  }
+}
+
+{% for service in ooniapi_gateway_direct_hosts if service in service_names %}
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name {{ service }}.{{ ooniapi_gateway_direct_domain_suffix }};
+
+  access_log syslog:server=unix:/dev/log,tag=ooniapi_gateway,severity=info ooniapi_gateway_fmt;
+  error_log syslog:server=unix:/dev/log,tag=ooniapi_gateway,severity=info;
+
+  ssl_certificate {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/fullchain.pem;
+  ssl_certificate_key {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/privkey.pem;
+  ssl_trusted_certificate {{ ooniapi_gateway_cert_path }}{{ ooniapi_gateway_cert_name }}/chain.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+
+  proxy_http_version 1.1;
+  proxy_set_header Host $http_host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_read_timeout 900;
+
+  location / {
+    proxy_pass http://{{ service }};
+  }
+}
+{% endfor %}
