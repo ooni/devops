@@ -1,0 +1,70 @@
+# Rolls a ClickHouse version bump out with the clickhouse role, one host at a time
+# (ansible/roles/clickhouse/tests/upgrade). Slow (it installs ClickHouse twice on three hosts),
+# so it only runs when it has something to test:
+# - a PR that changes clickhouse_version: from the base's version to the PR's;
+# - a PR that changes the role (other than its README and other tests), the schema step or
+#   this workflow: from production's version to tests/upgrade/next_version;
+# - by hand, with any two versions.
+# A change to the vars alone, e.g. a user's settings, doesn't run it.
+name: Test ClickHouse upgrade
+on:
+  pull_request:
+    paths:
+      - "ansible/group_vars/clickhouse/vars.yml"
+      - "ansible/roles/clickhouse/**"
+      - "!ansible/roles/clickhouse/README.md"
+      - "!ansible/roles/clickhouse/tests/**"
+      - "ansible/roles/clickhouse/tests/upgrade/**"
+      - "ansible/roles/oonidata_clickhouse/tasks/schema.yml"
+      - ".github/workflows/test_clickhouse_upgrade.yml"
+  workflow_dispatch:
+    inputs:
+      from_version: {description: "Version to install first (default: production's)", required: false}
+      to_version: {description: "Version to upgrade to (default: tests/upgrade/next_version)", required: false}
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Choose the versions
+        id: versions
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          FROM_INPUT: ${{ inputs.from_version }}
+          TO_INPUT: ${{ inputs.to_version }}
+        run: |
+          # clickhouse_version's value, without quotes or a trailing comment
+          version() { sed -n 's/^clickhouse_version: *["'"'"']\{0,1\}\([0-9.]*\).*/\1/p'; }
+          run=true from=$FROM_INPUT to=$TO_INPUT
+          if [ "$EVENT" = pull_request ]; then
+            base=$(git show "$BASE:ansible/group_vars/clickhouse/vars.yml" | version)
+            head=$(version < ansible/group_vars/clickhouse/vars.yml)
+            if [ "$base" != "$head" ]; then
+              from=$base to=$head
+            else
+              # the files of `paths:` above, other than the vars
+              changed=$(git diff --name-only "$BASE" HEAD \
+                | grep -E '^(ansible/roles/clickhouse/|ansible/roles/oonidata_clickhouse/tasks/schema\.yml$|\.github/workflows/test_clickhouse_upgrade\.yml$)' \
+                | grep -v -E '^ansible/roles/clickhouse/(README\.md$|tests/)' ; \
+                git diff --name-only "$BASE" HEAD | grep '^ansible/roles/clickhouse/tests/upgrade/' || true)
+              [ -n "$changed" ] || run=false  # only the vars changed, not the version
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "from=$from" >> "$GITHUB_OUTPUT"
+          echo "to=$to" >> "$GITHUB_OUTPUT"
+          echo "run=$run from=${from:-production} to=${to:-next_version}"
+      - if: steps.versions.outputs.run == 'true'
+        run: pipx install ansible-core==2.17.7 && sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends python3-yaml
+      - if: steps.versions.outputs.run == 'true'
+        env:
+          FROM_VERSION: ${{ steps.versions.outputs.from }}
+          TO_VERSION: ${{ steps.versions.outputs.to }}
+        run: ansible/roles/clickhouse/tests/upgrade/run.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: {name: upgrade-out, path: ansible/roles/clickhouse/tests/upgrade/out/}
