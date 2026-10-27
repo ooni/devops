@@ -7,7 +7,7 @@
     mode: 0644
     owner: root
     group: root
-  notify: Reload-clickhouse
+  notify: Restart-clickhouse  # a changed unit only applies on a restart
 
 - name: CLICKHOUSE | Configuring service
   ansible.builtin.systemd:
@@ -16,6 +16,11 @@
     enabled: "{{ clickhouse_service_enabled }}"
     daemon_reload: yes
 
+# Restart now (after daemon-reload) for new packages, config or unit, not at the end of
+# the play, so that the checks below see the restarted server before the next host.
+- name: CLICKHOUSE | Restart for changed packages, config or unit
+  ansible.builtin.meta: flush_handlers
+
 - name: CLICKHOUSE | Wait for service listening
   ansible.builtin.wait_for:
     host: localhost
@@ -23,6 +28,39 @@
     state: "{{ clickhouse_service_state }}"
     delay: 5
     timeout: 300
+  when:
+    - clickhouse_service_enabled
+    - clickhouse_service_state == "started"
+
+- name: CLICKHOUSE | Check that the server runs clickhouse_version
+  ansible.builtin.command:
+    cmd: clickhouse-client --config-file {{ clickhouse_admin_client_config }} --query "SELECT version()"
+  register: clickhouse_running_version
+  until: clickhouse_running_version.rc == 0
+  retries: 60
+  delay: 5
+  changed_when: false
+  check_mode: false  # read-only
+  failed_when: clickhouse_running_version.rc != 0 or clickhouse_running_version.stdout != clickhouse_version
+  when:
+    - clickhouse_service_enabled
+    - clickhouse_service_state == "started"
+    - not ansible_check_mode  # the new version only runs after a real restart
+
+# After a restart, replicated tables are read-only until the server is back in Keeper:
+# wait for that, so that the next host isn't restarted while this one is catching up.
+# A new host has no replicated tables yet, and passes at once.
+- name: CLICKHOUSE | Wait until no replicated table is read-only
+  ansible.builtin.command:
+    cmd: >-
+      clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+      --query "SELECT count() FROM system.replicas WHERE is_readonly OR is_session_expired"
+  register: clickhouse_readonly_replicas
+  until: clickhouse_readonly_replicas.rc == 0 and clickhouse_readonly_replicas.stdout == "0"
+  retries: 60
+  delay: 5
+  changed_when: false
+  check_mode: false  # read-only
   when:
     - clickhouse_service_enabled
     - clickhouse_service_state == "started"

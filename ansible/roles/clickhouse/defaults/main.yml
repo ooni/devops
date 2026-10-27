@@ -19,7 +19,8 @@ clickhouse_admin_client_config: /etc/clickhouse-client/ansible-admin.xml
 clickhouse_documentation_link: https://clickhouse.tech/docs/en/
 clickhouse_environment_file: /etc/default/clickhouse
 
-# Set to restart-clickhouse if you need a complete restart of the service i.e. changing listeners config
+# Handler for a changed config.xml or users.xml: Restart-clickhouse, or Reload-clickhouse to
+# have the server reload them without a restart (not every setting applies on a reload)
 clickhouse_handler_on_config_change: "Restart-clickhouse"
 
 # Owner
