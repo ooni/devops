@@ -1,39 +1,34 @@
 ---
 
-- name: CLICKHOUSE | List users (SQL-driven)
-  ansible.builtin.command: "clickhouse-client -u {{ clickhouse_admin_user }} --password {{ clickhouse_admin_password }} -q \"SELECT name FROM system.users WHERE storage == 'local directory';\""
-  changed_when: False
-  register: clickhouse_existing_sql_users
-  no_log: True
-  tags:
-    - clickhouse_users
-    - select
-    - SQL_driven
+# SQL-driven users (clickhouse_custom_users): created if missing, altered if they
+# already exist, so that changes in vars always apply. ALTER keeps a user's grants
+# and quota assignments.
 
-- name: CLICKHOUSE | Drop users (SQL-driven)
-  ansible.builtin.command: "clickhouse-client -u {{ clickhouse_admin_user }} --password {{ clickhouse_admin_password }} -q \"DROP USER IF EXISTS '{{ item }}' ;\""
-  with_items: "{{ clickhouse_existing_sql_users.stdout_lines }}"
-  when:
-    - clickhouse_existing_sql_users is defined
-    - item not in clickhouse_custom_users | map(attribute='name') | list
-  no_log: True
-  register: drop_users
-  changed_when: drop_users.rc != 0
-  tags:
-    - clickhouse_users
-    - delete
-    - SQL_driven
+- name: CLICKHOUSE | List SQL users
+  ansible.builtin.command:
+    cmd: >-
+      clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+      --query "SELECT name FROM system.users WHERE storage = 'local_directory'"
+  register: clickhouse_existing_users
+  changed_when: false
+  check_mode: false  # read-only, so that --check can show what would change
+  tags: [clickhouse_users]
 
-- name: CLICKHOUSE | Add users (SQL-driven)
-  ansible.builtin.command: "clickhouse-client -u {{ clickhouse_admin_user }} --password {{ clickhouse_admin_password }} -q {{ lookup('template', 'DDL/USER.j2') | quote }}"
-  with_items: "{{ clickhouse_custom_users }}"
-  when:
-    - clickhouse_custom_users is defined
-    - item.name not in clickhouse_existing_sql_users.stdout_lines
-  no_log: True
-  register: add_users
-  changed_when: add_users.rc != 0
-  tags:
-    - clickhouse_users
-    - create
-    - SQL_driven
+- name: CLICKHOUSE | Drop SQL users missing from vars
+  ansible.builtin.command:
+    cmd: >-
+      clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+      --query "DROP USER {{ item }}"
+  loop: "{{ clickhouse_existing_users.stdout_lines | difference(clickhouse_custom_users | map(attribute='name')) }}"
+  when: clickhouse_sql_objects_drop_unlisted
+  tags: [clickhouse_users]
+
+# Reports changed on every run, as the statements are always sent; they only change
+# the server when the vars have changed.
+- name: CLICKHOUSE | Create or update SQL users
+  ansible.builtin.command:
+    cmd: clickhouse-client --config-file {{ clickhouse_admin_client_config }} --multiquery
+    stdin: "{{ lookup('template', 'DDL/USERS.j2') }}"
+  vars:
+    existing: "{{ clickhouse_existing_users.stdout_lines }}"
+  tags: [clickhouse_users]
