@@ -1,0 +1,27 @@
+# Tests the clickhouse role's SQL users, quotas and grants and its apt pin
+# (ansible/roles/clickhouse/tests) when the role or its vars change
+name: Test ClickHouse role
+on:
+  pull_request:
+    paths:
+      - "ansible/roles/clickhouse/**"
+      - "ansible/group_vars/clickhouse/vars.yml"
+      - ".github/workflows/test_clickhouse_role.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ansible/roles/clickhouse/**"
+      - "ansible/group_vars/clickhouse/vars.yml"
+      - ".github/workflows/test_clickhouse_role.yml"
+
+jobs:
+  sql-objects:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install ansible-core==2.17.7 && sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends python3-yaml
+      - run: ansible/roles/clickhouse/tests/run.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: {name: sql-objects-out, path: ansible/roles/clickhouse/tests/out/}

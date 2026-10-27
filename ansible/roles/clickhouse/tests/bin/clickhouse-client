@@ -1,0 +1,7 @@
+#!/bin/bash
+# The role runs clickhouse-client on the ClickHouse host; run it in this test host's
+# container instead (CH_NODE), where tests/out/ is mounted at /out.
+set -euo pipefail
+args=()
+for a in "$@"; do args+=("${a/#$TESTS\/out\//\/out\/}"); done
+exec $COMPOSE -f "$TESTS/compose.yml" exec -T "$CH_NODE" clickhouse-client "${args[@]}"

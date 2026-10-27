@@ -1,0 +1,17 @@
+# The role's SQL-driven tasks, in tasks/main.yml's order, against the test containers
+- hosts: all
+  connection: local
+  gather_facts: false
+  vars:
+    clickhouse_admin_client_config: "{{ lookup('env', 'TESTS') }}/out/admin-{{ inventory_hostname }}.xml"
+  environment:
+    CH_NODE: "{{ inventory_hostname }}"
+    PATH: "{{ lookup('env', 'TESTS') }}/bin:{{ lookup('env', 'PATH') }}"
+  tasks:
+    # tasks/main.yml's task, without owner root
+    - name: Admin client configuration
+      ansible.builtin.template: {src: ../templates/admin-client.xml.j2, dest: "{{ clickhouse_admin_client_config }}", mode: "0644"}
+      no_log: true
+    - {name: quotas, include_role: {name: clickhouse, tasks_from: config/quotas.yml}, when: clickhouse_role_manage_quotas}
+    - {name: users, include_role: {name: clickhouse, tasks_from: config/users.yml}, when: clickhouse_role_manage_users}
+    - {name: grants, include_role: {name: clickhouse, tasks_from: config/grants.yml}, when: clickhouse_role_manage_grants}
