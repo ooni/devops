@@ -1,0 +1,13 @@
+# What deploy-clickhouse.yml does to a replica, one host at a time: the clickhouse role, then
+# oonidata_clickhouse's schema step. Not oonidata_clickhouse's nftables rules, which only
+# let production's addresses in.
+- hosts: clickhouse
+  serial: 1  # as deploy-clickhouse.yml
+  gather_facts: true
+  vars:
+    oonidata_clickhouse_schema: "{{ lookup('env', 'SCHEMA') }}"
+  roles:
+    - clickhouse
+  tasks:
+    - ansible.builtin.include_role: {name: oonidata_clickhouse, tasks_from: schema.yml}
+      tags: [clickhouse_schema]

@@ -1185,6 +1185,27 @@ PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx) ORDER BY (measurement_uid, observation_idx, measurement_start_time, hostname) SETTINGS index_granularity = 8192
 ```
 
+### Upgrading ClickHouse
+
+ClickHouse is upgraded one hop at a time, along the plan of the upgrade test in
+ooni/devops#477 (for #437), whose next hop `ansible/roles/clickhouse/tests/upgrade/next_version`
+names:
+
+1. Change `clickhouse_version` in `ansible/group_vars/clickhouse/vars.yml` in a PR. CI
+   (`test_clickhouse_upgrade.yml`) rolls that bump out on a test cluster, one host at a time,
+   and shows what each step looks like.
+2. Deploy one host at a time, and look at the cluster before going on to the next:
+   ```
+   ./play deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu --diff -i inventory
+   ```
+   The role installs the new packages, pins them to the new version in
+   `/etc/apt/preferences.d/clickhouse` (so `apt upgrade` can't move them), restarts
+   ClickHouse, fails unless the server then runs `clickhouse_version`, and waits until none
+   of its replicated tables is read-only, i.e. until it's back in Keeper.
+
+Until every replica has been upgraded, some hops log errors from the replicas that run the
+other version; finish the rollout rather than leaving the cluster half upgraded.
+
 ### Adding and removing a replica
 
 The cluster's replicas are defined in `ansible/group_vars/clickhouse/vars.yml`:
