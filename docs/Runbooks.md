@@ -1074,7 +1074,7 @@ See the following links for more information:
 You should first create the replicated database cluster following the
 instructions at the [clickhouse docs](https://clickhouse.com/docs/en/architecture/replication).
 
-The ooni-devops repo has a role called `oonidata_clickhouse` that does that by using the [idealista.clickhouse_role](https://github.com/idealista/clickhouse_role).
+The ooni-devops repo has a role called `oonidata_clickhouse` that does that by using the `clickhouse` role (`ansible/roles/clickhouse`, vendored from [idealista/clickhouse_role](https://github.com/idealista/clickhouse_role)).
 
 Once the cluster is created you can proceed with creating a DATABASE on the cluster by running:
 
