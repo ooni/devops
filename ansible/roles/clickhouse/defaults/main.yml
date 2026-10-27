@@ -5,12 +5,14 @@
 clickhouse_version: 23.8.9.54
 clickhouse_release_type: lts  # Values should be: stable, lts or testing
 
-# Clickhouse role management
+# SQL-driven users, quotas and grants (tasks/config/{users,quotas,grants}.yml)
 clickhouse_role_manage_users: False
-clickhouse_role_manage_roles: False
-clickhouse_role_manage_settings_profiles: False
 clickhouse_role_manage_quotas: False
 clickhouse_role_manage_grants: False
+# Drop SQL-driven users and quotas that exist on the server but aren't in vars
+clickhouse_sql_objects_drop_unlisted: False
+# clickhouse-client config holding the admin credentials for those tasks
+clickhouse_admin_client_config: /etc/clickhouse-client/ansible-admin.xml
 
 ## Service options
 # Documentation
@@ -270,6 +272,7 @@ clickhouse_auth_backend: AD
 # clickhouse_kerberos:
 #   principal:
 #   realm:
+
 
 # clickhouse_remote_servers:
 #   - server:
@@ -685,31 +688,19 @@ clickhouse_default_users:
 
 clickhouse_custom_users: []
 # clickhouse_custom_users:
-#   - user:
-#     name: "user2"
-#     password_type: PLAINTEXT_PASSWORD  # one of: NO_PASSWORD, PLAINTEXT_PASSWORD, SHA256_PASSWORD, DOUBLE_SHA1_PASSWORD, LDAP, KERBEROS, SHA256_HASH, DOUBLE_SHA1_HASH
-#     password: "user2"
-#     networks: "{{ clickhouse_default_networks }}"
-#     profile: "default"
-#     quota: "default"
-#     databases: [test2]
+#   - name: user1
+#     password_type: sha256_hash
+#     password: "<sha256 hex of the password>"
+#     networks: ["IP '10.0.0.0/8'"]   # HOST clause; ANY when omitted
+#     settings:                       # SETTINGS clause; NONE when omitted
+#       - "readonly = 0"
+#       - "max_execution_time = 30 CONST"
 
-# Roles
-clickhouse_custom_roles: []
-
-# Grants
-clickhouse_custom_grants_previous_cleanup: True
 # clickhouse_custom_grants:
-#   - on:
-#     cluster:
-#     databases: []
-#     tables: []
-#     columns: []
-#     privileges: []
-#     to: []
-# clickhouse_custom_grant_roles:
-#   - roles: []
-#     to: []
+#   - databases: [db1]
+#     tables: ["*"]
+#     privileges: [SELECT]
+#     to: [user1]
 
 # Quotas
 clickhouse_default_quotas:
@@ -722,11 +713,12 @@ clickhouse_default_quotas:
     read_rows: 0
     execution_time: 0
 
-# clickhouse_custom_quotas_xml: []
 clickhouse_custom_quotas: []
-
-# Settings profiles
-clickhouse_custom_settings_profiles: []
+# clickhouse_custom_quotas:
+#   - name: user1
+#     intervals:                      # FOR clause; limits are kept as they are when omitted
+#       - "INTERVAL 600 second MAX queries = 12000"
+#     to: [user1]                     # TO clause; assignment is kept as it is when omitted
 
 
 # For additional config, like clickhouse_config_xml_extra_config but in users.xml

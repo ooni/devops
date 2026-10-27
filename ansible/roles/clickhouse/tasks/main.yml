@@ -15,23 +15,23 @@
   tags:
     - clickhouse_service
 
-- name: CLICKHOUSE | Configure settings profiles
-  ansible.builtin.include_tasks: config/settings-profiles.yml
-  tags:
-    - clickhouse_settings_profiles
-  when: clickhouse_role_manage_settings_profiles
-
-- name: CLICKHOUSE | Configure roles
-  ansible.builtin.include_tasks: config/roles.yml
-  tags:
-    - clickhouse_roles
-  when: clickhouse_role_manage_roles
-
-- name: CLICKHOUSE | Configure quotas
-  ansible.builtin.include_tasks: config/quotas.yml
+# The SQL-driven users, quotas and grants below are
+# applied with clickhouse-client as the admin user, which reads its credentials
+# from this file, so that no password is on a command line or in task output.
+- name: CLICKHOUSE | Admin client configuration
+  ansible.builtin.template:
+    src: admin-client.xml.j2
+    dest: "{{ clickhouse_admin_client_config }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  diff: false
+  check_mode: false  # the checks below read it, in --check too
   tags:
     - clickhouse_quotas
-  when: clickhouse_role_manage_quotas
+    - clickhouse_users
+    - clickhouse_grants
 
 - name: CLICKHOUSE | Configure users
   ansible.builtin.include_tasks: config/users.yml
@@ -39,8 +39,14 @@
     - clickhouse_users
   when: clickhouse_role_manage_users
 
-- name: CLICKHOUSE | Configure perms & privs
-  ansible.builtin.include_tasks: config/perms_and_privs.yml
+- name: CLICKHOUSE | Configure quotas
+  ansible.builtin.include_tasks: config/quotas.yml
+  tags:
+    - clickhouse_quotas
+  when: clickhouse_role_manage_quotas
+
+- name: CLICKHOUSE | Configure grants
+  ansible.builtin.include_tasks: config/grants.yml
   tags:
     - clickhouse_grants
   when: clickhouse_role_manage_grants
