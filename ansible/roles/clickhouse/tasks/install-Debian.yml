@@ -76,12 +76,15 @@
     mode: "0644"
   tags: [clickhouse_install]
 
+# A package upgrade doesn't restart the running server: restart it, or it keeps running
+# the old version until something else restarts it.
 - name: CLICKHOUSE | Be sure clickhouse packages are installed (apt)
   ansible.builtin.apt:
     name: "{{ clickhouse_packages }}"
     state: present
     update_cache: true
     allow_downgrade: true
+  notify: Restart-clickhouse
   tags: [clickhouse_install]
 
 - name: CLICKHOUSE | Ensure user files and access control directories exist

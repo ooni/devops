@@ -10,14 +10,9 @@
   tags:
     - clickhouse_configure
 
-- name: CLICKHOUSE | ClickHouse Service
-  ansible.builtin.include_tasks: service/clickhouse.yml
-  tags:
-    - clickhouse_service
-
-# The SQL-driven users, quotas and grants below are
-# applied with clickhouse-client as the admin user, which reads its credentials
-# from this file, so that no password is on a command line or in task output.
+# clickhouse-client runs as the admin user, for the checks after a restart and the
+# SQL-driven users, quotas and grants, reading its credentials from this file, so
+# that no password is on a command line or in task output.
 - name: CLICKHOUSE | Admin client configuration
   ansible.builtin.template:
     src: admin-client.xml.j2
@@ -29,9 +24,15 @@
   diff: false
   check_mode: false  # the checks below read it, in --check too
   tags:
+    - clickhouse_service
     - clickhouse_quotas
     - clickhouse_users
     - clickhouse_grants
+
+- name: CLICKHOUSE | ClickHouse Service
+  ansible.builtin.include_tasks: service/clickhouse.yml
+  tags:
+    - clickhouse_service
 
 - name: CLICKHOUSE | Configure users
   ansible.builtin.include_tasks: config/users.yml

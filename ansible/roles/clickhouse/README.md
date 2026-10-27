@@ -18,7 +18,10 @@ here like any other role in this repo.
    `apt upgrade` can't move them (`tasks/install-Debian.yml`). To upgrade or
    downgrade, change `clickhouse_version` and rerun the role.
 2. Writes `config.xml` and `users.xml` from `templates/` (`tasks/config/clickhouse.yml`)
-   and the systemd unit (`tasks/service/clickhouse.yml`).
+   and the systemd unit (`tasks/service/clickhouse.yml`). New packages, config or unit
+   restart ClickHouse right away, not at the end of the play; the role then fails unless the
+   server runs `clickhouse_version`, and waits until none of its replicated tables is
+   read-only, so that with `serial: 1` or `--limit` a host is back before the next one.
 3. Applies `clickhouse_custom_users`, `clickhouse_custom_quotas` and
    `clickhouse_custom_grants` as SQL (`tasks/config/{users,quotas,grants}.yml`,
    `templates/DDL/`), each behind its `clickhouse_role_manage_*` toggle:
@@ -30,7 +33,7 @@ here like any other role in this repo.
    - users and quotas that aren't in vars are dropped when
      `clickhouse_sql_objects_drop_unlisted` is true.
 
-   The SQL runs through `clickhouse-client --config-file
+   The SQL, and the checks after a restart, run through `clickhouse-client --config-file
    {{ clickhouse_admin_client_config }}`, a root-only file with `clickhouse_admin_user`'s
    credentials, and the statements go in on stdin, so task output isn't hidden. Only at
    `-vvv` does ansible show the statements, and with them the users' password hashes.
@@ -49,6 +52,8 @@ here like any other role in this repo.
   again.
 - Upstream put `--password` on every command line and hid all SQL task output with
   `no_log`.
+- Upstream didn't restart ClickHouse after installing new packages, and apt doesn't: a
+  version bump left the old version running until something else restarted it.
 - Upstream installed `clickhouse_packages` at `clickhouse_version` but didn't pin them,
   so `apt upgrade` would install the newest release in the repo (26.8.36.3 instead of
   24.8.6.70, checked 2026-10-27).
