@@ -1,0 +1,7 @@
+# Renders users.xml from the role's template with the test vars, for compose.yml
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files: [../defaults/main.yml, out/vars.yml]
+  tasks:
+    - ansible.builtin.template: {src: ../templates/users.xml.j2, dest: out/users.xml, mode: "0644"}
