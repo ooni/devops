@@ -1,0 +1,65 @@
+---
+
+- name: CLICKHOUSE | Add configuration files (from vars)
+  ansible.builtin.template:
+    src: "{{ clickhouse_config_file_name }}.j2"
+    dest: "{{ clickhouse_config_directory }}/{{ clickhouse_config_file_name }}"
+    mode: 0644
+  when: clickhouse_custom_config_file_path is not defined
+  notify: "{{ clickhouse_handler_on_config_change }}"
+  tags: clickhouse_configure
+
+- name: CLICKHOUSE | Add configuration files (from user files)
+  ansible.builtin.copy:
+    src: "{{ clickhouse_custom_config_file_path }}/"
+    dest: "{{ clickhouse_config_directory }}"
+    owner: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    mode: 0644
+  when: clickhouse_custom_config_file_path is defined
+  notify: "{{ clickhouse_handler_on_config_change }}"
+  tags: clickhouse_configure
+
+- name: CLICKHOUSE | Add extra configuration files
+  ansible.builtin.copy:
+    src: "{{ clickhouse_custom_extra_config_file_path }}/"
+    dest: "{{ clickhouse_config_directory_config_d }}/"
+    owner: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    mode: 0644
+  when: clickhouse_custom_extra_config_file_path is defined
+  tags: clickhouse_configure
+
+- name: CLICKHOUSE | Configure users (from vars)
+  ansible.builtin.template:
+    src: "{{ clickhouse_users_file_name }}.j2"
+    dest: "{{ clickhouse_config_directory }}/{{ clickhouse_users_file_name }}"
+    mode: 0644
+  when: clickhouse_custom_users_file_path is not defined
+  notify: "{{ clickhouse_handler_on_config_change }}"
+  tags:
+    - clickhouse_configure
+    - clickhouse_users
+
+- name: CLICKHOUSE | Configure users files (from users files)
+  ansible.builtin.copy:
+    src: "{{ clickhouse_custom_users_file_path }}/"
+    dest: "{{ clickhouse_config_directory }}"
+    owner: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    mode: 0644
+  when: clickhouse_custom_users_file_path is defined
+  notify: "{{ clickhouse_handler_on_config_change }}"
+  tags:
+    - clickhouse_configure
+    - clickhouse_users
+
+- name: CLICKHOUSE | Add extra user configuration files
+  ansible.builtin.copy:
+    src: "{{ clickhouse_custom_extra_users_file_path }}/"
+    dest: "{{ clickhouse_config_directory_users_d }}/"
+    owner: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    mode: 0644
+  when: clickhouse_custom_extra_users_file_path is defined
+  tags: clickhouse_configure

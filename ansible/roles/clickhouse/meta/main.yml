@@ -1,0 +1,17 @@
+---
+galaxy_info:
+  role_name: clickhouse
+  author: idealista
+  company: Idealista S.A.U.
+  description: Clickhouse Role
+  min_ansible_version: "2.9.9"
+  license: Apache 2.0
+  galaxy_tags:
+    - clickhouse
+    - db
+    - database
+    - install
+  platforms:
+    - name: Debian
+      versions:
+        - bullseye
