@@ -1,0 +1,42 @@
+---
+
+# A cluster member without the ooni database gets it from the repo's schema.sql: a new
+# replica, or one that was re-imaged. It is created on this host only (the file's
+# ON CLUSTER is removed), and the replicated tables then fetch their data from the other
+# replicas; the few tables that aren't replicated start empty. A host that has the
+# database is left alone: changes to it go in scripts/cluster-migration/migrations/.
+# A re-imaged replica must first be dropped from Keeper (SYSTEM DROP REPLICA), or
+# creating its replicated tables fails because the replica already exists.
+# If loading schema.sql fails, the deploy stops with ClickHouse's error and leaves the
+# database as it is; once the cause is fixed, load schema.sql by hand on that host (see
+# docs/Runbooks.md, "Adding and removing a replica"): its statements are IF NOT EXISTS.
+
+- name: Create the ooni database on a cluster member that doesn't have it
+  when: oonidata_clickhouse_replica
+  tags: [clickhouse_schema]
+  block:
+    - name: Check whether the ooni database exists
+      ansible.builtin.command:
+        cmd: >-
+          clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+          --query "EXISTS DATABASE {{ oonidata_clickhouse_database }}"
+      register: oonidata_clickhouse_database_exists
+      changed_when: false
+      check_mode: false  # read-only
+
+    - name: Create the ooni database from schema.sql
+      when: oonidata_clickhouse_database_exists.stdout == "0"
+      block:
+        - name: Create the ooni database
+          ansible.builtin.command:
+            cmd: >-
+              clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+              --query "CREATE DATABASE {{ oonidata_clickhouse_database }}"
+
+        # schema.sql's statements say ON CLUSTER oonidata_cluster; run them on this host only
+        - name: Create the tables and views of schema.sql
+          ansible.builtin.command:
+            cmd: >-
+              clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+              --database {{ oonidata_clickhouse_database }} --multiquery
+            stdin: "{{ lookup('file', oonidata_clickhouse_schema) | regex_replace(' ON CLUSTER \\w+', '') }}"
