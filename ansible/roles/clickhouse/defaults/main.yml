@@ -47,9 +47,12 @@ clickhouse_prerequisite_repos:
   - ca-certificates
   - dirmngr
 clickhouse_service: "clickhouse-server"
-clickhouse_deb_repo: "deb https://packages.clickhouse.com/deb {{ clickhouse_release_type }} main"
-clickhouse_deb_keyserver: hkp://keyserver.ubuntu.com:80
-clickhouse_deb_keyid: 8919F6BD2B48D754
+clickhouse_deb_repo: "deb [signed-by={{ clickhouse_deb_keyring_path }}] https://packages.clickhouse.com/deb {{ clickhouse_release_type }} main"
+# The repo signing key is pinned (files/clickhouse-repo-keyring.asc), not fetched on
+# every run; rotating it takes a reviewed commit. Verified 2026-09-22: fingerprint
+# 3A9E A119 3A97 B548 BE14 57D4 8919 F6BD 2B48 D754, "ClickHouse Inc. Repositories Key
+# <packages@clickhouse.com>".
+clickhouse_deb_keyring_path: /etc/apt/keyrings/clickhouse.asc
 clickhouse_packages:
   - procps
   - "clickhouse-client={{ clickhouse_version }}"
