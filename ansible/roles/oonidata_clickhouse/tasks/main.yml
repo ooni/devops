@@ -4,6 +4,13 @@
     - oonidata
     - clickhouse
 
+- name: Create the ooni database on a new replica
+  ansible.builtin.include_tasks: schema.yml
+  tags:
+    - oonidata
+    - clickhouse
+    - clickhouse_schema
+
 - name: Create nftables rule for clickhouse native port
   set_fact:
     ch_nft_rule: '{{ ch_nft_rule | default([]) + [''add rule inet filter input ip saddr '' + item.ip + '' tcp dport 9000 counter accept comment "incoming clickhouse from '' + item.fqdn + ''"''] }}'

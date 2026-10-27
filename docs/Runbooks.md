@@ -1185,6 +1185,50 @@ PARTITION BY concat(substring(bucket_date, 1, 4), substring(bucket_date, 6, 2))
 PRIMARY KEY (measurement_uid, observation_idx) ORDER BY (measurement_uid, observation_idx, measurement_start_time, hostname) SETTINGS index_granularity = 8192
 ```
 
+### Adding and removing a replica
+
+The cluster's replicas are defined in `ansible/group_vars/clickhouse/vars.yml`:
+`clickhouse_remote_servers` (the replicas of `oonidata_cluster`) and `clickhouse_macros` (each
+host's `shard` and `replica`). `ansible/roles/oonidata_clickhouse/tests/run.sh` does all of this
+on containers.
+
+To add a replica, e.g. `data4.htz-fsn.prod.ooni.nu` as `clickhouse4.prod.ooni.io`:
+
+1. Add the host to the inventory's `[clickhouse]` group and to `deploy-clickhouse.yml`'s hosts,
+   a replica to `clickhouse_remote_servers`, and a macro with an unused replica name
+   (`<replica>04</replica>`) to `clickhouse_macros`. It doesn't join Keeper unless it's also
+   added to `clickhouse_keeper` and `clickhouse_zookeeper`.
+2. Deploy the existing replicas one at a time, then the new one:
+   ```
+   ./play deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu --diff -i inventory
+   ```
+   On the new host, `oonidata_clickhouse` creates the `ooni` database from
+   `scripts/cluster-migration/schema.sql`, and its replicated tables fetch their data from the
+   other replicas. Tables that aren't replicated start empty. Only migrations change the
+   database of a replica that has it. If loading `schema.sql` fails, the deploy stops with
+   ClickHouse's error and leaves the database as it is: once the cause is fixed, load it by
+   hand on that host (its statements are `IF NOT EXISTS`, so it only creates what's missing):
+   ```
+   sed 's/ ON CLUSTER [a-z_]*//' scripts/cluster-migration/schema.sql | ssh data4.htz-fsn.prod.ooni.nu \
+     sudo clickhouse-client --config-file /etc/clickhouse-client/ansible-admin.xml --database ooni --multiquery
+   ```
+
+A new cluster has no Keeper quorum until two of its three hosts run, so deploy its hosts
+with `--skip-tags clickhouse_schema` first, then once more with `--tags clickhouse_schema` to
+create the `ooni` database on each.
+
+To remove a replica:
+
+1. Remove it from `clickhouse_remote_servers` and `clickhouse_macros`, and deploy the remaining
+   replicas one at a time.
+2. Stop ClickHouse on the removed host, then remove its replica from Keeper, on any other replica:
+   ```sql
+   SYSTEM DROP REPLICA '04'
+   ```
+
+A re-imaged replica that keeps its name must also be dropped from Keeper before it's deployed
+again, or creating its replicated tables fails because the replica already exists.
+
 ### Adding users to notebook server
 
 In order to add new users to the jupyterlab notebook server hosted

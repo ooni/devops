@@ -1,0 +1,8 @@
+---
+# The ooni database's schema (tasks/schema.yml), loaded on cluster members that don't
+# have the database yet
+oonidata_clickhouse_database: ooni
+oonidata_clickhouse_schema: "{{ playbook_dir }}/../scripts/cluster-migration/schema.sql"
+# Cluster members: the hosts named in a clickhouse_macros entry's `server` (each has its
+# replica macro there)
+oonidata_clickhouse_replica: "{{ inventory_hostname in (clickhouse_macros | default([]) | selectattr('server', 'defined') | map(attribute='server') | flatten) }}"
