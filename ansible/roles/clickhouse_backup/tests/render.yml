@@ -1,0 +1,35 @@
+# Renders the role's templates and Alertmanager's into work/, with vars.yml
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../defaults/main.yml
+    - vars.yml
+  tasks:
+    - name: Render the backup script's configs
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/clickhouse-backup.json.j2"
+        dest: "{{ playbook_dir }}/work/{{ item.name }}.json"
+        mode: "0644"
+      vars:
+        clickhouse_backup_jobs: "{{ item.jobs }}"
+        clickhouse_backup_max_bandwidth: "{{ item.bandwidth }}"
+        clickhouse_backup_check_cluster: "{{ item.check_cluster | default('') }}"
+      loop: "{{ test_configs }}"
+
+    - name: Render ClickHouse's bucket credentials, for every bucket of every config
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/ooni_backup_s3.xml.j2"
+        dest: "{{ playbook_dir }}/work/ooni_backup_s3.xml"
+        mode: "0644"
+      vars:
+        clickhouse_backup_jobs: "{{ test_configs | map(attribute='jobs') | flatten }}"
+
+    - name: Render Alertmanager's config, with Slack and the mail server stood in for
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/work/alertmanager.yml.j2"
+        dest: "{{ playbook_dir }}/work/alertmanager.yml"
+        mode: "0644"
+      vars:
+        alertmanager_slack_api_url: http://slack:8080/
+        am_mx_openobservatory: mx.invalid

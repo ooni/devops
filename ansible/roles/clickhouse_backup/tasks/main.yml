@@ -1,0 +1,75 @@
+---
+- name: Check backup bucket settings
+  ansible.builtin.assert:
+    that:
+      - clickhouse_backup_s3_endpoint | length > 0
+      - clickhouse_backup_s3_access_key_id | length > 0
+      - clickhouse_backup_s3_secret_access_key | length > 0
+      - clickhouse_backup_jobs | length > 0
+      - clickhouse_backup_jobs | rejectattr('s3_bucket', 'truthy') | list | length == 0
+      - clickhouse_backup_jobs | map(attribute='name') | unique | list | length == clickhouse_backup_jobs | length
+    fail_msg: set clickhouse_backup_s3_endpoint, the bucket credentials, and an s3_bucket and a unique name for every job
+
+- name: Create the directories for the backup state and the node_exporter textfile
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ clickhouse_backup_state_file | dirname }}"
+    - "{{ clickhouse_backup_metrics_file | dirname }}"
+
+- name: Install dependencies for the backup script
+  ansible.builtin.apt:
+    pkg:
+      - python3-boto3
+
+- name: Give ClickHouse the backup bucket credentials
+  ansible.builtin.template:
+    src: ooni_backup_s3.xml.j2
+    dest: /etc/clickhouse-server/config.d/ooni_backup_s3.xml
+    owner: clickhouse
+    group: clickhouse
+    mode: "0600"
+
+- name: Ensure /etc/ooni exists
+  ansible.builtin.file:
+    path: /etc/ooni
+    state: directory
+    mode: "0755"
+
+- name: Configure the backup script
+  ansible.builtin.template:
+    src: clickhouse-backup.json.j2
+    dest: /etc/ooni/clickhouse-backup.json
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Install the backup script
+  ansible.builtin.copy:
+    src: ooni_clickhouse_backup.py
+    dest: /usr/local/bin/ooni-clickhouse-backup
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the backup service and timer
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - ooni-clickhouse-backup.service
+    - ooni-clickhouse-backup.timer
+
+- name: Set the backup timer state
+  ansible.builtin.systemd:
+    name: ooni-clickhouse-backup.timer
+    daemon_reload: true
+    state: "{{ 'started' if clickhouse_backup_enabled else 'stopped' }}"
+    enabled: "{{ clickhouse_backup_enabled }}"
