@@ -53,9 +53,8 @@ clickhouse_backup_keep_chains: 2
 # Bytes/s passed to ClickHouse as max_backup_bandwidth: 100 MB/s
 clickhouse_backup_max_bandwidth: 100000000
 
-# fnmatch patterns, for every job. Materialized views' .inner tables are
-# always skipped: they're backed up with their view.
-# Tables that are never backed up, for every job, and why
+# Tables no job backs up (fnmatch patterns), and why. Materialized views'
+# .inner tables are always skipped: they're backed up with their view.
 clickhouse_backup_exclude_tables:
   - "*_tmp"               # updater staging tables
   - msmt_feedback_old
