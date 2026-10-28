@@ -187,8 +187,8 @@ Each host runs the jobs set in its host_vars, one after the other:
 | data3 | `private` | `ooni-clickhouse-backup-private` | `clickhouse_backup_private_tables`: `msmt_feedback`, `faulty_measurements`, `url_priorities` |
 | data1 | `data1` | `ooni-clickhouse-backup` | `clickhouse_backup_data1_tables`: plain MergeTree tables whose data only data1 holds |
 
-data3 takes the replicated tables because it isn't behind clickhouseproxy
-and doesn't run Airflow; replicated tables hold the same data on every node.
+data3 runs the backup for the replicated tables because it isn't on a critical
+path like data1 (fastpath, airflow) or data2 (oonimeasurements).
 Private tables have their own bucket because R2 tokens grant access per
 bucket, and researchers may be given read access to the measurement tables.
 When a data1-only table becomes replicated, remove it from
