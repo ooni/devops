@@ -217,12 +217,10 @@ When a data1-only table becomes replicated, remove it from
   so one backup file can reach 1.25 TiB.
 - Two complete chains are kept per table (`clickhouse_backup_keep_chains`),
   so a month or two of restore points.
-- Bandwidth is capped with `clickhouse_backup_max_bandwidth`, at 50 MB/s. A
-  new full backup of everything (~5.6 TB) takes about 31 hours at that rate.
-  Against MinIO in testing, 24.8 uploaded at only about a third of the cap,
-  which would make it about 4 days: check the rate of the first backups
-  (`ooni_clickhouse_backup_last_size_bytes / ooni_clickhouse_backup_last_duration_seconds`)
-  and raise the cap if they're that slow.
+- Bandwidth is capped with `clickhouse_backup_max_bandwidth`, at 100 MB/s.
+- One part uploads at a time per file (`s3_max_inflight_parts_for_one_file: 1`
+  in `clickhouse_backup_s3_settings`). With ClickHouse's default of 20, the
+  parts in flight shared the cap so thinly that their uploads timed out.
 
 Layout in the bucket:
 
@@ -253,9 +251,8 @@ without a restart.
    ```
    and the alert rules with `deploy-monitoring.yml`.
 4. The timer takes the first (full) backup at its next run, on Sunday at
-   02:30 UTC. A full backup of everything takes about 31 hours, or longer if
-   the upload rate is below the cap. To start it on deploy day instead, e.g. a
-   Friday so that it runs over the weekend:
+   02:30 UTC. To start it on deploy day instead, e.g. a Friday so that it runs
+   over the weekend:
    ```bash
    sudo systemctl start --no-block ooni-clickhouse-backup.service
    sudo journalctl -f --identifier ooni-clickhouse-backup
