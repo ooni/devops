@@ -297,6 +297,16 @@ module "geoip_bucket" {
   object_lock_enabled = false
 }
 
+module "builds_bucket" {
+  source = "../../modules/s3_bucket"
+
+  bucket_name         = "ooni-builds-${var.aws_region}-private-${local.environment}"
+  public_read         = false
+  create_iam_user     = true
+  versioning_enabled  = true
+  object_lock_enabled = false
+}
+
 resource "random_id" "artifact_id" {
   byte_length = 4
 }
