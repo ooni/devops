@@ -300,8 +300,8 @@ module "geoip_bucket" {
 module "builds_bucket" {
   source = "../../modules/s3_bucket"
 
-  bucket_name         = "ooni-builds-${var.aws_region}-private-${local.environment}"
-  public_read         = false
+  bucket_name         = "software-update-builds"
+  public_read         = true
   create_iam_user     = true
   versioning_enabled  = true
   object_lock_enabled = false
