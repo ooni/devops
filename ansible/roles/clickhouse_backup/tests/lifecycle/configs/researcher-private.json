@@ -1,0 +1,33 @@
+{
+  "database": "ooni",
+  "cluster": "oonidata_cluster",
+  "clickhouse_url": "http://researcher:8123/",
+  "clickhouse_user": "admin",
+  "clickhouse_password": "admin",
+  "s3_endpoint": "http://minio:9000",
+  "s3_prefix": "prod",
+  "s3_access_key_id": "researcher",
+  "s3_secret_access_key": "researchersecret",
+  "exclude_tables": [
+    "*_tmp",
+    "msmt_feedback_old",
+    "fingerprints_dns",
+    "fingerprints_http",
+    "session_expunge"
+  ],
+  "keep_chains": 2,
+  "poll_interval_seconds": 1,
+  "lock_file": "/tmp/researcher.lock",
+  "state_file": "/tmp/researcher.state.json",
+  "metrics_file": "/tmp/researcher.prom",
+  "jobs": [
+    {
+      "name": "private",
+      "s3_bucket": "ooni-clickhouse-backup-private",
+      "include_tables": [
+        "*"
+      ],
+      "exclude_tables": []
+    }
+  ]
+}

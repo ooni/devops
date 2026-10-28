@@ -1,0 +1,18 @@
+<clickhouse>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <trace_log remove="1"/>
+    <max_server_memory_usage_to_ram_ratio>0.5</max_server_memory_usage_to_ram_ratio>
+    <!-- a researcher's own database: a one-node oonidata_cluster with its own Keeper, no credentials -->
+    <remote_servers><oonidata_cluster><shard><replica><host>researcher</host><port>9000</port><user>admin</user><password>admin</password></replica></shard></oonidata_cluster></remote_servers>
+    <macros><cluster>oonidata_cluster</cluster><shard>01</shard><replica>researcher</replica></macros>
+    <keeper_server>
+        <tcp_port>9181</tcp_port><server_id>1</server_id>
+        <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+        <raft_configuration><server><id>1</id><hostname>researcher</hostname><port>9234</port></server></raft_configuration>
+    </keeper_server>
+    <zookeeper><node><host>researcher</host><port>9181</port></node></zookeeper>
+    <!-- the published read-only key for the measurements bucket -->
+    <s3><measurements><endpoint>http://minio:9000/ooni-clickhouse-backup/</endpoint><access_key_id>researcher</access_key_id><secret_access_key>researchersecret</secret_access_key></measurements></s3>
+</clickhouse>

@@ -176,6 +176,227 @@ Future implementation is tracked in:
 [Implement Grafana dashboard and alarms backup](#implement-grafana-dashboard-and-alarms-backup)&thinsp;🐞
 
 
+## ClickHouse backup runbook
+The `ooni` database on the ClickHouse cluster is backed up to Cloudflare R2
+by the `clickhouse_backup` Ansible role, using ClickHouse's native `BACKUP`.
+Each host runs the jobs set in its host_vars, one after the other:
+
+| Host | Job | Bucket | Tables |
+|---|---|---|---|
+| data3 | `measurements` | `ooni-clickhouse-backup` | every replicated table, minus the private ones and data1's |
+| data3 | `private` | `ooni-clickhouse-backup-private` | `clickhouse_backup_private_tables`: `msmt_feedback`, `faulty_measurements`, `url_priorities` |
+| data1 | `data1` | `ooni-clickhouse-backup` | `clickhouse_backup_data1_tables`: plain MergeTree tables whose data only data1 holds |
+
+data3 takes the replicated tables because it isn't behind clickhouseproxy
+and doesn't run Airflow; replicated tables hold the same data on every node.
+Private tables have their own bucket because R2 tokens grant access per
+bucket, and researchers may be given read access to the measurement tables.
+When a data1-only table becomes replicated, remove it from
+`clickhouse_backup_data1_tables` and data3 picks it up.
+
+- `ooni-clickhouse-backup.timer` runs `/usr/local/bin/ooni-clickhouse-backup run`
+  weekly, on Sundays at 02:30 UTC (`clickhouse_backup_on_calendar`).
+- Each table has its own chain: a full backup, then weekly incrementals, each
+  on top of the one before. A table starts a new chain with its first backup
+  of each calendar month (UTC): the first Sunday of the month.
+  Once a new chain is complete, older chains are deleted unless pinned.
+- EmbeddedRocksDB and Join tables (`test_groups`): `BACKUP` saves only their
+  schema, so their rows are also exported to `data.native.zst` inside each
+  backup.
+- Not backed up: `fingerprints_dns` and `fingerprints_http`, which are only on
+  data1 and data2 and which the hourly updater rebuilds, and `session_expunge`,
+  which is empty and no longer used. They're in
+  `clickhouse_backup_exclude_tables`, with the other tables that are never
+  backed up.
+- After each run, data3 lists the tables on every node of the cluster
+  (`clickhouse_backup_check_cluster`) and reports any that no job backs up and
+  that aren't excluded, e.g. a new table created on data1 only.
+- R2 rejects multipart uploads whose parts (all but the last) differ in
+  size, so `clickhouse_backup_s3_settings` fixes ClickHouse's part size at
+  128 MiB (`s3_upload_part_size_multiply_factor: 1`). R2 allows 10,000 parts,
+  so one backup file can reach 1.25 TiB.
+- Two complete chains are kept per table (`clickhouse_backup_keep_chains`),
+  so a month or two of restore points.
+- Bandwidth is capped with `clickhouse_backup_max_bandwidth`, at 100 MB/s.
+- One part uploads at a time per file (`s3_max_inflight_parts_for_one_file: 1`
+  in `clickhouse_backup_s3_settings`). With ClickHouse's default of 20, the
+  parts in flight shared the cap so thinly that their uploads timed out.
+
+Layout in the bucket:
+
+```
+prod/ooni/<table>/<chain>/<backup>/          native backup (first one is full)
+prod/ooni/<table>/<chain>/KEEP-<label>       pinned chain, never pruned
+```
+
+Never put S3 keys in `BACKUP`/`RESTORE`/`s3()` queries: an incremental
+backup stores its `base_backup` argument, keys included, in plain text in
+its `.backup` file. ClickHouse gets the keys from
+`/etc/clickhouse-server/config.d/ooni_backup_s3.xml`, which it reloads
+without a restart.
+
+### Setting up
+1. In the Cloudflare dashboard, create the R2 buckets `ooni-clickhouse-backup`
+   and `ooni-clickhouse-backup-private` (location hint: Western Europe), and
+   an R2 API token with Object Read & Write on both.
+2. Store the S3 endpoint (`https://<account id>.r2.cloudflarestorage.com`) and
+   the token's keys in SSM as
+   `/oonidevops/secrets/clickhouse_backup_r2_endpoint`,
+   `/oonidevops/secrets/clickhouse_backup_r2_access_key_id` and
+   `/oonidevops/secrets/clickhouse_backup_r2_secret_access_key`.
+3. Deploy node_exporter first, for its textfile directory, then the backups
+   (data2 gets the role for restoring, with its timer off):
+   ```bash
+   ./play -i inventory deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu,data3.htz-fsn.prod.ooni.nu -t node_exporter --diff
+   ./play -i inventory deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu,data2.htz-fsn.prod.ooni.nu,data3.htz-fsn.prod.ooni.nu -t clickhouse_backup --diff
+   ```
+   and the alert rules with `deploy-monitoring.yml`.
+4. The timer takes the first (full) backup at its next run, on Sunday at
+   02:30 UTC. To start it on deploy day instead, e.g. a Friday so that it runs
+   over the weekend:
+   ```bash
+   sudo systemctl start --no-block ooni-clickhouse-backup.service
+   sudo journalctl -f --identifier ooni-clickhouse-backup
+   ```
+
+### Monitoring
+After each table, the script writes its result to
+`/var/lib/node_exporter/textfile_collector/ooni_clickhouse_backup.prom`
+(metrics `ooni_clickhouse_backup_*`, labels `backup` = job and `table`).
+Alerts, in `alert_rules.yml`:
+
+- `ClickHouseBackupFailed`: a table's last attempt failed. Nothing is
+  deleted, and the next run retries it.
+- `ClickHouseTableNotBackedUp`: a table on the cluster is in no backup job and
+  not excluded. Add it to a job: replicated tables are backed up by data3's
+  `measurements` job unless they're private (`clickhouse_backup_private_tables`),
+  and a table whose data only data1 holds goes in
+  `clickhouse_backup_data1_tables`. Or, if it needs no backup, add it to
+  `clickhouse_backup_exclude_tables`.
+- `ClickHouseBackupCompleted`: a job's run backed up every table. One Slack
+  message per run in `#ooni-bots`, no email.
+- `ClickHouseBackupStale`: a table hasn't been backed up for 8 days (backups
+  are weekly), and no job on its host is in a run started in the last 5 days.
+- `ClickHouseBackupMissing`: data1 or data3 hasn't written any results for 8
+  days, e.g. since the role was deployed and before its first Sunday run.
+- `ClickHouseBackupHostLoadHigh`: data3's 5-minute load is over half its
+  CPUs for 15 minutes.
+
+```bash
+sudo systemctl status ooni-clickhouse-backup.service
+sudo journalctl --identifier ooni-clickhouse-backup --since yesterday
+sudo ooni-clickhouse-backup list
+```
+
+The unit fails if any table fails; the others are still backed up. If the
+script is stopped, a `BACKUP` already sent keeps running inside ClickHouse.
+The next run refuses to start until it finishes:
+
+```sql
+SELECT id, status, start_time, error FROM system.backups ORDER BY start_time DESC LIMIT 10
+```
+
+### Before upgrading ClickHouse
+A server can restore backups taken by the same or an older version, but not
+by a newer one. On 24.8, restoring a backup taken on 26.8 crashed the server
+(segfault in `restorePartFromBackup`). After an upgrade step that changes the
+on-disk format (25.8, 26.3), the only way back is restoring a backup taken
+before that step, so:
+
+1. Disable the timer with `clickhouse_backup_enabled: false` (or
+   `sudo systemctl stop ooni-clickhouse-backup.timer`) and check that
+   `system.backups` shows nothing running. ClickHouse waits for running
+   backups when it stops (`shutdown_wait_backups_and_restores`, and the
+   unit's `TimeoutStopSec=infinity`), so restarting a node during a full
+   backup hangs until the backup is done, a day or more.
+2. Take a pinned backup (incrementals, minutes):
+   ```bash
+   sudo ooni-clickhouse-backup run --keep pre-25.8.29.51
+   ```
+3. Upgrade all three nodes. Don't run backups while nodes are on different
+   versions.
+4. Once the whole upgrade is confirmed good, and with the timer still
+   disabled (once enabled, it may start a run straight away for a missed
+   Sunday), start new chains on the new version. That takes a day or more,
+   so run it as a service rather than in a shell:
+   ```bash
+   sudo systemd-run --unit=ooni-clickhouse-backup-full -p TimeoutStartSec=infinity \
+     -p SyslogIdentifier=ooni-clickhouse-backup /usr/local/bin/ooni-clickhouse-backup run --full
+   sudo journalctl -f --identifier ooni-clickhouse-backup
+   ```
+   When the journal shows `all tables backed up` for every job, unpin the
+   old chains and re-enable the timer (`clickhouse_backup_enabled: true`):
+   ```bash
+   sudo ooni-clickhouse-backup release pre-25.8.29.51
+   ```
+
+Data written after a pinned backup isn't in it. If you roll back, that
+window has to be filled again by reprocessing those days.
+
+### Restoring
+`ooni-clickhouse-backup restore` creates the tables a node is missing and
+skips the ones it has, so it can be rerun. A table another live node has is
+created with that node's definition; replicated tables then fetch their data
+from the other replicas, and Join and EmbeddedRocksDB rows are copied from a
+peer. The backups are used only for what no node has: data1's own tables, and
+everything after losing the whole cluster. Views come last (a view whose `TO`
+table is missing makes inserts into its source fail). Then it logs `restore:
+tables ready` and waits for the fetches; the node can take writes from then.
+
+data2 has the role too, timer off, for the config and `ooni_backup_s3.xml`.
+The role's `tests/lifecycle` tests all of this.
+
+**A node lost or re-imaged** (same name and macros):
+1. Deploy ClickHouse and the role on it (`deploy-clickhouse.yml`, tags
+   `clickhouse`, `clickhouse_backup`).
+2. Run `sudo ooni-clickhouse-backup restore` on it. It first removes the
+   node's stale replicas from Keeper, waiting up to 3 minutes for the old
+   Keeper session to expire. If the replica is still active after that,
+   another server is running under its name: stop it.
+3. Check the replicas:
+   ```sql
+   SELECT table, active_replicas, total_replicas FROM system.replicas WHERE database = 'ooni'
+   ```
+
+A re-imaged node must also rejoin Keeper's ensemble (`reconfig`); `restore`
+doesn't do that.
+
+**The whole cluster lost**, run `sudo ooni-clickhouse-backup restore` on:
+1. data2: everything comes from data3's backups. Its SSDs take it in, and
+   serve it to the other replicas, faster than data3's HDDs.
+2. data1: its own tables from its backups, the rest like data2's. Fastpath
+   can write to it once it logs `restore: tables ready`.
+3. data3, from then on.
+
+Then create the tables that are never backed up
+(`clickhouse_backup_exclude_tables`), empty; the updater refills the
+fingerprints:
+```bash
+clickhouse-client --database ooni --multiquery < scripts/cluster-migration/schema.sql
+```
+
+**One table**: `restore --table obs_web`, from a live replica if one has it,
+else from the latest backup.
+
+**A researcher's own database**: a one-node `oonidata_cluster` with its own
+Keeper and macros, an R2 API token with Object Read on
+`ooni-clickhouse-backup` in `config.d`, and a config with the `measurements`
+job. Anonymous public URLs don't work: `RESTORE` lists objects, and an
+incremental reads its base from R2's S3 endpoint. `--table` restores only
+some tables.
+
+To check a table by hand, compare its rows on each replica (from the parts'
+metadata, so it's instant):
+```sql
+SELECT hostName(), sum(rows) FROM clusterAllReplicas('oonidata_cluster', system.parts)
+WHERE database = 'ooni' AND table = 'obs_web' AND active GROUP BY 1
+```
+For a closer look, checksum one month's key columns on each node:
+```sql
+SELECT count(), sum(cityHash64(measurement_uid, observation_idx)) FROM ooni.obs_web
+WHERE _partition_value = tuple('202610')
+```
+
 ## Grafana editing
 This runbook describes adding new dashboards, panels and alerts in
 [Grafana](#grafana)&thinsp;🔧

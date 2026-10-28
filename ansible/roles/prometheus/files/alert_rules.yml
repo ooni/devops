@@ -99,9 +99,10 @@ groups:
     annotations:
       summary: 'Broken `textfile` at {{ $labels.instance }}'
 
-  # all the textfile are updated at least hourly
+  # all the textfile are updated at least hourly, except the ClickHouse
+  # backup results, which change after each backup (see ClickHouseBackupStale)
   - alert: TextfileJam
-    expr: (node_textfile_mtime - ON(instance,job) GROUP_LEFT() node_time) / -3600 > 2
+    expr: (node_textfile_mtime{file!~".*/ooni_clickhouse_backup\\.prom"} - ON(instance,job) GROUP_LEFT() node_time) / -3600 > 2
     annotations:
       summary: 'Stale `textfile` at {{ $labels.instance }}'
       description: '`{{ $labels.file }}` is {{ printf "%.0f" $value }}h old.'
@@ -144,4 +145,65 @@ groups:
     expr: rate(alertmanager_notifications_failed_total[1m]) > 0
     annotations:
       summary: 'Alertmanager {{ $labels.instance }} fails {{ $labels.integration }} notifications.'
+
+# Results written by ooni-clickhouse-backup (ansible role clickhouse_backup)
+# to node_exporter's textfile directory on data1 and data3
+- name: ClickHouse backups
+  rules:
+  - alert: ClickHouseBackupFailed
+    expr: ooni_clickhouse_backup_last_attempt_failed == 1
+    annotations:
+      summary: 'ClickHouse backup of {{ $labels.table }} ({{ $labels.backup }}) failed on {{ $labels.instance }}'
+      description: 'Nothing was deleted: the older backups of {{ $labels.table }} are kept. The next run retries it. See `journalctl --identifier ooni-clickhouse-backup` on {{ $labels.instance }}.'
+
+  # A table on the cluster that no backup job covers, and that isn't excluded:
+  # e.g. a new table created on one node only (data3 checks after each run)
+  - alert: ClickHouseTableNotBackedUp
+    expr: ooni_clickhouse_backup_table_not_backed_up == 1
+    annotations:
+      summary: 'ClickHouse table {{ $labels.table }} is not backed up (on {{ $labels.hosts }})'
+      description: 'No backup job covers it and it is not excluded. Add it to a job (clickhouse_backup_data1_tables if only data1 holds its data, clickhouse_backup_private_tables if private), or to clickhouse_backup_exclude_tables if it needs no backup. See the runbook, "ClickHouse backup".'
+
+  # A job's run finished with every table backed up. One Slack message per
+  # job run, no email and no "resolved" message: Alertmanager routes it to
+  # slack-notice. It clears an hour after the run.
+  - alert: ClickHouseBackupCompleted
+    expr: |
+      ooni_clickhouse_backup_last_run_duration_seconds
+        and on (instance, backup) (time() - ooni_clickhouse_backup_last_run_finished_timestamp_seconds < 3600)
+        and on (instance, backup) ooni_clickhouse_backup_last_run_failed_tables == 0
+    annotations:
+      summary: 'ClickHouse backup {{ $labels.backup }} on {{ $labels.instance }} completed in {{ $value | humanizeDuration }}'
+      description: 'Tables backed up: {{ with printf `ooni_clickhouse_backup_last_run_tables{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }}, in full: {{ with printf `ooni_clickhouse_backup_last_run_full_backups{instance="%s",backup="%s"}` $labels.instance $labels.backup | query }}{{ . | first | value }}{{ end }}. Nothing to do.'
+
+  # Backups run weekly, so a table's last one is normally up to a week old. Not
+  # while any job on the host is in a run that started in the last 5 days: on
+  # the first Sunday of a month the full backups take more than a day, and the
+  # jobs run one after the other. A run older than that is stuck (e.g. the
+  # script was killed and left running at 1), and no longer holds the alert back.
+  - alert: ClickHouseBackupStale
+    expr: |
+      time() - ooni_clickhouse_backup_last_success_timestamp_seconds > 8 * 86400
+        unless on (instance) (time() - (ooni_clickhouse_backup_running_since_timestamp_seconds != 0) < 5 * 86400)
+    annotations:
+      summary: 'No ClickHouse backup of {{ $labels.table }} ({{ $labels.backup }}) for {{ $value | humanizeDuration }}'
+      description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on {{ $labels.instance }}.'
+
+  # The job hasn't written any result since its host was set up, or the file is
+  # gone. Backups run weekly, so a new host has none until its first Sunday.
+  - alert: ClickHouseBackupMissing
+    expr: absent(ooni_clickhouse_backup_running{instance="data3.htz-fsn.prod.ooni.nu"}) or absent(ooni_clickhouse_backup_running{instance="data1.htz-fsn.prod.ooni.nu"})
+    for: 8d
+    annotations:
+      summary: 'No ClickHouse backup results from {{ $labels.instance }} for over a week'
+
+  # data3 takes the backups. Above half its CPUs (load per CPU > 0.5), the
+  # backup or merges are crowding the node; lower clickhouse_backup_max_bandwidth
+  # or move the backup to another replica.
+  - alert: ClickHouseBackupHostLoadHigh
+    expr: node_load5{instance="data3.htz-fsn.prod.ooni.nu"} / on (instance) count by (instance) (node_cpu_seconds_total{mode="idle", instance="data3.htz-fsn.prod.ooni.nu"}) > 0.5
+    for: 15m
+    annotations:
+      summary: 'data3 load is {{ $value | humanizePercentage }} of its CPUs'
+      description: 'If a backup is running (ooni_clickhouse_backup_running on data3), lower clickhouse_backup_max_bandwidth; otherwise check merges and queries.'
 ...

@@ -1,0 +1,35 @@
+# Backs up production's schema with production's jobs, then restores after a lost replica, a lost
+# data1, a lost cluster, and on a researcher's own server (ansible/roles/clickhouse_backup/tests/lifecycle),
+# only when the backup script, the schema or the jobs change
+name: Test ClickHouse backup lifecycle
+on:
+  pull_request:
+    paths:
+      - "ansible/roles/clickhouse_backup/files/**"
+      - "ansible/roles/clickhouse_backup/defaults/main.yml"
+      - "ansible/roles/clickhouse_backup/tests/lifecycle/**"
+      - "ansible/roles/clickhouse_backup/tests/runner.Dockerfile"
+      - "ansible/group_vars/clickhouse/vars.yml"
+      - "scripts/cluster-migration/schema.sql"
+      - "scripts/cluster-migration/migrations/**"
+      - ".github/workflows/test_clickhouse_backup_lifecycle.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ansible/roles/clickhouse_backup/files/**"
+      - "ansible/roles/clickhouse_backup/defaults/main.yml"
+      - "ansible/roles/clickhouse_backup/tests/lifecycle/**"
+      - "ansible/roles/clickhouse_backup/tests/runner.Dockerfile"
+      - "ansible/group_vars/clickhouse/vars.yml"
+      - "scripts/cluster-migration/schema.sql"
+      - "scripts/cluster-migration/migrations/**"
+      - ".github/workflows/test_clickhouse_backup_lifecycle.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-boto3 python3-yaml
+      - run: ansible/roles/clickhouse_backup/tests/lifecycle/run.sh

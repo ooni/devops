@@ -411,6 +411,40 @@ clickhouse_prometheus:
   asynchronous_metrics: true
   status_info: true
 
+# For textfile metrics, e.g. from clickhouse_backup
+node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector
+
+# clickhouse_backup: Cloudflare R2. The endpoint names the account, so it's
+# kept in SSM with the token's keys.
+clickhouse_backup_s3_endpoint: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_endpoint', profile='oonidevops_user_prod') }}"
+clickhouse_backup_s3_access_key_id: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_access_key_id', profile='oonidevops_user_prod') }}"
+clickhouse_backup_s3_secret_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_secret_access_key', profile='oonidevops_user_prod') }}"
+# Tables with personal or unpublished data, backed up to the private bucket
+clickhouse_backup_private_tables:
+  - msmt_feedback        # account ids and free-text comments
+  - faulty_measurements  # until its contents are reviewed
+  - url_priorities       # until it's decided whether it's published
+# data3's jobs, which data2 also restores from: the replicated tables, minus
+# the ones only data1 holds data for. Private tables go to their own bucket:
+# R2 tokens grant access per bucket, and researchers may be given read access
+# to the measurement tables.
+clickhouse_backup_replicated_jobs:
+  - name: measurements
+    s3_bucket: ooni-clickhouse-backup
+    include_tables: ["*"]
+    exclude_tables: "{{ clickhouse_backup_private_tables + clickhouse_backup_data1_tables }}"
+  - name: private
+    s3_bucket: ooni-clickhouse-backup-private
+    include_tables: "{{ clickhouse_backup_private_tables }}"
+    exclude_tables: []
+# Plain MergeTree tables whose data only data1 holds (2026-10-20). Remove a
+# table from here once it's replicated, and data3 picks it up.
+clickhouse_backup_data1_tables:
+  - labeling_frames
+  - event_detector_cusums
+  - event_detector_v2_changepoints
+  - changepoint_label
+
 prometheus_nginx_proxy_config:
   - location: /metrics/node_exporter
     proxy_pass: http://127.0.0.1:8100/metrics

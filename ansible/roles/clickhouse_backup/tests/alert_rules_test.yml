@@ -1,0 +1,130 @@
+# promtool unit tests for the ClickHouse backup alerts in alert_rules.yml, and for the backup file's
+# exclusion from TextfileJam. Test time starts at 0 (1970-01-01), so a timestamp N days before the test
+# starts is -N * 86400.
+rule_files: [alert_rules.yml]
+evaluation_interval: 1m
+tests:
+  # Completed and Failed
+  - interval: 1m
+    input_series:
+      # measurements finished at t=0 after 30 min, all 14 tables backed up, 1 in full
+      - {series: 'ooni_clickhouse_backup_last_run_finished_timestamp_seconds{instance="data3", backup="measurements"}', values: '0x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_duration_seconds{instance="data3", backup="measurements"}', values: '1800x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_failed_tables{instance="data3", backup="measurements"}', values: '0x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_tables{instance="data3", backup="measurements"}', values: '14x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_full_backups{instance="data3", backup="measurements"}', values: '1x180'}
+      # private finished at the same time, with fastpath failed
+      - {series: 'ooni_clickhouse_backup_last_run_finished_timestamp_seconds{instance="data3", backup="private"}', values: '0x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_duration_seconds{instance="data3", backup="private"}', values: '60x180'}
+      - {series: 'ooni_clickhouse_backup_last_run_failed_tables{instance="data3", backup="private"}', values: '1x180'}
+      - {series: 'ooni_clickhouse_backup_last_attempt_failed{instance="data3", backup="private", table="fastpath"}', values: '1x180'}
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ClickHouseBackupCompleted
+        exp_alerts:
+          - exp_labels: {instance: data3, backup: measurements}
+            exp_annotations:
+              summary: 'ClickHouse backup measurements on data3 completed in 30m 0s'
+              description: 'Tables backed up: 14, in full: 1. Nothing to do.'
+      # an hour after the run it clears
+      - eval_time: 2h
+        alertname: ClickHouseBackupCompleted
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: ClickHouseBackupFailed
+        exp_alerts:
+          - exp_labels: {instance: data3, backup: private, table: fastpath}
+            exp_annotations:
+              summary: 'ClickHouse backup of fastpath (private) failed on data3'
+              description: 'Nothing was deleted: the older backups of fastpath are kept. The next run retries it. See `journalctl --identifier ooni-clickhouse-backup` on data3.'
+
+  # Stale: after 8 days, unless a job on the same host is in a run started in the last 5 days
+  - interval: 1m
+    input_series:
+      # data1: nothing running; one table backed up 9 days ago, one 7 days ago
+      - {series: 'ooni_clickhouse_backup_running_since_timestamp_seconds{instance="data1", backup="data1"}', values: '0x30'}
+      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="data1", backup="data1", table="nine_days"}', values: '-777600x30'}
+      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="data1", backup="data1", table="seven_days"}', values: '-604800x30'}
+      # data3: measurements' monthly full started 2 days ago; private, waiting behind it, last ran 9 days ago
+      - {series: 'ooni_clickhouse_backup_running_since_timestamp_seconds{instance="data3", backup="measurements"}', values: '-172800x30'}
+      - {series: 'ooni_clickhouse_backup_running_since_timestamp_seconds{instance="data3", backup="private"}', values: '0x30'}
+      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="data3", backup="private", table="msmt_feedback"}', values: '-777600x30'}
+      # stuck: a run that "started" 6 days ago, after the script was killed; its table is 9 days old
+      - {series: 'ooni_clickhouse_backup_running_since_timestamp_seconds{instance="stuck", backup="measurements"}', values: '-518400x30'}
+      - {series: 'ooni_clickhouse_backup_last_success_timestamp_seconds{instance="stuck", backup="measurements", table="fastpath"}', values: '-777600x30'}
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ClickHouseBackupStale
+        exp_alerts:
+          - exp_labels: {instance: data1, backup: data1, table: nine_days}
+            exp_annotations:
+              summary: 'No ClickHouse backup of nine_days (data1) for 9d 0h 10m 0s'
+              description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on data1.'
+          - exp_labels: {instance: stuck, backup: measurements, table: fastpath}
+            exp_annotations:
+              summary: 'No ClickHouse backup of fastpath (measurements) for 9d 0h 10m 0s'
+              description: 'Check `systemctl status ooni-clickhouse-backup.timer` and the journal on stuck.'
+
+  # Missing: data1 has results, data3 never wrote any; it fires after 8 days
+  - interval: 1h
+    input_series:
+      - {series: 'ooni_clickhouse_backup_running{instance="data1.htz-fsn.prod.ooni.nu", backup="data1"}', values: '0x240'}
+    alert_rule_test:
+      - {eval_time: 7d, alertname: ClickHouseBackupMissing, exp_alerts: []}
+      - eval_time: 9d
+        alertname: ClickHouseBackupMissing
+        exp_alerts:
+          - exp_labels: {instance: data3.htz-fsn.prod.ooni.nu}
+            exp_annotations:
+              summary: 'No ClickHouse backup results from data3.htz-fsn.prod.ooni.nu for over a week'
+
+  # HostLoadHigh: data3's 8 CPUs with a load of 5
+  - interval: 1m
+    input_series:
+      - {series: 'node_load5{instance="data3.htz-fsn.prod.ooni.nu"}', values: '5x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="0", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="1", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="2", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="3", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="4", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="5", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="6", mode="idle"}', values: '0+1x60'}
+      - {series: 'node_cpu_seconds_total{instance="data3.htz-fsn.prod.ooni.nu", cpu="7", mode="idle"}', values: '0+1x60'}
+    alert_rule_test:
+      - {eval_time: 10m, alertname: ClickHouseBackupHostLoadHigh, exp_alerts: []}
+      - eval_time: 20m
+        alertname: ClickHouseBackupHostLoadHigh
+        exp_alerts:
+          - exp_labels: {instance: data3.htz-fsn.prod.ooni.nu}
+            exp_annotations:
+              summary: 'data3 load is 62.5% of its CPUs'
+              description: 'If a backup is running (ooni_clickhouse_backup_running on data3), lower clickhouse_backup_max_bandwidth; otherwise check merges and queries.'
+
+  # TextfileJam leaves out the backup's file, which changes only once a week. node_exporter's file label
+  # is the file's full path.
+  - interval: 1m
+    input_series:
+      - {series: 'node_time{instance="data3", job="node"}', values: '0+60x240'}
+      - {series: 'node_textfile_mtime{instance="data3", job="node", file="/var/lib/node_exporter/textfile_collector/ooni_clickhouse_backup.prom"}', values: '0x240'}
+      - {series: 'node_textfile_mtime{instance="data3", job="node", file="/var/lib/node_exporter/textfile_collector/other.prom"}', values: '0x240'}
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: TextfileJam
+        exp_alerts:
+          - exp_labels: {instance: data3, job: node, file: /var/lib/node_exporter/textfile_collector/other.prom}
+            exp_annotations:
+              summary: 'Stale `textfile` at data3'
+              description: '`/var/lib/node_exporter/textfile_collector/other.prom` is 3h old.'
+
+  # TableNotBackedUp: a table no backup job covers
+  - interval: 1m
+    input_series:
+      - {series: 'ooni_clickhouse_backup_table_not_backed_up{instance="data3", table="made_on_data1", hosts="data1.htz-fsn.prod.ooni.nu"}', values: '1x30'}
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ClickHouseTableNotBackedUp
+        exp_alerts:
+          - exp_labels: {instance: data3, table: made_on_data1, hosts: data1.htz-fsn.prod.ooni.nu}
+            exp_annotations:
+              summary: 'ClickHouse table made_on_data1 is not backed up (on data1.htz-fsn.prod.ooni.nu)'
+              description: 'No backup job covers it and it is not excluded. Add it to a job (clickhouse_backup_data1_tables if only data1 holds its data, clickhouse_backup_private_tables if private), or to clickhouse_backup_exclude_tables if it needs no backup. See the runbook, "ClickHouse backup".'
