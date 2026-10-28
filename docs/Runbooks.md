@@ -233,7 +233,7 @@ Never put S3 keys in `BACKUP`/`RESTORE`/`s3()` queries: an incremental
 backup stores its `base_backup` argument, keys included, in plain text in
 its `.backup` file. ClickHouse gets the keys from
 `/etc/clickhouse-server/config.d/ooni_backup_s3.xml`, which it reloads
-without a restart.
+without a restart using systemctl reload clickhouse-server.
 
 ### Setting up
 1. In the Cloudflare dashboard, create the R2 buckets `ooni-clickhouse-backup`
