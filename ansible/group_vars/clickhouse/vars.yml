@@ -303,9 +303,12 @@ clickhouse_custom_quotas:
   # dropped if clickhouse_sql_objects_drop_unlisted is turned on
   - name: ooniprobe
   - name: oonirun
-  # TODO: the old vars had oonimeasurements' limits here too, never applied anywhere
-  - name: oonitestlists
   - name: notebook
+  # The test lists editor only inserts url_priorities rows, so a small quota
+  - name: oonitestlists
+    intervals:
+      - "INTERVAL 3600 second MAX queries = 1000, errors = 100, execution_time = 600"
+    to: [oonitestlists]
 
 clickhouse_custom_grants:
   - databases: [ooni, oonitest]
