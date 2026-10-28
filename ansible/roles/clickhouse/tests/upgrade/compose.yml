@@ -27,3 +27,8 @@ services:
     container_name: chupgrade-data3
     hostname: clickhouse3.prod.ooni.io
     networks: {default: {aliases: [data3.htz-fsn.prod.ooni.nu, clickhouse3.prod.ooni.io]}}
+# The role's config listens on "::" only, as in production. Docker turns IPv6 off
+# in containers on an IPv4-only network, and ClickHouse then can't listen at all.
+networks:
+  default:
+    enable_ipv6: true

@@ -31,3 +31,8 @@ services:
     volumes: ["./out/data4.htz-fsn.prod.ooni.nu:/etc/clickhouse-server:ro,z", "./out:/out:ro,z"]
 volumes:
   data3:
+# The role's config listens on "::" only, as in production. Docker turns IPv6 off
+# in containers on an IPv4-only network, and ClickHouse then can't listen at all.
+networks:
+  default:
+    enable_ipv6: true
