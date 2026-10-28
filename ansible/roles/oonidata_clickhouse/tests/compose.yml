@@ -1,0 +1,38 @@
+# ClickHouse at production's version, one container per host, with the production host
+# names as hostname and alias, so that the configs the clickhouse role renders from the
+# real vars (out/<host>/) work unchanged: Keeper and replication use clickhouseN.prod.ooni.io,
+# the role matches hosts by their inventory name dataN.htz-fsn.prod.ooni.nu.
+# data4 is the replica that the test adds and removes.
+x-node: &node
+  image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+  ulimits: {nofile: 262144}
+  mem_limit: 1500m
+services:
+  data1:
+    <<: *node
+    hostname: clickhouse1.prod.ooni.io
+    networks: {default: {aliases: [data1.htz-fsn.prod.ooni.nu, clickhouse1.prod.ooni.io]}}
+    volumes: ["./out/data1.htz-fsn.prod.ooni.nu:/etc/clickhouse-server:ro,z", "./out:/out:ro,z"]
+  data2:
+    <<: *node
+    hostname: clickhouse2.prod.ooni.io
+    networks: {default: {aliases: [data2.htz-fsn.prod.ooni.nu, clickhouse2.prod.ooni.io]}}
+    volumes: ["./out/data2.htz-fsn.prod.ooni.nu:/etc/clickhouse-server:ro,z", "./out:/out:ro,z"]
+  data3:
+    <<: *node
+    hostname: clickhouse3.prod.ooni.io
+    networks: {default: {aliases: [data3.htz-fsn.prod.ooni.nu, clickhouse3.prod.ooni.io]}}
+    # data3's clickhouse_base_path is /data/clickhouse
+    volumes: ["./out/data3.htz-fsn.prod.ooni.nu:/etc/clickhouse-server:ro,z", "./out:/out:ro,z", "data3:/data"]
+  data4:
+    <<: *node
+    hostname: clickhouse4.prod.ooni.io
+    networks: {default: {aliases: [data4.htz-fsn.prod.ooni.nu, clickhouse4.prod.ooni.io]}}
+    volumes: ["./out/data4.htz-fsn.prod.ooni.nu:/etc/clickhouse-server:ro,z", "./out:/out:ro,z"]
+volumes:
+  data3:
+# The role's config listens on "::" only, as in production. Docker turns IPv6 off
+# in containers on an IPv4-only network, and ClickHouse then can't listen at all.
+networks:
+  default:
+    enable_ipv6: true

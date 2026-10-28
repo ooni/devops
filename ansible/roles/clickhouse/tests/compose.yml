@@ -1,0 +1,16 @@
+# ClickHouse at production's version: `fresh` starts empty, data1-3 are seeded like the
+# production nodes (seed/). users.xml is rendered from the role's template (render.yml);
+# out/ also holds the admin client configs the role's tasks write.
+x-node: &node
+  image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+  environment: {CLICKHOUSE_SKIP_USER_SETUP: "1"}
+  volumes:
+    - ./out/users.xml:/etc/clickhouse-server/users.xml:ro,z
+    - ./out:/out:ro,z
+  ulimits: {nofile: 262144}
+  mem_limit: 1500m  # ClickHouse caps itself at 90% of it; at 700m, queries during the role ran out on CI
+services:
+  fresh: {<<: *node, ports: ["127.0.0.1:18120:8123"]}
+  data1: {<<: *node, ports: ["127.0.0.1:18121:8123"]}
+  data2: {<<: *node, ports: ["127.0.0.1:18122:8123"]}
+  data3: {<<: *node, ports: ["127.0.0.1:18123:8123"]}

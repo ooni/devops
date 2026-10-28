@@ -1,0 +1,34 @@
+# Three Debian hosts with systemd, named like the production replicas (hostname and alias as
+# in ../../../oonidata_clickhouse/tests/compose.yml), that ansible reaches with the
+# community.docker connection and installs ClickHouse on with the role. The test copies the
+# downloaded packages through cache/debs from host to host, so that each version is
+# downloaded once (sharing apt's cache itself would make the hosts wait for its lock).
+x-host: &host
+  build: .
+  image: localhost/clickhouse-role-upgrade-host
+  privileged: true      # systemd
+  pids_limit: -1        # ClickHouse starts hundreds of threads
+  tmpfs: ["/run", "/run/lock"]
+  volumes: ["./cache/debs:/debs:z"]
+  mem_limit: 2g
+services:
+  data1:
+    <<: *host
+    container_name: chupgrade-data1
+    hostname: clickhouse1.prod.ooni.io
+    networks: {default: {aliases: [data1.htz-fsn.prod.ooni.nu, clickhouse1.prod.ooni.io]}}
+  data2:
+    <<: *host
+    container_name: chupgrade-data2
+    hostname: clickhouse2.prod.ooni.io
+    networks: {default: {aliases: [data2.htz-fsn.prod.ooni.nu, clickhouse2.prod.ooni.io]}}
+  data3:
+    <<: *host
+    container_name: chupgrade-data3
+    hostname: clickhouse3.prod.ooni.io
+    networks: {default: {aliases: [data3.htz-fsn.prod.ooni.nu, clickhouse3.prod.ooni.io]}}
+# The role's config listens on "::" only, as in production. Docker turns IPv6 off
+# in containers on an IPv4-only network, and ClickHouse then can't listen at all.
+networks:
+  default:
+    enable_ipv6: true

@@ -1,0 +1,15 @@
+# Renders each host's config.xml and users.xml with the clickhouse role's own tasks, into
+# out/<host>/, which compose.yml mounts as the container's /etc/clickhouse-server.
+# The test restarts the containers itself, one at a time, as serial: 1 would. notebook1
+# is rendered too, as it's in [clickhouse], but has no container.
+- hosts: clickhouse
+  connection: local
+  gather_facts: false
+  vars:
+    clickhouse_config_directory: "{{ lookup('env', 'TESTS') }}/out/{{ inventory_hostname }}"
+    clickhouse_handler_on_config_change: Config changed
+  handlers:
+    - {name: Config changed, ansible.builtin.debug: {msg: "the test restarts the container"}}
+  tasks:
+    - ansible.builtin.file: {path: "{{ clickhouse_config_directory }}", state: directory, mode: "0755"}
+    - ansible.builtin.include_role: {name: clickhouse, tasks_from: config/clickhouse.yml}

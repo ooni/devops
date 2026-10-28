@@ -1,0 +1,19 @@
+---
+
+- name: CLICKHOUSE | Configure server
+  ansible.builtin.template:
+    src: "{{ clickhouse_config_file_name }}.j2"
+    dest: "{{ clickhouse_config_directory }}/{{ clickhouse_config_file_name }}"
+    mode: 0644
+  notify: "{{ clickhouse_handler_on_config_change }}"
+  tags: clickhouse_configure
+
+- name: CLICKHOUSE | Configure users (from vars)
+  ansible.builtin.template:
+    src: "{{ clickhouse_users_file_name }}.j2"
+    dest: "{{ clickhouse_config_directory }}/{{ clickhouse_users_file_name }}"
+    mode: 0644
+  notify: "{{ clickhouse_handler_on_config_change }}"
+  tags:
+    - clickhouse_configure
+    - clickhouse_users
