@@ -12,6 +12,7 @@
     - name: Admin client configuration
       ansible.builtin.template: {src: ../templates/admin-client.xml.j2, dest: "{{ clickhouse_admin_client_config }}", mode: "0644"}
       no_log: true
-    - {name: quotas, include_role: {name: clickhouse, tasks_from: config/quotas.yml}, when: clickhouse_role_manage_quotas}
+    # users first, as in tasks/main.yml: a quota's TO names users
     - {name: users, include_role: {name: clickhouse, tasks_from: config/users.yml}, when: clickhouse_role_manage_users}
+    - {name: quotas, include_role: {name: clickhouse, tasks_from: config/quotas.yml}, when: clickhouse_role_manage_quotas}
     - {name: grants, include_role: {name: clickhouse, tasks_from: config/grants.yml}, when: clickhouse_role_manage_grants}
