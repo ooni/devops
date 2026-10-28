@@ -244,10 +244,11 @@ without a restart.
    `/oonidevops/secrets/clickhouse_backup_r2_endpoint`,
    `/oonidevops/secrets/clickhouse_backup_r2_access_key_id` and
    `/oonidevops/secrets/clickhouse_backup_r2_secret_access_key`.
-3. Deploy node_exporter first, for its textfile directory, then the backups:
+3. Deploy node_exporter first, for its textfile directory, then the backups
+   (data2 gets the role for restoring, with its timer off):
    ```bash
    ./play -i inventory deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu,data3.htz-fsn.prod.ooni.nu -t node_exporter --diff
-   ./play -i inventory deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu,data3.htz-fsn.prod.ooni.nu -t clickhouse_backup --diff
+   ./play -i inventory deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu,data2.htz-fsn.prod.ooni.nu,data3.htz-fsn.prod.ooni.nu -t clickhouse_backup --diff
    ```
    and the alert rules with `deploy-monitoring.yml`.
 4. The timer takes the first (full) backup at its next run, on Sunday at
@@ -333,37 +334,61 @@ Data written after a pinned backup isn't in it. If you roll back, that
 window has to be filled again by reprocessing those days.
 
 ### Restoring
-The target server needs `ooni_backup_s3.xml` in `config.d` (the role
-installs it). `ooni-clickhouse-backup list` prints the latest backup URL of
-each table. Restoring the latest incremental restores the whole chain.
+`ooni-clickhouse-backup restore` creates the tables a node is missing and
+skips the ones it has, so it can be rerun. A table another live node has is
+created with that node's definition; replicated tables then fetch their data
+from the other replicas, and Join and EmbeddedRocksDB rows are copied from a
+peer. The backups are used only for what no node has: data1's own tables, and
+everything after losing the whole cluster. Views come last (a view whose `TO`
+table is missing makes inserts into its source fail). Then it logs `restore:
+tables ready` and waits for the fetches; the node can take writes from then.
 
-1. The database isn't part of a table backup:
+data2 has the role too, timer off, for the config and `ooni_backup_s3.xml`.
+The role's `tests/lifecycle` tests all of this.
+
+**A node lost or re-imaged** (same name and macros):
+1. Deploy ClickHouse and the role on it (`deploy-clickhouse.yml`, tags
+   `clickhouse`, `clickhouse_backup`).
+2. Run `sudo ooni-clickhouse-backup restore` on it. It first removes the
+   node's stale replicas from Keeper, waiting up to 3 minutes for the old
+   Keeper session to expire. If the replica is still active after that,
+   another server is running under its name: stop it.
+3. Check the replicas:
    ```sql
-   CREATE DATABASE IF NOT EXISTS ooni
-   ```
-2. Restore tables before the materialized views that read from them, on
-   one node, and a view's `TO` table before the view: while a view exists
-   without its table, every insert into the view's source fails (fastpath's,
-   for `counters_asn_test_list`). A replicated table that still exists makes `RESTORE` fail with
-   `REPLICA_ALREADY_EXISTS`: drop it (`DROP TABLE ... SYNC`) or restore on
-   another server.
-   ```sql
-   RESTORE TABLE ooni.obs_web FROM S3('https://<account id>.r2.cloudflarestorage.com/ooni-clickhouse-backup/prod/ooni/obs_web/<chain>/<backup>')
-   ```
-3. For EmbeddedRocksDB and Join tables (`test_groups`), load the rows too:
-   ```sql
-   INSERT INTO ooni.test_groups
-   SELECT * FROM s3('<backup URL>/data.native.zst', 'Native')
-   ```
-4. On the other replicas, create replicated tables with the same
-   `SHOW CREATE TABLE` statement; they fetch the data from the restored node.
-   Non-replicated tables whose data only data1 holds were backed up from
-   data1 (job `data1`); restore them there.
-5. Compare row counts and checksums with what you expect, e.g.
-   ```sql
-   SELECT count(), sum(cityHash64(toString(tuple(*)))) FROM ooni.obs_web
+   SELECT table, active_replicas, total_replicas FROM system.replicas WHERE database = 'ooni'
    ```
 
+A re-imaged node must also rejoin Keeper's ensemble (`reconfig`); `restore`
+doesn't do that.
+
+**The whole cluster lost**, run `sudo ooni-clickhouse-backup restore` on:
+1. data2: everything comes from data3's backups. Its SSDs take it in, and
+   serve it to the other replicas, faster than data3's HDDs.
+2. data1: its own tables from its backups, the rest like data2's. Fastpath
+   can write to it once it logs `restore: tables ready`.
+3. data3, from then on.
+
+Then create the tables that are never backed up
+(`clickhouse_backup_exclude_tables`), empty; the updater refills the
+fingerprints:
+```bash
+clickhouse-client --database ooni --multiquery < scripts/cluster-migration/schema.sql
+```
+
+**One table**: `restore --table obs_web`, from a live replica if one has it,
+else from the latest backup.
+
+**A researcher's own database**: a one-node `oonidata_cluster` with its own
+Keeper and macros, an R2 API token with Object Read on
+`ooni-clickhouse-backup` in `config.d`, and a config with the `measurements`
+job. Anonymous public URLs don't work: `RESTORE` lists objects, and an
+incremental reads its base from R2's S3 endpoint. `--table` restores only
+some tables.
+
+To check a table by hand, compare row counts and checksums, e.g.
+```sql
+SELECT count(), sum(cityHash64(*)) FROM ooni.obs_web FINAL
+```
 
 ## Grafana editing
 This runbook describes adding new dashboards, panels and alerts in
