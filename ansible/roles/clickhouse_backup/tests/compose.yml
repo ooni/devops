@@ -1,0 +1,82 @@
+# The backup's environment: ClickHouse at production's version, MinIO in place
+# of R2, the backup script in "runner", node_exporter reading its textfile,
+# Prometheus with the repo's alert rules, Alertmanager with the repo's routes,
+# and a stand-in for Slack. run.sh renders work/ first.
+name: chbackup-test
+services:
+  minio:
+    image: docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: testkey
+      MINIO_ROOT_PASSWORD: testsecret123
+    ports: ["127.0.0.1:19910:9000"]
+
+  # data3, the node the backups run against
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+    hostname: data3
+    environment:
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: admin
+    volumes:
+      - ./work/ooni_backup_s3.xml:/etc/clickhouse-server/config.d/ooni_backup_s3.xml:ro,z
+      - ./clickhouse.xml:/etc/clickhouse-server/config.d/test.xml:ro,z
+    ulimits:
+      nofile: 262144
+    mem_limit: 2g
+    ports: ["127.0.0.1:19911:8123"]
+
+  # another node of the cluster, where a table nobody backs up gets created
+  clickhouse2:
+    image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+    hostname: data1
+    environment:
+      CLICKHOUSE_USER: admin
+      CLICKHOUSE_PASSWORD: admin
+    volumes:
+      - ./clickhouse.xml:/etc/clickhouse-server/config.d/test.xml:ro,z
+    ulimits:
+      nofile: 262144
+    mem_limit: 1g
+    ports: ["127.0.0.1:19912:8123"]
+
+  runner:
+    build: {context: ., dockerfile: runner.Dockerfile}
+    command: sleep infinity
+    volumes:
+      - ../files:/role:ro,z
+      - ./work:/work:ro,z
+      - ./work/textfile:/var/lib/node_exporter/textfile_collector:z
+
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:v1.8.2
+    command: [--collector.disable-defaults, --collector.textfile, --collector.textfile.directory=/textfile]
+    volumes:
+      - ./work/textfile:/textfile:ro,z
+
+  # monitoring.ooni.org runs Debian's prometheus 2.42.0
+  prometheus:
+    image: docker.io/prom/prometheus:v2.42.0
+    command: [--config.file=/etc/prometheus/prometheus.yml]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro,z
+      - ../../prometheus/files/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro,z
+      - ./alert_rules_test.yml:/etc/prometheus/alert_rules_test.yml:ro,z
+    ports: ["127.0.0.1:19990:9090"]
+
+  # and Debian's alertmanager 0.25.0
+  alertmanager:
+    image: docker.io/prom/alertmanager:v0.25.0
+    command: [--config.file=/etc/alertmanager/alertmanager.yml]
+    volumes:
+      - ./work/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,z
+      - ../../prometheus_alertmanager/files/templates:/etc/prometheus/alertmanager_templates:ro,z
+    ports: ["127.0.0.1:19993:9093"]
+
+  slack:
+    image: docker.io/library/python:3.11-slim-bookworm
+    command: [python3, /slack.py]
+    volumes:
+      - ./slack.py:/slack.py:ro,z
+    ports: ["127.0.0.1:19980:8080"]

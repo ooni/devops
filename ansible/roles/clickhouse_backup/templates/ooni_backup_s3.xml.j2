@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!-- {{ ansible_managed }}
+     Credentials for the backup buckets, one endpoint per bucket. BACKUP/RESTORE
+     and the s3 function use them for any URL under the endpoint, so queries
+     never carry keys: an incremental backup stores its base_backup argument
+     in plain text in the bucket. ClickHouse reloads this file without a
+     restart. -->
+<clickhouse>
+    <s3>
+{% for bucket in clickhouse_backup_jobs | map(attribute='s3_bucket') | unique %}
+        <ooni_backup_{{ loop.index }}>
+            <endpoint>{{ clickhouse_backup_s3_endpoint | regex_replace('/$', '') }}/{{ bucket }}/</endpoint>
+            <region>{{ clickhouse_backup_s3_region }}</region>
+            <access_key_id>{{ clickhouse_backup_s3_access_key_id | e }}</access_key_id>
+            <secret_access_key>{{ clickhouse_backup_s3_secret_access_key | e }}</secret_access_key>
+        </ooni_backup_{{ loop.index }}>
+{% endfor %}
+    </s3>
+</clickhouse>

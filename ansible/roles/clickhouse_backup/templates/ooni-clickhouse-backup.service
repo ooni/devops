@@ -1,0 +1,14 @@
+[Unit]
+Description=Back up ClickHouse tables to object storage
+Wants=ooni-clickhouse-backup.timer
+After=clickhouse-server.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ooni-clickhouse-backup run
+SyslogIdentifier=ooni-clickhouse-backup
+# A new full backup of the largest tables takes more than a day
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=multi-user.target
