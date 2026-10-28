@@ -41,6 +41,13 @@ Commands:
     run [--job J ...] [--full] [--table T ...] [--keep LABEL]
     list [--job J ...] [--table T ...]
     release [--job J ...] LABEL
+    restore [--job J ...] [--table T ...]
+
+restore brings back the tables this node should have, after it was lost,
+replaced or re-imaged, or on a new server: from the cluster's live replicas
+where they have a table (cluster in the config), from the backups where only
+they do (see Restorer). Run it on each node; it leaves tables already there
+alone. A researcher runs it on a one-node cluster with a read-only key.
 
 After each table, the result goes to a Prometheus textfile (metrics_file in
 the config) for node_exporter: last success and attempt per table, whether
@@ -192,6 +199,13 @@ class Store:
             if e.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
                 return False
             raise
+
+    def get_text(self, key: str):
+        """The object's text, or None if there's no such object"""
+        try:
+            return self.s3.get_object(Bucket=self.bucket, Key=key)["Body"].read().decode()
+        except self.s3.exceptions.NoSuchKey:
+            return None
 
     def put_empty(self, key: str) -> None:
         self.s3.put_object(Bucket=self.bucket, Key=key, Body=b"")
@@ -503,7 +517,8 @@ class BackupJob:
                 log.info(f"waiting for ClickHouse: {e}")
                 time.sleep(10)
 
-    def wait(self, op_id: str, what: str) -> dict:
+    def wait(self, op_id: str, what: str, done: str = "BACKUP_CREATED", running: str = "CREATING_BACKUP") -> dict:
+        """Poll a BACKUP (or, with done="RESTORED", running="RESTORING", a RESTORE) until it ends"""
         t0 = time.monotonic()
         last_log = t0
         failing_since = None
@@ -528,9 +543,9 @@ class BackupJob:
             if not rows:
                 raise RuntimeError(f"{what}: gone from system.backups (server restart?)")
             st = rows[0]
-            if st["status"] == "BACKUP_CREATED":
+            if st["status"] == done:
                 return st
-            if st["status"] != "CREATING_BACKUP":
+            if st["status"] != running:
                 raise RuntimeError(f"{what}: {st['status']}: {st['error']}")
             now = time.monotonic()
             if now - last_log >= 1800:
@@ -691,6 +706,235 @@ class BackupJob:
         log.info(f"released {n} chain(s) pinned as {label}; the next run prunes them")
         return 0
 
+    def restorable(self, only: list) -> dict:
+        """{table: (key of its latest complete backup, its CREATE statement)} for this job's tables"""
+        out = {}
+        for table in self.store.subdirs(f"{self.store.prefix}/{self.db}/"):
+            if not table or (only and table not in only) or not self.includes(table) or self.excludes(table):
+                continue
+            chains = self.store.chains(self.db, table)
+            chain, backup = latest_backup(chains)
+            if not backup:
+                continue
+            tprefix = self.store.table_prefix(self.db, table)
+            # An incremental stores the definition only if it changed: the
+            # newest backup of the chain that has the file has the current one
+            create = None
+            for b in sorted((b for b, ok in chains[chain]["backups"].items() if ok and b <= backup), reverse=True):
+                create = self.store.get_text(f"{tprefix}{chain}/{b}/metadata/{self.db}/{table}.sql")
+                if create:
+                    break
+            out[table] = (f"{tprefix}{chain}/{backup}", create or "")
+        return out
+
+
+def engine_of(create: str) -> str:
+    """The engine of a CREATE statement: MaterializedView, ReplicatedMergeTree, ..."""
+    if re.match(r"\s*(CREATE|ATTACH)\s+MATERIALIZED\s+VIEW", create, re.I):
+        return "MaterializedView"
+    m = re.search(r"\bENGINE\s*=\s*(\w+)", create)
+    return m.group(1) if m else ""
+
+
+class Restorer:
+    """Brings this node's tables back, after it was lost, replaced or re-imaged, or on a new server.
+
+    The cluster's live replicas are the source wherever they have a table:
+    this node creates it with their current definition, and a replicated
+    table then fetches its data from them. The backups are the source for
+    what only they have: a replicated table no node has (the whole cluster
+    was lost, or a researcher's own server), and the local tables this
+    node's jobs back up (data1's). Join and EmbeddedRocksDB rows come from a
+    peer that has them, else from the backup's export. Views come last,
+    after the tables they read and write. Only then does it wait for the
+    replicated tables to fetch their data, so the node can take inserts
+    meanwhile. Tables already here are left alone, so running it again is
+    safe."""
+
+    def __init__(self, jobs: list, cluster: str):
+        self.jobs, self.cluster = jobs, cluster
+        self.ch, self.db = jobs[0].ch, jobs[0].db
+
+    def peers(self) -> dict:
+        """{table: {"host", "engine", "create", "zk_path"}} as the cluster's other live nodes have them"""
+        if not self.cluster:
+            return {}
+        c, db, me = sql_str(self.cluster), sql_str(self.db), sql_str(self.hostname())
+        # Each node reports its own tables and replica paths, and the other
+        # nodes' rows are the peers'. skip_unavailable_shards: a node that's
+        # down doesn't stop the restore.
+        rows = self.ch.rows(
+            f"""
+            SELECT host, name, engine, create, zk_path FROM clusterAllReplicas({c}, view(
+                SELECT hostName() AS host, t.name AS name, t.engine AS engine,
+                       t.create_table_query AS create, r.zookeeper_path AS zk_path
+                FROM system.tables AS t
+                LEFT JOIN system.replicas AS r ON r.database = t.database AND r.table = t.name
+                WHERE t.database = {db} AND NOT t.is_temporary AND NOT startsWith(t.name, '.inner')
+            ))
+            WHERE host != {me}
+            ORDER BY host, name
+            """,
+            settings={"skip_unavailable_shards": "1"},
+        )
+        out = {}
+        for r in rows:
+            out.setdefault(r["name"], r)
+        return out
+
+    def hostname(self) -> str:
+        # a literal: hostName() in a query on the cluster runs on each node
+        return self.ch.query("SELECT hostName()").strip()
+
+    def macros(self) -> dict:
+        return {r["macro"]: r["substitution"] for r in self.ch.rows("SELECT macro, substitution FROM system.macros")}
+
+    def drop_stale_replicas(self, paths: set) -> None:
+        """Remove this node's leftover replica entries from Keeper: a node that
+        comes back empty can't create a replicated table while Keeper still
+        lists it as a replica. ClickHouse refuses to drop an active replica."""
+        me = self.macros().get("replica")
+        if not me:
+            return
+        local = {r["zookeeper_path"] for r in self.ch.rows(f"SELECT zookeeper_path FROM system.replicas WHERE database = {sql_str(self.db)}")}
+        for path in sorted(paths - local):
+            try:
+                rows = self.ch.rows(f"SELECT name FROM system.zookeeper WHERE path = {sql_str(path + '/replicas')}")
+            except RuntimeError:
+                continue  # no such table in Keeper
+            if any(r["name"] == me for r in rows):
+                log.info(f"dropping stale replica {me} from {path}")
+                self.drop_replica(me, path)
+
+    def drop_replica(self, me: str, path: str, wait_s: float = 180) -> None:
+        # The old server's Keeper session outlives it until it times out (30 s
+        # by default), and until then Keeper still says it's active. If it
+        # stays active, another server is running under this replica's name.
+        t0 = time.monotonic()
+        while True:
+            try:
+                self.ch.query(f"SYSTEM DROP REPLICA {sql_str(me)} FROM ZKPATH {sql_str(path)}")
+                return
+            except RuntimeError as e:
+                if "because it's active" not in str(e) or time.monotonic() - t0 > wait_s:
+                    raise RuntimeError(f"{path}: replica {me} is still active: is another server running as {me}? ({e})") from None
+                log.info(f"{path}: replica {me} still active, waiting for the old server's Keeper session to expire")
+                time.sleep(5)
+
+    def zk_path(self, create: str) -> str:
+        """A replicated table's Keeper path from its CREATE, with this node's macros"""
+        m = re.search(r"Replicated\w*MergeTree\(\s*'([^']+)'", create)
+        if not m:
+            return ""
+        path = m.group(1)
+        for k, v in self.macros().items():
+            path = path.replace("{" + k + "}", v)
+        return path
+
+    def run(self, only: list) -> int:
+        try:
+            self.jobs[0].wait_for_clickhouse()
+            self.ch.query(f"CREATE DATABASE IF NOT EXISTS `{self.db}`")
+            here = {r["name"] for r in self.ch.rows(f"SELECT name FROM system.tables WHERE database = {sql_str(self.db)}")}
+            peers = self.peers()
+            backups = {}
+            for job in self.jobs:
+                for table, b in job.restorable(only).items():
+                    backups.setdefault(table, (job, *b))
+        except Exception as e:
+            log.error(f"restore: could not start: {e}")
+            return 1
+        tables = sorted(t for t in set(peers) | set(backups) if not only or t in only)
+        engine = {t: peers[t]["engine"] if t in peers else engine_of(backups[t][2]) for t in tables}
+
+        self.drop_stale_replicas(
+            {p["zk_path"] for p in peers.values() if p["zk_path"]}
+            | {self.zk_path(b[2]) for b in backups.values()} - {""}
+        )
+        failed, fetching, done = [], [], 0
+        # views last: they need the tables they read and write
+        for table in sorted(tables, key=lambda t: (engine[t] == "MaterializedView", t)):
+            if table in here:
+                log.info(f"{table}: already here")
+                continue
+            try:
+                how = self.restore_table(table, engine[table], peers.get(table), backups.get(table))
+                log.info(f"{table}: {how}")
+                done += 1
+                if "fetching" in how:
+                    fetching.append(table)
+            except Exception as e:
+                log.error(f"{table}: restore failed: {e}")
+                failed.append(table)
+        # Every table exists now, so the node can take inserts while its
+        # replicated tables fetch their data in the background.
+        log.info(f"restore: tables ready, waiting for {len(fetching)} replicated tables to fetch their data")
+        for table in fetching:
+            try:
+                self.ch.query(f"SYSTEM SYNC REPLICA `{self.db}`.`{table}`", timeout=24 * 3600)
+                log.info(f"{table}: fetched")
+            except Exception as e:
+                log.error(f"{table}: fetch did not finish: {e}")
+                failed.append(table)
+        if failed:
+            log.error(f"restore: failed tables: {', '.join(failed)}")
+            return 1
+        log.info(f"restore: {done} tables restored, {len(tables) - done} already here")
+        return 0
+
+    def restore_table(self, table: str, engine: str, peer: dict, backup: tuple) -> str:
+        replicated = engine.startswith("Replicated")
+        if peer and (replicated or engine == "MaterializedView" or not backup):
+            self.ch.query(peer["create"])
+            if replicated:
+                return f"created like {peer['host']}'s, fetching from the other replicas"
+            if engine in EXPORT_ENGINES:
+                n = self.copy_rows(table)
+                return f"created like {peer['host']}'s, {n} rows copied from a peer"
+            return f"created like {peer['host']}'s"
+        if not backup:
+            raise RuntimeError("no live peer has it and no backup")
+        job, key, _ = backup
+        sql = f"RESTORE TABLE `{self.db}`.`{table}` FROM S3({job.store.ch_s3(key)}) ASYNC"
+        out = self.ch.query(sql + "\nFORMAT JSONEachRow", settings=job.settings)
+        op_id = json.loads(out.splitlines()[0])["id"]
+        job.wait(op_id, f"{table}: restoring {key}", done="RESTORED", running="RESTORING")
+        if engine in EXPORT_ENGINES:
+            self.ch.query(
+                f"INSERT INTO `{self.db}`.`{table}` SELECT * FROM s3({job.store.ch_s3(key + '/data.native.zst')}, 'Native')",
+                settings=job.settings,
+                timeout=3600,
+            )
+        return f"restored from {key}"
+
+    def copy_rows(self, table: str) -> int:
+        """Copy a Join or EmbeddedRocksDB table's rows from the peer that has the most.
+
+        Each peer is asked on its own, with remote() and the cluster config's
+        addresses: a query on the whole cluster fails if any node lacks the
+        table, e.g. one not restored yet. ClickHouse hides remote()'s
+        password in its logs."""
+        hosts = self.ch.rows(
+            f"SELECT host_name, port FROM system.clusters WHERE cluster = {sql_str(self.cluster)} AND NOT is_local"
+        )
+        best, most = None, 0
+        for h in hosts:
+            src = (f"remote({sql_str(h['host_name'] + ':' + str(h['port']))}, `{self.db}`, `{table}`, "
+                   f"{sql_str(self.ch.user)}, {sql_str(self.ch.password)})")
+            try:
+                n = int(self.ch.query(f"SELECT count() FROM {src}").strip())
+            except RuntimeError:
+                continue  # down, or doesn't have the table
+            if n > most:
+                best, most = src, n
+        if not best:
+            return 0
+        # Read them, then insert: a Join table refuses an INSERT whose SELECT
+        # reads it. These lookup tables are small.
+        rows = self.ch.query(f"SELECT * FROM {best} FORMAT JSONEachRow")
+        self.ch.query(f"INSERT INTO `{self.db}`.`{table}` FORMAT JSONEachRow\n{rows}")
+        return most
+
 
 def not_backed_up(tables: dict, here: str, jobs: list, excluded: list, elsewhere: list) -> dict:
     """The tables of {table: [hosts]} that no job here backs up and that
@@ -770,6 +1014,8 @@ def main() -> int:
     p.add_argument("--table", action="append", default=[])
     p = sub.add_parser("release", help="unpin chains pinned under LABEL")
     p.add_argument("label")
+    p = sub.add_parser("restore", help="bring back this node's missing tables, from peers and backups")
+    p.add_argument("--table", action="append", default=[], help="only this table (repeatable)")
     for p in sub.choices.values():
         p.add_argument("--job", action="append", default=[], help="only this job (repeatable)")
     args = ap.parse_args()
@@ -810,6 +1056,8 @@ def main() -> int:
         except BlockingIOError:
             log.error(f"another instance holds {lock_path}")
             return 1
+        if args.command == "restore":
+            return Restorer(jobs, conf.get("cluster", "")).run(args.table)
         rc = 0
         for job in jobs:
             if args.command == "run":

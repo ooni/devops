@@ -63,6 +63,12 @@ clickhouse_backup_exclude_tables:
   - fingerprints_http
   - session_expunge       # empty, no longer used (backend #972)
 
+# The ClickHouse cluster this node is part of. restore creates a table with a
+# live replica's definition when one of the other nodes has it, so that a
+# replicated table fetches its data from them; empty restores everything
+# from the backups.
+clickhouse_backup_cluster: oonidata_cluster
+
 # The cluster whose tables are checked after each run: any table on any of its
 # nodes that no job here backs up, that isn't excluded above and that isn't in
 # clickhouse_backup_backed_up_elsewhere is reported (ClickHouseTableNotBackedUp).
