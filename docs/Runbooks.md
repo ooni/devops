@@ -385,9 +385,16 @@ job. Anonymous public URLs don't work: `RESTORE` lists objects, and an
 incremental reads its base from R2's S3 endpoint. `--table` restores only
 some tables.
 
-To check a table by hand, compare row counts and checksums, e.g.
+To check a table by hand, compare its rows on each replica (from the parts'
+metadata, so it's instant):
 ```sql
-SELECT count(), sum(cityHash64(*)) FROM ooni.obs_web FINAL
+SELECT hostName(), sum(rows) FROM clusterAllReplicas('oonidata_cluster', system.parts)
+WHERE database = 'ooni' AND table = 'obs_web' AND active GROUP BY 1
+```
+For a closer look, checksum one month's key columns on each node:
+```sql
+SELECT count(), sum(cityHash64(measurement_uid, observation_idx)) FROM ooni.obs_web
+WHERE _partition_value = tuple('202610')
 ```
 
 ## Grafana editing
