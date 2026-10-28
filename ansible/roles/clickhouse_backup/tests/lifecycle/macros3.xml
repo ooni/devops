@@ -1,0 +1,1 @@
+<clickhouse><macros><cluster>oonidata_cluster</cluster><shard>01</shard><replica>data3</replica></macros></clickhouse>

@@ -1,0 +1,49 @@
+# The lifecycle test's environment (test_lifecycle.py): production's shape, data1-3 in one shard of
+# oonidata_cluster at production's ClickHouse version, Keeper on its own so a node can be wiped without
+# it, MinIO in place of R2, a researcher's standalone one-node cluster, and the backup script in "runner".
+name: chbackup-lifecycle
+x-clickhouse: &clickhouse
+  image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+  environment: {CLICKHOUSE_USER: admin, CLICKHOUSE_PASSWORD: admin}
+  ulimits: {nofile: 262144}
+  mem_limit: 1500m
+services:
+  keeper:
+    image: docker.io/clickhouse/clickhouse-keeper:24.8.6.70
+    hostname: keeper
+    volumes:
+      - ./keeper.xml:/etc/clickhouse-keeper/keeper_config.xml:ro,z
+  minio:
+    image: docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: server /data
+    environment: {MINIO_ROOT_USER: testkey, MINIO_ROOT_PASSWORD: testsecret123}
+    ports: ["127.0.0.1:19920:9000"]
+  data1:
+    <<: *clickhouse
+    hostname: data1
+    volumes:
+      - ./cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro,z
+      - ./macros1.xml:/etc/clickhouse-server/config.d/macros.xml:ro,z
+  data2:
+    <<: *clickhouse
+    hostname: data2
+    volumes:
+      - ./cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro,z
+      - ./macros2.xml:/etc/clickhouse-server/config.d/macros.xml:ro,z
+  data3:
+    <<: *clickhouse
+    hostname: data3
+    volumes:
+      - ./cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro,z
+      - ./macros3.xml:/etc/clickhouse-server/config.d/macros.xml:ro,z
+  researcher:
+    <<: *clickhouse
+    hostname: researcher
+    volumes:
+      - ./researcher.xml:/etc/clickhouse-server/config.d/researcher.xml:ro,z
+  runner:
+    build: {context: .., dockerfile: runner.Dockerfile}
+    command: sleep infinity
+    volumes:
+      - ../../files:/role:ro,z
+      - ./configs:/configs:ro,z
