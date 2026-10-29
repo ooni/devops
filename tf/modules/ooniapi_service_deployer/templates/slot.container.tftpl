@@ -1,0 +1,31 @@
+# A Quadlet unit for one blue/green slot. deploy.py fills in __IMAGE_TAG__
+# and installs it as /etc/containers/systemd/${service_name}-${slot}.container,
+# which Quadlet turns into ${service_name}-${slot}.service.
+[Unit]
+Description=OONI API ${service_name}, slot ${slot}
+
+[Container]
+ContainerName=${service_name}-${slot}
+Image=docker.io/ooni/api-${service_name}:__IMAGE_TAG__
+Pull=always
+Network=${network_name}
+PublishPort=127.0.0.1:${host_port}:${container_port}
+# root in the container is an unprivileged host user, in a UID range of its own
+UserNS=auto
+%{ for key, value in env_vars ~}
+Environment="${key}=${replace(replace(replace(value, "\\", "\\\\"), "\"", "\\\""), "%", "%%")}"
+%{ endfor ~}
+# Podman secrets deploy.py creates from the service's Secrets Manager secret:
+# environment variables in the container, as the services' settings expect,
+# but never written to a unit file
+%{ for name in secrets ~}
+Secret=${service_name}-${slot}-${name},type=env,target=${name}
+%{ endfor ~}
+
+[Service]
+Restart=always
+# a first deploy pulls the image
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

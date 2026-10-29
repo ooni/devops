@@ -545,7 +545,7 @@ resource "aws_route53_record" "ooni_wc_th" {
 module "ooniapi_reverseproxy_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -983,7 +983,7 @@ EOF
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -1356,7 +1356,7 @@ resource "aws_iam_role_policy" "reuploader_role" {
 module "ooniapi_oonirun_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -1420,7 +1420,7 @@ module "ooniapi_oonirun" {
 module "ooniapi_oonifindings_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -1484,7 +1484,7 @@ module "ooniapi_oonifindings" {
 module "ooniapi_ooniauth_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -1582,7 +1582,7 @@ module "ooniapi_ooniauth" {
 module "ooniapi_oonimeasurements_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"

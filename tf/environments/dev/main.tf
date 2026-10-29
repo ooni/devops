@@ -369,7 +369,7 @@ locals {
   }
 }
 
-# The compose files, nginx upstream confs and deploy.py the deploy jobs copy
+# The Quadlet units, nginx upstream confs and deploy.py the deploy jobs copy
 # to the host
 resource "aws_s3_bucket" "ooniapi_deploy" {
   bucket = "ooniapi-deploy-${var.aws_region}-${random_id.artifact_id.hex}"
@@ -682,7 +682,7 @@ EOF
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -839,7 +839,7 @@ module "ooniapi_ooniprobe_legacy" {
 module "ooniapi_reverseproxy_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -1168,7 +1168,7 @@ module "fastpath_builder" {
 module "ooniapi_oonirun_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -1236,7 +1236,7 @@ module "ooniapi_oonirun" {
 module "ooniapi_oonifindings_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -1303,7 +1303,7 @@ module "ooniapi_oonifindings" {
 module "ooniapi_ooniauth_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"
@@ -1404,7 +1404,7 @@ module "ooniapi_ooniauth" {
 module "ooniapi_oonimeasurements_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
-  # "blue_green" deploys this service with Docker Compose blue/green to the
+  # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
   deploy_mode = "ecs"

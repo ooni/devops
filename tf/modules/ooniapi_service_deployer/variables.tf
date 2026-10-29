@@ -39,7 +39,7 @@ variable "deploy_mode" {
   description = <<-EOF
     Which Deploy stage implementation the pipeline uses:
       - "ecs"        (default) the existing ECS rolling-deploy stage.
-      - "blue_green" Docker Compose blue/green deploy to dedicated Hetzner
+      - "blue_green" Podman Quadlet blue/green deploy to dedicated Hetzner
                       hosts, driven by a CodeBuild "Deploy" action over SSH.
       - "both"       the ECS deploy, then the blue/green deploy, of the same
                       image. For the migration: the ALB keeps serving the
@@ -73,7 +73,7 @@ variable "ecs_service_name" {
 # --- deploy_mode = "blue_green" or "both" --------------------------------
 
 variable "deploy_bucket" {
-  description = "S3 bucket that rendered compose files, the nginx upstream conf snippet, and deploy.py are uploaded to. Required when deploy_mode is \"blue_green\" or \"both\"."
+  description = "S3 bucket that the rendered Quadlet units, the nginx upstream conf snippet, and deploy.py are uploaded to. Required when deploy_mode is \"blue_green\" or \"both\"."
   type        = string
   default     = null
 }
@@ -109,25 +109,25 @@ variable "container_port" {
 }
 
 variable "network_name" {
-  description = "Docker network the service's containers attach to. Required when deploy_mode is \"blue_green\" or \"both\"."
+  description = "Podman network the service's containers attach to. Required when deploy_mode is \"blue_green\" or \"both\"."
   type        = string
   default     = null
 }
 
 variable "env_vars" {
-  description = "Cleartext environment variables for the container. Same shape as ooniapi_service's task_environment (map(string)). Baked directly into the rendered compose file, since none of this is sensitive."
+  description = "Cleartext environment variables for the container. Same shape as ooniapi_service's task_environment (map(string)). Baked directly into the rendered Quadlet unit, since none of this is sensitive."
   type        = map(string)
   default     = {}
 }
 
 variable "secrets" {
-  description = "Names of the keys in var.service_secrets_arn's JSON blob. Declared in the rendered compose file as Compose file-based secrets, so each is mounted read-only at /run/secrets/<name> in the container instead of being exposed as an environment variable. Required when deploy_mode is \"blue_green\" or \"both\"."
+  description = "Names of the keys in var.service_secrets_arn's JSON blob. deploy.py creates each as a Podman secret, which the rendered Quadlet unit passes to the container as the environment variable of that name, where the services' settings read it. Required when deploy_mode is \"blue_green\" or \"both\"."
   type        = list(string)
   default     = []
 }
 
 variable "service_secrets_arn" {
-  description = "ARN of the Secrets Manager secret holding the service's runtime secrets as a flat JSON key/value object. Every key becomes a Compose file-based secret written to disk during deploy (see var.secrets). Required when deploy_mode is \"blue_green\" or \"both\"."
+  description = "ARN of the Secrets Manager secret holding the service's runtime secrets as a flat JSON key/value object. Every key becomes a Podman secret during deploy (see var.secrets). Required when deploy_mode is \"blue_green\" or \"both\"."
   type        = string
   default     = null
 }

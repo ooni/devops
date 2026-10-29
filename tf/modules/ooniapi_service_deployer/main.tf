@@ -164,16 +164,16 @@ resource "aws_codebuild_project" "ooniapi" {
   }
 }
 
-## Docker Compose blue/green deploy (deploy_mode = "blue_green" or "both")
+## Podman Quadlet blue/green deploy (deploy_mode = "blue_green" or "both")
 
-resource "aws_s3_object" "compose_file" {
+resource "aws_s3_object" "slot_unit" {
   for_each = local.deploy_blue_green ? { a = var.host_port_a, b = var.host_port_b } : {}
 
   bucket       = var.deploy_bucket
-  key          = "${var.service_name}/${var.service_name}-${each.key}.yaml"
+  key          = "${var.service_name}/${var.service_name}-${each.key}.container"
   content_type = "text/plain"
 
-  content = templatefile("${path.module}/templates/compose.yaml.tftpl", {
+  content = templatefile("${path.module}/templates/slot.container.tftpl", {
     service_name   = var.service_name
     slot           = each.key
     host_port      = each.value
