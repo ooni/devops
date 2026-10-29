@@ -124,6 +124,27 @@
     state: present
     update_cache: true
 
+# UserNS=auto takes each container's UID range from these, for the user
+# "containers" (which needn't exist); Debian creates none
+- name: Give Podman UID and GID ranges for UserNS=auto
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    regexp: '^containers:'
+    line: "containers:{{ ooniapi_gateway_userns_range }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop: [/etc/subuid, /etc/subgid]
+
+- name: Ensure Podman's config drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/containers/containers.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Make netavark use nftables
   ansible.builtin.copy:
     dest: /etc/containers/containers.conf.d/50-ooniapi-gateway.conf
