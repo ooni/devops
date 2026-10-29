@@ -183,6 +183,20 @@
     label: "{{ item.name }}"
   notify: restart valkey
 
+# The nftables role's input chain drops by default, and containers resolve
+# names through aardvark-dns on their bridge, which is host input
+- name: Let the containers query aardvark-dns
+  ansible.builtin.copy:
+    dest: /etc/ooni/nftables/ooniapi_gateway.nft
+    content: |
+      # Managed by ansible - roles/ooniapi_gateway
+      add rule inet filter input ip saddr { {{ ooniapi_gateway_services | map(attribute='subnet') | join(', ') }} } meta l4proto { tcp, udp } th dport 53 counter accept comment "aardvark-dns"
+    owner: root
+    group: root
+    mode: "0644"
+  when: ooniapi_gateway_services | length > 0
+  notify: reload ooniapi gateway nftables
+
 - name: Remove the network all services shared before
   ansible.builtin.file:
     path: /etc/containers/systemd/ooniapi.network
