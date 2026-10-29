@@ -1,0 +1,6 @@
+---
+- name: restart cadvisor
+  ansible.builtin.systemd_service:
+    name: cadvisor.service
+    state: restarted
+    daemon_reload: true

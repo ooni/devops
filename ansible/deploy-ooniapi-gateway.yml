@@ -7,9 +7,24 @@
   hosts: backend-hel.ooni.org
   become: true
   roles:
+    - role: nftables
+      tags: nftables
     - role: nginx
       tags: nginx
     - role: dehydrated
       tags: dehydrated
     - role: ooniapi_gateway
       tags: ooniapi_gateway
+    # cAdvisor next to node_exporter, behind the same nginx vhost on 9001
+    - role: prometheus_node_exporter
+      tags: monitoring
+      vars:
+        use_https: true
+        https_port: 9001
+        prometheus_nginx_proxy_config:
+          - location: /metrics/node_exporter
+            proxy_pass: http://127.0.0.1:8100/metrics
+          - location: /metrics/cadvisor
+            proxy_pass: http://127.0.0.1:8101/metrics
+    - role: cadvisor
+      tags: monitoring

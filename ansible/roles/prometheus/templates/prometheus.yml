@@ -94,6 +94,7 @@ scrape_configs:
         - https://wcth0.fra1.prod.ooni.io:9001/metrics/node_exporter
         - https://wcth1.fra1.prod.ooni.io:9001/metrics/node_exporter
         - https://wcth2.fra1.prod.ooni.io:9001/metrics/node_exporter
+        - https://backend-hel.ooni.org:9001/metrics/node_exporter
     relabel_configs:
         # set the scheme based on what has been parsed in the address
       - source_labels: [__address__]
@@ -140,6 +141,23 @@ scrape_configs:
 #      - targets:
 
   # Application level metrics
+
+  # Containers on the API hosts
+  - job_name: 'cadvisor'
+    scrape_interval: 15s
+    scheme: https
+    metrics_path: /metrics/cadvisor
+    basic_auth:
+      username: 'prom'
+      password: '{{ prometheus_metrics_password }}'
+    static_configs:
+      - targets:
+        - backend-hel.ooni.org:9001
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([^:]+):\d+'
+        replacement: '$1'
+        target_label: instance
 
   - job_name: 'clickhouse'
     scrape_interval: 5s

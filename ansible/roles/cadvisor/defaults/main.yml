@@ -1,0 +1,11 @@
+---
+# cAdvisor reports each container's CPU, memory, network and OOM kills.
+# Debian doesn't package it: the release binary, checked against its digest.
+cadvisor_version: "0.60.6"
+cadvisor_sha256: c381c2c911bc43d465d1e0eaff60f96d58c031c409bddf06da0316fdde8a9296
+cadvisor_download_url: "https://github.com/google/cadvisor/releases/download/v{{ cadvisor_version }}/cadvisor-v{{ cadvisor_version }}-linux-amd64"
+cadvisor_bin_path: /usr/local/bin/cadvisor
+
+# Only on loopback: Prometheus scrapes it through nginx, as
+# /metrics/cadvisor (prometheus_nginx_proxy_config)
+cadvisor_port: 8101
