@@ -5,17 +5,12 @@
 # image needs nothing beyond python3, ssh/scp and the aws cli, all of which
 # it already ships.
 #
-# For DEPLOY_HOST_PRIMARY, then DEPLOY_HOST_SECONDARY if set: find the currently idle slot
-# (a/b) on that host, write that slot's secrets as individual files (picked
-# up by the compose file's file-based `secrets:` entries -- the container
-# only ever sees these mounted read-only at /run/secrets/<name>, never as
-# environment variables), install & (re)start that slot's docker-compose.yaml
-# at the new image tag, health-check it directly on its host port, then flip
-# nginx's upstream to it and record the new active slot.
-#
-# Containers are started with `restart: always`, so the docker daemon
-# itself keeps them running across crashes/reboots -- no systemd unit is
-# needed on top of docker compose.
+# For DEPLOY_HOST_PRIMARY, then DEPLOY_HOST_SECONDARY if set: find the idle
+# slot (a/b) on that host, write that slot's secrets to its env file,
+# install its Quadlet unit at the new image tag and restart it,
+# health-check it directly on its host port, then flip nginx's upstream to it
+# and record the new active slot. systemd keeps the slot running across
+# crashes and reboots (Restart=always, WantedBy=multi-user.target).
 
 import json
 import logging
@@ -33,9 +28,9 @@ SSH_OPTS = [
 ]
 
 # Private, deploy-user-owned (0700) directory files land in before being
-# moved/installed into place -- not shared /tmp, so the env file (which
-# carries service secrets) is never briefly world-readable on the target
-# host. Must match ooniapi_gateway_staging_dir in the Ansible role.
+# moved/installed into place -- not shared /tmp, so the secret files are
+# never briefly world-readable on the target host. Must match
+# ooniapi_gateway_staging_dir in the Ansible role.
 STAGING_DIR = "/var/lib/ooniapi/deploy-staging"
 
 log = logging.getLogger("deploy")
@@ -99,6 +94,17 @@ def write_tmp(name, content, mode=0o644):
     return path
 
 
+def env_file(secrets):
+    # podman --env-file takes each line as KEY=VALUE, with the value literal
+    # to the end of the line
+    lines = []
+    for key, value in secrets.items():
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key) or "\n" in value:
+            sys.exit(f"secret {key!r} can't go in an env file")
+        lines.append(f"{key}={value}\n")
+    return "".join(lines)
+
+
 def deploy_host(host, ctx):
     service = ctx["service"]
     user = ctx["user"]
@@ -124,28 +130,28 @@ def deploy_host(host, ctx):
     target_port = ctx["host_port_b"] if target_slot == "b" else ctx["host_port_a"]
     log.info(f"{service} on {host}: active slot is {active_slot}, deploying to slot {target_slot} (port {target_port})")
 
-    # compose file for the target slot
-    compose_file = f"{service}-{target_slot}.yaml"
-    compose_path = f"/etc/ooniapi/{service}/{compose_file}"
-    compose_content = s3_fetch(ctx["bucket"], f"{service}/{compose_file}")
-    compose_content = compose_content.replace("__IMAGE_TAG__", ctx["image_tag"])
-    compose_local = write_tmp(compose_file, compose_content)
-    scp(user, host, compose_local, f"{STAGING_DIR}/{compose_file}")
-    ssh(user, host, f"sudo mv {STAGING_DIR}/{compose_file} {compose_path}")
+    # the slot's env file, which its unit loads (EnvironmentFile=): written
+    # 600 locally, so scp -p lands it locked down, then installed root-owned
+    env_file = f"{service}-{target_slot}.env"
+    env_local = write_tmp(env_file, ctx["env_file"], mode=0o600)
+    scp(user, host, env_local, f"{STAGING_DIR}/{env_file}")
+    ssh(user, host,
+        f"sudo install -m 600 -o root -g root {STAGING_DIR}/{env_file} /etc/ooniapi/{service}/{target_slot}.env"
+        f" && rm -f {STAGING_DIR}/{env_file}")
 
-    # one file per secret, chmod'd 600 locally before scp -p sends it, then
-    # installed straight to the path the compose file's `secrets:` section
-    # references (install -D creates the slot's secrets/ dir on first use)
-    for key, value in ctx["secrets"].items():
-        secret_file = f"{service}-{target_slot}-{key}.secret"
-        secret_local = write_tmp(secret_file, value, mode=0o600)
-        secret_dest = f"/etc/ooniapi/{service}/{target_slot}/secrets/{key}"
-        scp(user, host, secret_local, f"{STAGING_DIR}/{secret_file}")
-        ssh(user, host,
-            f"sudo install -D -m 600 -o root -g root {STAGING_DIR}/{secret_file} {secret_dest}"
-            f" && rm -f {STAGING_DIR}/{secret_file}")
+    # the slot's Quadlet unit, at the new image tag
+    unit_file = f"{service}-{target_slot}.container"
+    unit_content = s3_fetch(ctx["bucket"], f"{service}/{unit_file}")
+    unit_local = write_tmp(unit_file, unit_content.replace("__IMAGE_TAG__", ctx["image_tag"]))
+    scp(user, host, unit_local, f"{STAGING_DIR}/{unit_file}")
+    ssh(user, host,
+        f"sudo install -m 644 -o root -g root {STAGING_DIR}/{unit_file} /etc/containers/systemd/{unit_file}"
+        f" && rm -f {STAGING_DIR}/{unit_file}")
 
-    ssh(user, host, f"sudo docker compose -f {compose_path} up -d --pull always --remove-orphans")
+    # Quadlet regenerates the slot's service from its unit on daemon-reload;
+    # the restart pulls the image (Pull=always)
+    ssh(user, host, "sudo systemctl daemon-reload")
+    ssh(user, host, f"sudo systemctl restart {service}-{target_slot}.service")
 
     # like the ECS target groups' health check (ooniapi_service: timeout 5,
     # healthy_threshold 2): each check may take up to 5 s, and the slot must
@@ -206,7 +212,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
     with open("imagedefinitions.json") as f:
         image_tag = json.load(f)[0]["imageUri"].rsplit(":", 1)[-1]
-    # it ends up in an nginx string and in compose files
+    # it ends up in an nginx string and in Quadlet units
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", image_tag):
         sys.exit(f"unexpected image tag: {image_tag!r}")
 
@@ -226,7 +232,7 @@ def main():
         "host_port_b": require_env("HOST_PORT_B"),
         "health_check_timeout": int(os.environ.get("HEALTH_CHECK_TIMEOUT") or 120),
         "drain_timeout": int(os.environ.get("DRAIN_TIMEOUT") or 300),
-        "secrets": json.loads(secretsmanager_get(require_env("SERVICE_SECRETS_ARN"))),
+        "env_file": env_file(json.loads(secretsmanager_get(require_env("SERVICE_SECRETS_ARN")))),
     }
 
     # a single host is enough where downtime while it reboots is acceptable

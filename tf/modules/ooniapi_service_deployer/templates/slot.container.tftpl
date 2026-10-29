@@ -15,12 +15,10 @@ UserNS=auto
 %{ for key, value in env_vars ~}
 Environment="${key}=${replace(replace(replace(value, "\\", "\\\\"), "\"", "\\\""), "%", "%%")}"
 %{ endfor ~}
-# Podman secrets deploy.py creates from the service's Secrets Manager secret:
+# The service's Secrets Manager secret, written by deploy.py (root, mode 600):
 # environment variables in the container, as the services' settings expect,
-# but never written to a unit file
-%{ for name in secrets ~}
-Secret=${service_name}-${slot}-${name},type=env,target=${name}
-%{ endfor ~}
+# but never in this unit. Its keys: ${join(", ", secrets)}
+EnvironmentFile=/etc/ooniapi/${service_name}/${slot}.env
 
 [Service]
 Restart=always

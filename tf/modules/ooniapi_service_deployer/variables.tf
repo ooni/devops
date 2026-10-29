@@ -121,13 +121,13 @@ variable "env_vars" {
 }
 
 variable "secrets" {
-  description = "Names of the keys in var.service_secrets_arn's JSON blob. deploy.py creates each as a Podman secret, which the rendered Quadlet unit passes to the container as the environment variable of that name, where the services' settings read it. Required when deploy_mode is \"blue_green\" or \"both\"."
+  description = "Names of the keys in var.service_secrets_arn's JSON blob. deploy.py writes them to each slot's env file (root, mode 600), which the rendered Quadlet unit loads: environment variables in the container, where the services' settings read them. Required when deploy_mode is \"blue_green\" or \"both\"."
   type        = list(string)
   default     = []
 }
 
 variable "service_secrets_arn" {
-  description = "ARN of the Secrets Manager secret holding the service's runtime secrets as a flat JSON key/value object. Every key becomes a Podman secret during deploy (see var.secrets). Required when deploy_mode is \"blue_green\" or \"both\"."
+  description = "ARN of the Secrets Manager secret holding the service's runtime secrets as a flat JSON key/value object. Every key goes into the slot's env file during deploy (see var.secrets). Required when deploy_mode is \"blue_green\" or \"both\"."
   type        = string
   default     = null
 }

@@ -1,29 +1,25 @@
 # Managed by ansible - roles/ooniapi_gateway/templates/sudoers-ooniapi-deploy.j2
 #
-# Scoped to exactly the remote commands issued by
-# tf/modules/ooniapi_service_deployer/files/deploy.py over SSH as
-# {{ ooniapi_gateway_deploy_user }}. Intentionally narrower than the blanket
-# "NOPASSWD:ALL" pattern used for the deploy user in other roles (e.g.
-# roles/anonc) -- this user is driven by an automated CI job over the
-# network, not a human operator.
+# Exactly the commands tf/modules/ooniapi_service_deployer/files/deploy.py
+# runs over SSH as {{ ooniapi_gateway_deploy_user }}, an automated CI job, each
+# spelled out per service and slot. No wildcards: sudoers' "*" also matches
+# spaces, which would let extra arguments through.
 #
-# Sources below are always files this same job just scp'd into
-# {{ ooniapi_gateway_staging_dir }}, a directory only {{ ooniapi_gateway_deploy_user }}
-# (and root) can read -- see tasks/main.yml for why that, and not shared
-# /tmp, is where the per-secret files (each a Compose file-based secret,
-# mounted read-only into its container -- never an environment variable)
-# land.
-#
-# Caveat: sudoers glob matching (fnmatch without FNM_PATHNAME) lets "*"
-# match "/", so this is a theoretical rather than practical widening of
-# scope, but worth knowing if you're auditing this file.
+# Sources are files the job just scp'd into {{ ooniapi_gateway_staging_dir }},
+# which only {{ ooniapi_gateway_deploy_user }} and root can read.
+{% set staging = ooniapi_gateway_staging_dir %}
 
-Cmnd_Alias OONIAPI_DEPLOY_MV_COMPOSE = /usr/bin/mv {{ ooniapi_gateway_staging_dir }}/*.yaml /etc/ooniapi/*/*.yaml
-Cmnd_Alias OONIAPI_DEPLOY_MV_UPSTREAM = /usr/bin/mv {{ ooniapi_gateway_staging_dir }}/*-upstream.conf /etc/nginx/conf.d/*-upstream.conf
-Cmnd_Alias OONIAPI_DEPLOY_SECRET_INSTALL = /usr/bin/install -D -m 600 -o root -g root {{ ooniapi_gateway_staging_dir }}/*.secret /etc/ooniapi/*/*/secrets/*
-Cmnd_Alias OONIAPI_DEPLOY_COMPOSE_UP = /usr/bin/docker compose -f /etc/ooniapi/*/*.yaml up -d --pull always --remove-orphans
-Cmnd_Alias OONIAPI_DEPLOY_NGINX_RELOAD = /usr/bin/systemctl reload nginx
-Cmnd_Alias OONIAPI_DEPLOY_NGINX_TEST = /usr/sbin/nginx -t
-Cmnd_Alias OONIAPI_DEPLOY_MARKER = /usr/bin/tee /etc/ooniapi/*/active_slot
+Cmnd_Alias OONIAPI_DEPLOY_SLOTS = \
+{% for s in ooniapi_gateway_services %}
+{% for slot in ['a', 'b'] %}
+    /usr/bin/install -m 600 -o root -g root {{ staging }}/{{ s.name }}-{{ slot }}.env /etc/ooniapi/{{ s.name }}/{{ slot }}.env, \
+    /usr/bin/install -m 644 -o root -g root {{ staging }}/{{ s.name }}-{{ slot }}.container /etc/containers/systemd/{{ s.name }}-{{ slot }}.container, \
+    /usr/bin/systemctl restart {{ s.name }}-{{ slot }}.service, \
+{% endfor %}
+    /usr/bin/mv {{ staging }}/{{ s.name }}-upstream.conf /etc/nginx/conf.d/{{ s.name }}-upstream.conf, \
+    /usr/bin/tee /etc/ooniapi/{{ s.name }}/active_slot{{ ", \\" if not loop.last else "" }}
+{% endfor %}
 
-{{ ooniapi_gateway_deploy_user }} ALL=(root) NOPASSWD: OONIAPI_DEPLOY_MV_COMPOSE, OONIAPI_DEPLOY_MV_UPSTREAM, OONIAPI_DEPLOY_SECRET_INSTALL, OONIAPI_DEPLOY_COMPOSE_UP, OONIAPI_DEPLOY_NGINX_RELOAD, OONIAPI_DEPLOY_NGINX_TEST, OONIAPI_DEPLOY_MARKER
+Cmnd_Alias OONIAPI_DEPLOY_HOST = /usr/bin/systemctl daemon-reload, /usr/sbin/nginx -t, /usr/bin/systemctl reload nginx
+
+{{ ooniapi_gateway_deploy_user }} ALL=(root) NOPASSWD: OONIAPI_DEPLOY_SLOTS, OONIAPI_DEPLOY_HOST
