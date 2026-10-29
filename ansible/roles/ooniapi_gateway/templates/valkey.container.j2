@@ -5,11 +5,16 @@ Description=Valkey for the OONI API services' rate limits
 [Container]
 ContainerName={{ ooniapi_gateway_valkey_name }}
 Image={{ ooniapi_gateway_valkey_image }}
-Network={{ ooniapi_gateway_network_name }}.network
+{% for s in ooniapi_gateway_services if s.valkey | default(false) %}
+Network=ooniapi-{{ s.name }}.network
+{% endfor %}
 UserNS=auto
 Exec=valkey-server --save "" --appendonly no --maxmemory {{ ooniapi_gateway_valkey_maxmemory }} --maxmemory-policy allkeys-lru
 
 [Service]
+{% if ooniapi_gateway_valkey_slice %}
+Slice={{ ooniapi_gateway_valkey_slice }}
+{% endif %}
 Restart=always
 
 [Install]

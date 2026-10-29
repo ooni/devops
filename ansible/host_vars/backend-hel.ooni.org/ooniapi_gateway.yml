@@ -10,14 +10,20 @@ ooniapi_gateway_direct_domain_suffix: dev.ooni.io
 # the ALB at the cutover.
 ooniapi_gateway_testlists_upstream: testlists.dev.ooni.io
 
-# Must match ooniapi_deploy_ports in tf/environments/dev/main.tf
+# Ports must match ooniapi_deploy_ports in tf/environments/dev/main.tf.
+# Subnets: /28s of 10.250.0.0/24, which nothing else on the host may route
+# (check ip -4 route).
 ooniapi_gateway_services:
-  - {name: reverseproxy, host_port_a: 18001, host_port_b: 18002}
-  - {name: ooniprobe, host_port_a: 18011, host_port_b: 18012}
-  - {name: oonirun, host_port_a: 18021, host_port_b: 18022}
-  - {name: oonifindings, host_port_a: 18031, host_port_b: 18032}
-  - {name: ooniauth, host_port_a: 18041, host_port_b: 18042}
-  - {name: oonimeasurements, host_port_a: 18051, host_port_b: 18052}
+  - {name: ooniprobe, host_port_a: 18011, host_port_b: 18012, subnet: 10.250.0.0/28}
+  - {name: oonirun, host_port_a: 18021, host_port_b: 18022, subnet: 10.250.0.16/28}
+  - {name: oonifindings, host_port_a: 18031, host_port_b: 18032, subnet: 10.250.0.32/28}
+  - {name: ooniauth, host_port_a: 18041, host_port_b: 18042, subnet: 10.250.0.48/28}
+  - {name: oonimeasurements, host_port_a: 18051, host_port_b: 18052, subnet: 10.250.0.64/28, valkey: true}
+
+# dev's caps: twice what it has on ECS, and a fifth of prod's CPU share
+ooniapi_gateway_slices:
+  - {name: ooniapi-dev, cpu_quota: 400%, memory_max: 4G, cpu_weight: 20}
+ooniapi_gateway_valkey_slice: ooniapi-dev.slice
 
 # The certificate for the dev names can only be issued once they resolve
 # here. At the cutover, after moving their DNS: add this line to

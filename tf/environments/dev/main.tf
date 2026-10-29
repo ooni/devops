@@ -352,9 +352,11 @@ data "dns_a_record_set" "ooniapi_deploy_host" {
 
 locals {
   ooniapi_deploy_host    = data.dns_a_record_set.ooniapi_deploy_host.host
-  ooniapi_deploy_network = "ooniapi"
-  # the valkey container roles/ooniapi_gateway runs on that network
-  # (ooniapi_gateway_valkey_name), for the services' rate limits
+  # dev's slice on the host, with its CPU and memory caps
+  # (roles/ooniapi_gateway's ooniapi_gateway_slices)
+  ooniapi_deploy_slice = "ooniapi-dev.slice"
+  # the valkey container roles/ooniapi_gateway runs on the networks of the
+  # services that use it (ooniapi_gateway_valkey_name), for their rate limits
   ooniapi_deploy_valkey_url = "valkey://valkey:6379"
   # what the services there connect to from: fastpath, Postgres and the
   # ClickHouse proxy let it in, as they let in the VPC
@@ -717,7 +719,7 @@ module "ooniapi_ooniprobe_deployer" {
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
   deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
   deploy_host_primary       = local.ooniapi_deploy_host
-  network_name              = local.ooniapi_deploy_network
+  slice                     = local.ooniapi_deploy_slice
   container_port            = 80
   host_port_a               = local.ooniapi_deploy_ports.ooniprobe[0]
   host_port_b               = local.ooniapi_deploy_ports.ooniprobe[1]
@@ -866,7 +868,7 @@ module "ooniapi_reverseproxy_deployer" {
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
   deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
   deploy_host_primary       = local.ooniapi_deploy_host
-  network_name              = local.ooniapi_deploy_network
+  slice                     = local.ooniapi_deploy_slice
   container_port            = 80
   host_port_a               = local.ooniapi_deploy_ports.reverseproxy[0]
   host_port_b               = local.ooniapi_deploy_ports.reverseproxy[1]
@@ -1193,7 +1195,7 @@ module "ooniapi_oonirun_deployer" {
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
   deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
   deploy_host_primary       = local.ooniapi_deploy_host
-  network_name              = local.ooniapi_deploy_network
+  slice                     = local.ooniapi_deploy_slice
   container_port            = 80
   host_port_a               = local.ooniapi_deploy_ports.oonirun[0]
   host_port_b               = local.ooniapi_deploy_ports.oonirun[1]
@@ -1261,7 +1263,7 @@ module "ooniapi_oonifindings_deployer" {
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
   deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
   deploy_host_primary       = local.ooniapi_deploy_host
-  network_name              = local.ooniapi_deploy_network
+  slice                     = local.ooniapi_deploy_slice
   container_port            = 80
   host_port_a               = local.ooniapi_deploy_ports.oonifindings[0]
   host_port_b               = local.ooniapi_deploy_ports.oonifindings[1]
@@ -1343,7 +1345,7 @@ module "ooniapi_ooniauth_deployer" {
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
   deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
   deploy_host_primary       = local.ooniapi_deploy_host
-  network_name              = local.ooniapi_deploy_network
+  slice                     = local.ooniapi_deploy_slice
   container_port            = 80
   host_port_a               = local.ooniapi_deploy_ports.ooniauth[0]
   host_port_b               = local.ooniapi_deploy_ports.ooniauth[1]
@@ -1435,7 +1437,7 @@ module "ooniapi_oonimeasurements_deployer" {
   deploy_ssh_key_secret_arn = aws_secretsmanager_secret.ooniapi_deploy_ssh_key.arn
   deploy_bucket             = aws_s3_bucket.ooniapi_deploy.bucket
   deploy_host_primary       = local.ooniapi_deploy_host
-  network_name              = local.ooniapi_deploy_network
+  slice                     = local.ooniapi_deploy_slice
   container_port            = 80
   host_port_a               = local.ooniapi_deploy_ports.oonimeasurements[0]
   host_port_b               = local.ooniapi_deploy_ports.oonimeasurements[1]

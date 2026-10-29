@@ -143,24 +143,52 @@
     group: root
     mode: "0755"
 
-# The network every service's containers and Valkey share, as a Quadlet unit:
-# the slots' units name it (Network=<name>.network), so systemd starts it first
-- name: Define the services' network
+# One IPv4 network per service, as Quadlet units: a slot's unit names its
+# service's (Network=ooniapi-<service>.network), so systemd starts it first.
+# Only nginx on the host reaches the slots, through their loopback ports.
+- name: Define each service's network
   ansible.builtin.copy:
-    dest: "/etc/containers/systemd/{{ ooniapi_gateway_network_name }}.network"
+    dest: "/etc/containers/systemd/ooniapi-{{ item.name }}.network"
     content: |
       # Managed by ansible - roles/ooniapi_gateway
       [Network]
-      NetworkName={{ ooniapi_gateway_network_name }}
+      NetworkName=ooniapi-{{ item.name }}
+      Subnet={{ item.subnet }}
     owner: root
     group: root
     mode: "0644"
+  loop: "{{ ooniapi_gateway_services }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: restart valkey
+
+- name: Remove the network all services shared before
+  ansible.builtin.file:
+    path: /etc/containers/systemd/ooniapi.network
+    state: absent
+
+# CPU and memory caps, e.g. dev's, which the slots and Valkey run in (Slice=)
+- name: Define the slices
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item.name }}.slice"
+    content: |
+      # Managed by ansible - roles/ooniapi_gateway
+      [Slice]
+      CPUQuota={{ item.cpu_quota }}
+      MemoryMax={{ item.memory_max }}
+      CPUWeight={{ item.cpu_weight }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ ooniapi_gateway_slices }}"
+  loop_control:
+    label: "{{ item.name }}"
   notify: restart valkey
 
 # Rate limit counters of the services on this host (VALKEY_URL
 # valkey://<ooniapi_gateway_valkey_name>:6379), what ElastiCache holds for
-# them on ECS. Reachable only on the services' network, and kept in memory
-# only: losing the counters on a restart resets the limits, as a restart of
+# them on ECS. Reachable only on the networks of the services that use it
+# (valkey: true), and kept in memory only: losing the counters on a restart resets the limits, as a restart of
 # the services would with VALKEY_URL=memory.
 - name: Define Valkey's unit
   ansible.builtin.template:

@@ -108,10 +108,10 @@ variable "container_port" {
   default     = null
 }
 
-variable "network_name" {
-  description = "Podman network the service's containers attach to. Required when deploy_mode is \"blue_green\" or \"both\"."
+variable "slice" {
+  description = "systemd slice the slots run in, which caps their CPU and memory (roles/ooniapi_gateway's ooniapi_gateway_slices), e.g. \"ooniapi-dev.slice\". Empty: the default slice. The slots' network is ooniapi-<service_name>, which the role creates."
   type        = string
-  default     = null
+  default     = ""
 }
 
 variable "env_vars" {

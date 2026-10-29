@@ -34,19 +34,22 @@ ooniapi_gateway_cert_path: /var/lib/dehydrated/certs/
 # safe to run ahead of the real DNS cutover.
 ooniapi_gateway_cert_ready: false
 
-# Services fronted by this gateway, and the two host ports their blue/green
-# slots are bound to. host_port_a/host_port_b must match the values passed
-# to that service's ooniapi_service_deployer module invocation in Terraform.
+# Services fronted by this gateway: the two host ports their blue/green
+# slots are bound to, which must match the values passed to that service's
+# ooniapi_service_deployer module invocation in Terraform; the subnet of the
+# service's own network, ooniapi-<name>, an RFC 1918 /28 that doesn't overlap
+# the host's routes; and valkey: true for the services that use Valkey.
 #
 # Example:
 # ooniapi_gateway_services:
-#   - name: reverseproxy
-#     host_port_a: 18001
-#     host_port_b: 18002
-#   - name: oonirun
-#     host_port_a: 18011
-#     host_port_b: 18012
+#   - {name: oonirun, host_port_a: 18021, host_port_b: 18022, subnet: 10.250.0.16/28}
+#   - {name: oonimeasurements, host_port_a: 18051, host_port_b: 18052, subnet: 10.250.0.64/28, valkey: true}
 ooniapi_gateway_services: []
+
+# systemd slices that cap their units' CPU and memory, e.g.
+#   - {name: ooniapi-dev, cpu_quota: 400%, memory_max: 4G, cpu_weight: 20}
+# A service's deployer names its slice (slice = "ooniapi-dev.slice").
+ooniapi_gateway_slices: []
 
 # Cross-cloud passthrough for tier0 services not yet migrated off AWS
 # (currently just testlists). Set to its public hostname to proxy those
@@ -54,14 +57,13 @@ ooniapi_gateway_services: []
 # those routes entirely.
 ooniapi_gateway_testlists_upstream: ""
 
-# Podman network shared by every service's containers and Valkey on this host.
-ooniapi_gateway_network_name: ooniapi
-
-# Valkey for the services' rate limits, reached on the shared network by its
+# Valkey for the services' rate limits, reached on their networks by its
 # container name: must match ooniapi_deploy_valkey_url in tf/environments
 ooniapi_gateway_valkey_name: valkey
 ooniapi_gateway_valkey_image: docker.io/valkey/valkey:8.1-alpine
 ooniapi_gateway_valkey_maxmemory: 256mb
+# the slice Valkey runs in, e.g. ooniapi-dev.slice; empty: the default one
+ooniapi_gateway_valkey_slice: ""
 
 # Routes of the API, shared with the ALB (see the file's header); the
 # gateway's locations are generated from them in tasks/main.yml

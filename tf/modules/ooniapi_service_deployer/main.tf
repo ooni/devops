@@ -178,7 +178,8 @@ resource "aws_s3_object" "slot_unit" {
     slot           = each.key
     host_port      = each.value
     container_port = var.container_port
-    network_name   = var.network_name
+    network_name   = "ooniapi-${var.service_name}"
+    slice          = var.slice
     env_vars       = var.env_vars
     secrets        = var.secrets
   })

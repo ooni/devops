@@ -21,6 +21,9 @@ Environment="${key}=${replace(replace(replace(value, "\\", "\\\\"), "\"", "\\\""
 EnvironmentFile=/etc/ooniapi/${service_name}/${slot}.env
 
 [Service]
+%{ if slice != "" ~}
+Slice=${slice}
+%{ endif ~}
 Restart=always
 # a first deploy pulls the image
 TimeoutStartSec=300
