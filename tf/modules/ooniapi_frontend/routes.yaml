@@ -3,7 +3,8 @@
 #   (aws_lb_listener_rule.route["<name>"]), for the services on ECS.
 # - Ansible, roles/ooniapi_gateway: the nginx locations of the gateway on the
 #   Hetzner hosts, for the services deployed there blue/green.
-# Anything no route matches goes to reverseproxy, on both.
+# Anything no route matches goes to reverseproxy on the ALB, and gets a 404 on
+# the gateway.
 #
 # Each entry is one ALB rule, so the ALB's limits apply: at most 5 values
 # over all its conditions. Fields:

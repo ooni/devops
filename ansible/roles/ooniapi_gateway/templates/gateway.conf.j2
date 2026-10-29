@@ -5,8 +5,9 @@
 # the AWS ALB's listener rules are generated from too, so both route alike.
 # Only routes of services running blue/green here
 # ({{ ooniapi_gateway_services | map(attribute='name') | join(', ') }}) and of
-# those proxied cross-cloud are handled; everything unmatched falls through
-# to "reverseproxy", exactly like the ALB's default_action.
+# those proxied cross-cloud are handled; everything unmatched gets a 404.
+# Unlike the ALB's default_action, nothing falls back to the legacy API:
+# what's missing is ported.
 #
 # Each service's own `<service>-upstream.conf` (the `upstream <service> {
 # ... }` block referenced below via proxy_pass) is dropped into this same
@@ -104,12 +105,10 @@ server {
 {% endif %}
 {% endfor %}
 
-  ## --- default: everything else goes to reverseproxy, same as the ALB's
-  ## default_action. Covers legacy/unmigrated paths (oonith is NOT among
-  ## them -- it's routed by host_header on *.th.ooni.org, a hostname this
-  ## vhost doesn't answer for, so it never reaches here either way). ---
+  ## --- default: a path no service serves (oonith is routed by host
+  ## header on *.th.ooni.org, which this vhost doesn't answer for) ---
   location / {
-    proxy_pass http://reverseproxy;
+    return 404;
   }
 }
 
