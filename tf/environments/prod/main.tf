@@ -297,6 +297,16 @@ module "geoip_bucket" {
   object_lock_enabled = false
 }
 
+module "builds_bucket" {
+  source = "../../modules/s3_bucket"
+
+  bucket_name         = "software-update-builds"
+  public_read         = true
+  create_iam_user     = true
+  versioning_enabled  = true
+  object_lock_enabled = false
+}
+
 resource "random_id" "artifact_id" {
   byte_length = 4
 }
