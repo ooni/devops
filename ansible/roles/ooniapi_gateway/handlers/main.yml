@@ -8,7 +8,8 @@
     name: nginx
     state: reloaded
 
-- name: restart docker
+- name: restart valkey
   ansible.builtin.systemd_service:
-    name: docker
+    name: "{{ ooniapi_gateway_valkey_name }}.service"
     state: restarted
+    daemon_reload: true

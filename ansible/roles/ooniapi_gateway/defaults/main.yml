@@ -54,7 +54,7 @@ ooniapi_gateway_services: []
 # those routes entirely.
 ooniapi_gateway_testlists_upstream: ""
 
-# Docker network shared by every service's containers on this host.
+# Podman network shared by every service's containers and Valkey on this host.
 ooniapi_gateway_network_name: ooniapi
 
 # Valkey for the services' rate limits, reached on the shared network by its

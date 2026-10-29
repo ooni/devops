@@ -8,7 +8,7 @@ Description=OONI API ${service_name}, slot ${slot}
 ContainerName=${service_name}-${slot}
 Image=docker.io/ooni/api-${service_name}:__IMAGE_TAG__
 Pull=always
-Network=${network_name}
+Network=${network_name}.network
 PublishPort=127.0.0.1:${host_port}:${container_port}
 # root in the container is an unprivileged host user, in a UID range of its own
 UserNS=auto

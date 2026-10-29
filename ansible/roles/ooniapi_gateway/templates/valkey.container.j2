@@ -1,0 +1,16 @@
+# Managed by ansible - roles/ooniapi_gateway
+[Unit]
+Description=Valkey for the OONI API services' rate limits
+
+[Container]
+ContainerName={{ ooniapi_gateway_valkey_name }}
+Image={{ ooniapi_gateway_valkey_image }}
+Network={{ ooniapi_gateway_network_name }}.network
+UserNS=auto
+Exec=valkey-server --save "" --appendonly no --maxmemory {{ ooniapi_gateway_valkey_maxmemory }} --maxmemory-policy allkeys-lru
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
