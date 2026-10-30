@@ -1173,7 +1173,7 @@ module "ooniapi_oonirun_deployer" {
   # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
-  deploy_mode = "ecs"
+  deploy_mode = "both"
 
   service_name            = "oonirun"
   repo                    = "ooni/backend"
@@ -1308,7 +1308,7 @@ module "ooniapi_ooniauth_deployer" {
   # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
-  deploy_mode = "ecs"
+  deploy_mode = "both"
 
   service_name            = "ooniauth"
   repo                    = "ooni/backend"
@@ -1409,7 +1409,7 @@ module "ooniapi_oonimeasurements_deployer" {
   # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
-  deploy_mode = "ecs"
+  deploy_mode = "both"
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
