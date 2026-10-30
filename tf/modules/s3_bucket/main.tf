@@ -40,35 +40,6 @@ resource "aws_s3_bucket_acl" "bucket" {
   ]
 }
 
-resource "aws_s3_bucket_policy" "public" {
-  count  = var.public_read ? 1 : 0
-  bucket = aws_s3_bucket.bucket.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = concat(
-      [
-        for action in var.public_bucket_actions : {
-          Sid       = replace(action, ":", "")
-          Effect    = "Allow"
-          Principal = "*"
-          Action    = action
-          Resource  = aws_s3_bucket.bucket.arn
-        }
-      ],
-      [
-        for action in var.public_object_actions : {
-          Sid       = replace(action, ":", "")
-          Effect    = "Allow"
-          Principal = "*"
-          Action    = action
-          Resource  = "${aws_s3_bucket.bucket.arn}/*"
-        }
-      ]
-    )
-  })
-}
-
 resource "aws_iam_user" "bucket_user" {
   count = var.create_iam_user ? 1 : 0
   name  = "${var.bucket_name}-user"
@@ -93,26 +64,46 @@ resource "aws_iam_user_policy" "s3_access" {
   })
 }
 
-resource "aws_s3_bucket_policy" "bucket_iam_permissions" {
-  count  = var.create_iam_user ? 1 : 0
+resource "aws_s3_bucket_policy" "bucket" {
+  count  = var.public_read || var.create_iam_user ? 1 : 0
   bucket = aws_s3_bucket.bucket.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "IAMUserBucketPolicy",
-        Effect = "Allow",
-        Principal = {
-          AWS = aws_iam_user.bucket_user[0].arn
-        },
-        Action = var.iam_user_permissions,
-        Resource = [
-          aws_s3_bucket.bucket.arn,
-          "${aws_s3_bucket.bucket.arn}/*"
-        ]
-      }
-    ]
+    Statement = concat(
+      [
+        for action in(var.public_read ? var.public_bucket_actions : []) : {
+          Sid       = replace(action, ":", "")
+          Effect    = "Allow"
+          Principal = "*"
+          Action    = action
+          Resource  = aws_s3_bucket.bucket.arn
+        }
+      ],
+      [
+        for action in(var.public_read ? var.public_object_actions : []) : {
+          Sid       = replace(action, ":", "")
+          Effect    = "Allow"
+          Principal = "*"
+          Action    = action
+          Resource  = "${aws_s3_bucket.bucket.arn}/*"
+        }
+      ],
+      var.create_iam_user ? [
+        {
+          Sid    = "IAMUserBucketPolicy"
+          Effect = "Allow"
+          Principal = {
+            AWS = aws_iam_user.bucket_user[0].arn
+          }
+          Action = var.iam_user_permissions
+          Resource = [
+            aws_s3_bucket.bucket.arn,
+            "${aws_s3_bucket.bucket.arn}/*"
+          ]
+        }
+      ] : []
+    )
   })
 }
 
