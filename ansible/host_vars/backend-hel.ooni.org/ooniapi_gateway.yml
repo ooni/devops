@@ -34,8 +34,12 @@ ssl_domains:
   - "backend-hel.ooni.org"
 ooniapi_gateway_cert_ready: false
 
-# Public half of dev's oonidevops/ooniapi/deploy_ssh_key secret (eu-central-1,
-# dev account), which the deploy jobs log in with. Generate the pair, put the
-# private key in the secret and the public key here:
+# The deploy jobs log in with the private key in dev's
+# oonidevops/ooniapi/deploy_ssh_key secret (eu-central-1); its public half is
+# in the SSM parameter below. To rotate the pair:
 #   ssh-keygen -t ed25519 -N '' -C ooniapi-deploy-dev -f deploy_dev
-ooniapi_gateway_deploy_ssh_public_key: ""
+#   aws --profile oonidevops_user_dev --region eu-central-1 secretsmanager put-secret-value \
+#     --secret-id oonidevops/ooniapi/deploy_ssh_key --secret-string file://deploy_dev
+#   aws --profile oonidevops_user_dev --region eu-central-1 ssm put-parameter --overwrite \
+#     --name /oonidevops/ooniapi/deploy_ssh_public_key --type String --value "$(cat deploy_dev.pub)"
+ooniapi_gateway_deploy_ssh_public_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/ooniapi/deploy_ssh_public_key', profile='oonidevops_user_dev', region='eu-central-1') }}"
