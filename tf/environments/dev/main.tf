@@ -351,7 +351,7 @@ data "dns_a_record_set" "ooniapi_deploy_host" {
 }
 
 locals {
-  ooniapi_deploy_host    = data.dns_a_record_set.ooniapi_deploy_host.host
+  ooniapi_deploy_host = data.dns_a_record_set.ooniapi_deploy_host.host
   # dev's slice on the host, with its CPU and memory caps
   # (roles/ooniapi_gateway's ooniapi_gateway_slices)
   ooniapi_deploy_slice = "ooniapi-dev.slice"
