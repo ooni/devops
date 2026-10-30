@@ -284,6 +284,8 @@ locals {
       PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.value
       CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_ooniprobe_url.value
       ANONC_SECRET_KEY            = data.aws_ssm_parameter.anonc_secret_key.value
+      AWS_ACCESS_KEY_ID           = aws_iam_access_key.ooniprobe_host.id
+      AWS_SECRET_ACCESS_KEY       = aws_iam_access_key.ooniprobe_host.secret
     }
     oonirun = {
       POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.value
@@ -681,13 +683,48 @@ resource "aws_iam_role_policy" "ooniprobe_role" {
 EOF
 }
 
+# ooniprobe on the blue/green hosts, which have no ECS task role: the same
+# bucket access, as an access key in its service secret
+resource "aws_iam_user" "ooniprobe_host" {
+  name = "${local.name}-ooniprobe-host"
+  tags = local.tags
+}
+
+resource "aws_iam_user_policy" "ooniprobe_host" {
+  name = "${local.name}-ooniprobe-host"
+  user = aws_iam_user.ooniprobe_host.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = "s3:GetObject"
+        Resource = [
+          "${aws_s3_bucket.ooni_private_config_bucket.arn}/*",
+          "${aws_s3_bucket.anoncred_manifests.arn}/*",
+        ]
+      },
+    ]
+  })
+}
+
+resource "aws_iam_access_key" "ooniprobe_host" {
+  user = aws_iam_user.ooniprobe_host.name
+}
+
 module "ooniapi_ooniprobe_deployer" {
   source = "../../modules/ooniapi_service_deployer"
 
   # "blue_green" deploys this service with Podman Quadlet blue/green to the
   # dedicated Hetzner hosts instead of ECS; "both" deploys to ECS, then to
   # the hosts, so the ALB stays current until DNS moves.
-  deploy_mode = "ecs"
+  deploy_mode = "both"
 
   service_name            = "ooniprobe"
   repo                    = "ooni/backend"
@@ -713,6 +750,7 @@ module "ooniapi_ooniprobe_deployer" {
     PSIPHON_CONFIG        = "psiphon_config.json"
     ANONC_MANIFEST_BUCKET = aws_s3_bucket.anoncred_manifests.bucket
     ANONC_MANIFEST_FILE   = "manifest.json"
+    AWS_DEFAULT_REGION    = var.aws_region # the buckets' region, for boto3
   }
   secrets                   = keys(local.ooniapi_deploy_service_secrets.ooniprobe)
   service_secrets_arn       = aws_secretsmanager_secret.ooniapi_deploy_service_secrets["ooniprobe"].arn
