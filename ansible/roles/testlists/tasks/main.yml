@@ -98,7 +98,7 @@
       WORKING_DIR: "/var/lib/ooniapi/testlists"
       GITHUB_TOKEN: "{{ github_token }}"
       GITHUB_USER: "ooni-bot"
-      ORIGIN_REPO: "citizenlab/test-lists"
+      ORIGIN_REPO: "{{ testlists_origin_repo }}"
       PUSH_REPO: "ooni/test-lists"
       LOG_LEVEL: "{{ log_level }}"
       USER: "ooniapi"
