@@ -230,8 +230,17 @@ prod/ooni/<table>/<chain>/KEEP-<label>       pinned chain, never pruned
 Never put S3 keys in `BACKUP`/`RESTORE`/`s3()` queries: an incremental
 backup stores its `base_backup` argument, keys included, in plain text in
 its `.backup` file. ClickHouse gets the keys from
-`/etc/clickhouse-server/config.d/ooni_backup_s3.xml`, which it reloads
-without a restart using systemctl reload clickhouse-server.
+`/etc/clickhouse-server/config.d/ooni_backup_s3.xml`. It rereads config.d by
+itself within seconds of a change, and the role runs `SYSTEM RELOAD CONFIG`
+after changing the file. `systemctl reload clickhouse-server` doesn't reload
+anything: ClickHouse takes the SIGHUP it sends as a request to reopen its
+logs.
+
+ClickHouse cancels running backups when it stops
+(`shutdown_wait_backups_and_restores` off, in `config.d/ooni_backup_shutdown.xml`),
+so it can be restarted at any time, e.g. for a security update, even during a
+full backup. ClickHouse reads that setting at startup only: after the role
+first installs it, restart ClickHouse once while no backup is running.
 
 ### Setting up
 1. In the Cloudflare dashboard, create the R2 bucket `ooni-clickhouse-backup`
@@ -301,10 +310,7 @@ before that step, so:
 
 1. Disable the timer with `clickhouse_backup_enabled: false` (or
    `sudo systemctl stop ooni-clickhouse-backup.timer`) and check that
-   `system.backups` shows nothing running. ClickHouse waits for running
-   backups when it stops (`shutdown_wait_backups_and_restores`, and the
-   unit's `TimeoutStopSec=infinity`), so restarting a node during a full
-   backup hangs until the backup is done, a day or more.
+   `system.backups` shows nothing running.
 2. Take a pinned backup (incrementals, minutes):
    ```bash
    sudo ooni-clickhouse-backup run --keep pre-25.8.29.51

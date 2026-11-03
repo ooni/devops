@@ -3,8 +3,8 @@
      Credentials for the backup buckets, one endpoint per bucket. BACKUP/RESTORE
      and the s3 function use them for any URL under the endpoint, so queries
      never carry keys: an incremental backup stores its base_backup argument
-     in plain text in the bucket. ClickHouse reloads this file without a
-     restart. -->
+     in plain text in the bucket. ClickHouse rereads this file by itself
+     within seconds of a change; the role's handler applies it at once. -->
 <clickhouse>
     <s3>
 {% for bucket in clickhouse_backup_jobs | map(attribute='s3_bucket') | unique %}

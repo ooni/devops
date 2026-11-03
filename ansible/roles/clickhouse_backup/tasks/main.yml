@@ -33,6 +33,16 @@
     owner: clickhouse
     group: clickhouse
     mode: "0600"
+  notify: Reload ClickHouse's config
+
+# Takes effect from ClickHouse's next restart (see the file)
+- name: Make ClickHouse cancel running backups when it stops
+  ansible.builtin.copy:
+    src: ooni_backup_shutdown.xml
+    dest: /etc/clickhouse-server/config.d/ooni_backup_shutdown.xml
+    owner: clickhouse
+    group: clickhouse
+    mode: "0644"
 
 - name: Ensure /etc/ooni exists
   ansible.builtin.file:

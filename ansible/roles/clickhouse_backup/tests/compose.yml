@@ -21,6 +21,7 @@ services:
       CLICKHOUSE_PASSWORD: admin
     volumes:
       - ./work/ooni_backup_s3.xml:/etc/clickhouse-server/config.d/ooni_backup_s3.xml:ro,z
+      - ../files/ooni_backup_shutdown.xml:/etc/clickhouse-server/config.d/ooni_backup_shutdown.xml:ro,z
       - ./clickhouse.xml:/etc/clickhouse-server/config.d/test.xml:ro,z
     ulimits:
       nofile: 262144
