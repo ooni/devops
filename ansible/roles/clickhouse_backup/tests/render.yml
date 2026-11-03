@@ -17,6 +17,21 @@
         clickhouse_backup_check_cluster: "{{ item.check_cluster | default('') }}"
       loop: "{{ test_configs }}"
 
+    # From group_vars/clickhouse, as the hosts get them, so the tests check
+    # that they're enough. Read as YAML, not as variables: the file's other
+    # values look up secrets.
+    - name: Render the backup user's grants
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/work/backup_user.sql"
+        mode: "0644"
+        content: |
+          CREATE USER backup IDENTIFIED BY 'backup';
+          {% for g in grants if 'backup' in g.to %}{% for db in g.databases %}{% for t in g.tables %}
+          GRANT {{ g.privileges | join(', ') }} ON {{ db }}.{{ t }} TO backup;
+          {% endfor %}{% endfor %}{% endfor %}
+      vars:
+        grants: "{{ (lookup('file', playbook_dir ~ '/../../../group_vars/clickhouse/vars.yml') | from_yaml).clickhouse_custom_grants }}"
+
     - name: Render ClickHouse's bucket credentials, for every bucket of every config
       ansible.builtin.template:
         src: "{{ playbook_dir }}/../templates/ooni_backup_s3.xml.j2"

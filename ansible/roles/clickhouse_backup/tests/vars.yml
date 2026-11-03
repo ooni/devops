@@ -2,6 +2,9 @@
 clickhouse_admin_user: admin
 clickhouse_admin_password: admin
 clickhouse_backup_clickhouse_url: http://clickhouse:8123/
+# with the grants of group_vars/clickhouse (render.yml)
+clickhouse_backup_clickhouse_user: backup
+clickhouse_backup_clickhouse_password: backup
 clickhouse_backup_s3_endpoint: http://minio:9000
 clickhouse_backup_s3_access_key_id: testkey
 clickhouse_backup_s3_secret_access_key: testsecret123

@@ -250,14 +250,23 @@ first installs it, restart ClickHouse once while no backup is running.
    the token's keys in SSM as
    `/oonidevops/secrets/clickhouse_backup_r2_endpoint`,
    `/oonidevops/secrets/clickhouse_backup_r2_access_key_id` and
-   `/oonidevops/secrets/clickhouse_backup_r2_secret_access_key`.
-3. Deploy node_exporter first, for its textfile directory, then the backups:
+   `/oonidevops/secrets/clickhouse_backup_r2_secret_access_key`, and a new
+   password for the `backup` ClickHouse user as
+   `/oonidevops/secrets/clickhouse_backup_password`.
+3. Create the `backup` user on every node of the cluster: data3's check of the
+   cluster's tables runs as that user on data1 and data2 too.
+   ```bash
+   ./play -i inventory deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu,data2.htz-fsn.prod.ooni.nu,data3.htz-fsn.prod.ooni.nu -t clickhouse --diff
+   ```
+4. Deploy node_exporter, for its textfile directory, then the backups:
    ```bash
    ./play -i inventory deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu,data3.htz-fsn.prod.ooni.nu -t node_exporter --diff
    ./play -i inventory deploy-clickhouse.yml -l data1.htz-fsn.prod.ooni.nu,data3.htz-fsn.prod.ooni.nu -t clickhouse_backup --diff
    ```
-   and the alert rules with `deploy-monitoring.yml`.
-4. The timer takes the first (full) backup at its next run, on Sunday at
+   then restart ClickHouse on data1 and data3 while no backup is running, for
+   `shutdown_wait_backups_and_restores`, and deploy the alert rules with
+   `deploy-monitoring.yml`.
+5. The timer takes the first (full) backup at its next run, on Sunday at
    02:30 UTC. To start it on deploy day instead, e.g. a Friday so that it runs
    over the weekend:
    ```bash
@@ -335,10 +344,32 @@ before that step, so:
 Data written after a pinned backup isn't in it. If you roll back, that
 window has to be filled again by reprocessing those days.
 
+Once on 25.8, narrow the `backup` user's `S3` grant to the bucket. On 24.8,
+`S3` allows `s3()` on any URL, and the only limit is the server-wide
+`remote_url_allow_hosts`, by host, for every user. 25.8 grants a URL regexp,
+and enforces it (checked on 25.8.33.6). In place of `S3`:
+
+```sql
+GRANT WRITE ON S3('https://<account id>.r2.cloudflarestorage.com/ooni-clickhouse-backup/.*') TO backup
+```
+
+`WRITE` only: the script only writes with `s3()` (the EmbeddedRocksDB and
+Join export), and restores run as admin. `BACKUP` doesn't need the grant.
+Make the change in `clickhouse_custom_grants` in
+`group_vars/clickhouse/vars.yml`: the clickhouse role's grant template only
+renders `ON <database>.<table>`, so this grant needs a change to the template
+or a task of its own. Then check it as `backup`: `s3()` to another bucket
+must fail with `Not enough privileges`, and the backup must still succeed.
+Don't go by `SHOW GRANTS`, which shows it as `GRANT S3 ON *.*`. If it isn't
+enforced, look at `access_control_improvements` in the server's config
+(`enable_read_write_grants`): the test was with the server image's default
+config.
+
 ### Restoring
 The target server needs `ooni_backup_s3.xml` in `config.d` (the role
 installs it). `ooni-clickhouse-backup list` prints the latest backup URL of
-each table. Restoring the latest incremental restores the whole chain.
+each table. Restoring the latest incremental restores the whole chain. Run
+the queries as admin: the `backup` user can't restore.
 
 1. The database isn't part of a table backup:
    ```sql

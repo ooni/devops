@@ -146,6 +146,10 @@ def test_first_run():
     print("== 1. first run: a full backup of every table")
     r = backup("backup", "run")
     check(r.returncode == 0, "the run succeeds", r.stderr)
+    # the script runs as the backup user, with production's grants
+    with open(os.path.join(HERE, "work", "backup_user.sql")) as f:
+        for sql in filter(None, (s.strip() for s in f.read().split(";"))):
+            ch(sql)
     for table in ("fastpath", "obs_web", "test_groups", "msmt_feedback"):
         c = chains(MEASUREMENTS, table)
         check(len(c) == 1 and all(all(b.values()) for b in c.values()), f"{table}: one complete chain")

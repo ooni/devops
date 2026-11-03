@@ -19,6 +19,7 @@ services:
     environment:
       CLICKHOUSE_USER: admin
       CLICKHOUSE_PASSWORD: admin
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1  # admin creates the backup user
     volumes:
       - ./work/ooni_backup_s3.xml:/etc/clickhouse-server/config.d/ooni_backup_s3.xml:ro,z
       - ../files/ooni_backup_shutdown.xml:/etc/clickhouse-server/config.d/ooni_backup_shutdown.xml:ro,z
