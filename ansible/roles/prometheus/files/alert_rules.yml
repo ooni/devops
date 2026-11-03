@@ -102,7 +102,7 @@ groups:
   # all the textfile are updated at least hourly, except the ClickHouse
   # backup results, which change after each backup (see ClickHouseBackupStale)
   - alert: TextfileJam
-    expr: (node_textfile_mtime{file!~".*/ooni_clickhouse_backup\\.prom"} - ON(instance,job) GROUP_LEFT() node_time) / -3600 > 2
+    expr: (node_textfile_mtime_seconds{file!~".*/ooni_clickhouse_backup\\.prom"} - ON(instance,job) GROUP_LEFT() node_time_seconds) / -3600 > 2
     annotations:
       summary: 'Stale `textfile` at {{ $labels.instance }}'
       description: '`{{ $labels.file }}` is {{ printf "%.0f" $value }}h old.'
@@ -206,4 +206,35 @@ groups:
     annotations:
       summary: 'data3 load is {{ $value | humanizePercentage }} of its CPUs'
       description: 'If a backup is running (ooni_clickhouse_backup_running on data3), lower clickhouse_backup_max_bandwidth; otherwise check merges and queries.'
+
+  # A running BACKUP keeps the parts it copies, so the space merges would free
+  # stays used until it's done: more than a day for a full. Fires when, at the
+  # rate of the last 6 hours, a disk of the host fills within a day.
+  - alert: ClickHouseBackupDiskFilling
+    expr: |
+      predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}[6h], 86400) < 0
+        and on (instance) (max by (instance) (ooni_clickhouse_backup_running) == 1)
+    for: 30m
+    annotations:
+      summary: '{{ $labels.instance }}{{ $labels.mountpoint }} fills within a day, with a ClickHouse backup running'
+      description: '{{ with printf `node_filesystem_avail_bytes{instance="%s",mountpoint="%s"}` $labels.instance $labels.mountpoint | query }}{{ . | first | value | humanize1024 }}B{{ end }} available. To free the space the backup holds, stop it (`systemctl stop ooni-clickhouse-backup`) and restart clickhouse-server, which cancels it, then start the backup again.'
+
+# Replication on the ClickHouse cluster (job clickhouse-cluster)
+- name: ClickHouse
+  rules:
+  # e.g. the node lost Keeper: inserts into those tables fail
+  - alert: ClickHouseReplicaReadonly
+    expr: ClickHouseMetrics_ReadonlyReplica > 0
+    for: 5m
+    annotations:
+      summary: '{{ $value }} replicated tables are read-only on {{ $labels.instance }}'
+      description: 'Inserts into them fail. See `SELECT database, table, zookeeper_exception FROM system.replicas WHERE is_readonly` and the server log.'
+
+  # A backup on data3 shares its link with replication fetches
+  - alert: ClickHouseReplicationLag
+    expr: ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay > 900
+    for: 30m
+    annotations:
+      summary: 'ClickHouse replication on {{ $labels.instance }} is {{ $value | humanizeDuration }} behind'
+      description: 'If a backup is running (ooni_clickhouse_backup_running), lower clickhouse_backup_max_bandwidth; otherwise see system.replication_queue.'
 ...

@@ -104,9 +104,9 @@ tests:
   # is the file's full path.
   - interval: 1m
     input_series:
-      - {series: 'node_time{instance="data3", job="node"}', values: '0+60x240'}
-      - {series: 'node_textfile_mtime{instance="data3", job="node", file="/var/lib/node_exporter/textfile_collector/ooni_clickhouse_backup.prom"}', values: '0x240'}
-      - {series: 'node_textfile_mtime{instance="data3", job="node", file="/var/lib/node_exporter/textfile_collector/other.prom"}', values: '0x240'}
+      - {series: 'node_time_seconds{instance="data3", job="node"}', values: '0+60x240'}
+      - {series: 'node_textfile_mtime_seconds{instance="data3", job="node", file="/var/lib/node_exporter/textfile_collector/ooni_clickhouse_backup.prom"}', values: '0x240'}
+      - {series: 'node_textfile_mtime_seconds{instance="data3", job="node", file="/var/lib/node_exporter/textfile_collector/other.prom"}', values: '0x240'}
     alert_rule_test:
       - eval_time: 3h
         alertname: TextfileJam
@@ -128,3 +128,43 @@ tests:
             exp_annotations:
               summary: 'ClickHouse table made_on_data1 is not backed up (on data1.htz-fsn.prod.ooni.nu)'
               description: 'No backup job covers it and it is not excluded. Add it to a job (clickhouse_backup_data1_tables if only data1 holds its data), or to clickhouse_backup_exclude_tables if it needs no backup. See the runbook, "ClickHouse backup".'
+
+  # DiskFilling: data3's disk loses ~1 GiB every 10 minutes (144 GiB a day) from 100 GiB, during a backup;
+  # data1's the same, with no backup running
+  - interval: 1m
+    input_series:
+      - {series: 'node_filesystem_avail_bytes{instance="data3", mountpoint="/data", fstype="ext4"}', values: '107374182400-107374182x600'}
+      - {series: 'ooni_clickhouse_backup_running{instance="data3", backup="measurements"}', values: '1x600'}
+      - {series: 'node_filesystem_avail_bytes{instance="data1", mountpoint="/data", fstype="ext4"}', values: '107374182400-107374182x600'}
+      - {series: 'ooni_clickhouse_backup_running{instance="data1", backup="data1"}', values: '0x600'}
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: ClickHouseBackupDiskFilling
+        exp_alerts:
+          - exp_labels: {instance: data3, mountpoint: /data, fstype: ext4}
+            exp_annotations:
+              summary: 'data3/data fills within a day, with a ClickHouse backup running'
+              description: '58GiB available. To free the space the backup holds, stop it (`systemctl stop ooni-clickhouse-backup`) and restart clickhouse-server, which cancels it, then start the backup again.'
+
+  # Replication: data2 has 3 read-only tables; data3 is 20 minutes behind for 40 minutes, data1 for 10
+  - interval: 1m
+    input_series:
+      - {series: 'ClickHouseMetrics_ReadonlyReplica{instance="data2.htz-fsn.prod.ooni.nu", job="clickhouse-cluster"}', values: '3x60'}
+      - {series: 'ClickHouseMetrics_ReadonlyReplica{instance="data3.htz-fsn.prod.ooni.nu", job="clickhouse-cluster"}', values: '0x60'}
+      - {series: 'ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{instance="data3.htz-fsn.prod.ooni.nu", job="clickhouse-cluster"}', values: '1200x60'}
+      - {series: 'ClickHouseAsyncMetrics_ReplicasMaxAbsoluteDelay{instance="data1.htz-fsn.prod.ooni.nu", job="clickhouse-cluster"}', values: '0x30 1200x30'}
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ClickHouseReplicaReadonly
+        exp_alerts:
+          - exp_labels: {instance: data2.htz-fsn.prod.ooni.nu, job: clickhouse-cluster}
+            exp_annotations:
+              summary: '3 replicated tables are read-only on data2.htz-fsn.prod.ooni.nu'
+              description: 'Inserts into them fail. See `SELECT database, table, zookeeper_exception FROM system.replicas WHERE is_readonly` and the server log.'
+      - eval_time: 40m
+        alertname: ClickHouseReplicationLag
+        exp_alerts:
+          - exp_labels: {instance: data3.htz-fsn.prod.ooni.nu, job: clickhouse-cluster}
+            exp_annotations:
+              summary: 'ClickHouse replication on data3.htz-fsn.prod.ooni.nu is 20m 0s behind'
+              description: 'If a backup is running (ooni_clickhouse_backup_running), lower clickhouse_backup_max_bandwidth; otherwise see system.replication_queue.'

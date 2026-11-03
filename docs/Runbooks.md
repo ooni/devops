@@ -336,6 +336,16 @@ before that step, so:
    sudo journalctl -f --identifier ooni-clickhouse-backup
    ```
    When the journal shows `all tables backed up` for every job, unpin the
+- `ClickHouseBackupDiskFilling`: during a backup, a disk of the host fills
+  within a day at the rate of the last 6 hours. A running `BACKUP` keeps the
+  parts it copies, so the space merges would free stays used until it ends.
+  If the disk would fill first, stop the backup and restart ClickHouse, which
+  cancels it; `sudo ooni-clickhouse-backup resume` finishes the run later.
+- `ClickHouseReplicationLag` and `ClickHouseReplicaReadonly`, for any node of
+  the cluster: replication over 15 minutes behind for 30 minutes, or
+  read-only replicated tables. A backup on data3 shares its link with
+  replication fetches; if one is running, lower
+  `clickhouse_backup_max_bandwidth`.
    old chains and re-enable the timer (`clickhouse_backup_enabled: true`):
    ```bash
    sudo ooni-clickhouse-backup release pre-25.8.29.51
