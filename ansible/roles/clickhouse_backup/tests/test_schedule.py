@@ -57,14 +57,19 @@ class FakeClickHouse:
         return json.dumps({"id": "op"})
 
 
-def runs(every_days, until, failing=(), jitter=True):
-    """Back up a table at 02:30 UTC daily or on Sundays from START. Yields (day, full, complete chains)."""
+def new_job():
     job = backup.BackupJob.__new__(backup.BackupJob)
     job.db, job.name, job.keep_chains, job.settings = "ooni", "t", 2, {}
     job.store = FakeStore()
     job.ch = FakeClickHouse(job.store)
     job.metrics = backup.Metrics()
     job.wait = lambda op, what: {"num_files": 1, "uncompressed_size": 1}
+    return job
+
+
+def runs(every_days, until, failing=(), jitter=True, job=None):
+    """Back up a table at 02:30 UTC daily or on Sundays from START. Yields (day, full, complete chains)."""
+    job = job or new_job()
     t, n = START, 0
     while t < until:
         # a table's backup starts a few minutes earlier or later each time
@@ -114,6 +119,44 @@ class TestSchedule(unittest.TestCase):
                 self.assertIsNone(full, day)
             before = complete
         self.assertEqual([c[:8] for c in complete], ["20270314", "20270404"])
+
+    def test_never_fewer_than_two_complete_chains(self):
+        # fulls and incrementals failing (cancelled, killed): from the second month's full on, two complete
+        # chains at every step
+        failing = {"2026-11-08", "2026-11-15", "2026-12-06", "2026-12-13", "2027-01-10", "2027-02-07", "2027-03-21"}
+        for day, full, complete in runs(7, datetime(2027, 5, 1, tzinfo=timezone.utc), failing):
+            if day >= "2026-11-01":
+                self.assertGreaterEqual(len(complete), 2, f"{day}: {complete}")
+
+    def test_a_failed_incremental_is_removed_and_the_next_builds_on_the_last_complete_one(self):
+        job = new_job()
+        list(runs(7, datetime(2026, 11, 20, tzinfo=timezone.utc), {"2026-11-15"}, job=job))
+        nov = job.store.c[max(job.store.c)]["backups"]
+        self.assertEqual([b[:8] for b in sorted(nov)], ["20261101", "20261108", "20261115"])
+        self.assertFalse(nov[max(nov)], "the failed incremental: files but no .backup")
+        job.ch.fail = False
+        sql = []
+        query = job.ch.query
+        job.ch.query = lambda q, **kw: sql.append(q) or query(q, **kw)
+        backup.utcnow = lambda: datetime(2026, 11, 22, 2, 30, tzinfo=timezone.utc)
+        job.backup_table("obs_web", "ReplicatedMergeTree", False, "")
+        nov = job.store.c[max(job.store.c)]["backups"]
+        self.assertEqual([b[:8] for b in sorted(nov)], ["20261101", "20261108", "20261122"])
+        self.assertIn("20261108", sql[0].split("base_backup")[1], "the incremental's base")
+
+    def test_a_prune_cut_short_is_finished_by_the_next_run(self):
+        # killed while deleting the oldest chain: its full's .backup went first (keys are deleted in order),
+        # its incremental's is left, so it still counts as complete, though it can't be restored
+        job = new_job()
+        job.store.c = {
+            "20260906T023000Z": {"backups": {"20260906T023000Z": False, "20260913T023000Z": True}, "keep": []},
+            "20261004T023000Z": {"backups": {"20261004T023000Z": True}, "keep": []},
+            "20261101T023000Z": {"backups": {"20261101T023000Z": True}, "keep": []},
+        }
+        backup.utcnow = lambda: datetime(2026, 11, 8, 2, 30, tzinfo=timezone.utc)
+        self.assertFalse(job.backup_table("obs_web", "ReplicatedMergeTree", False, ""), "an incremental")
+        self.assertEqual(sorted(job.store.c), ["20261004T023000Z", "20261101T023000Z"])
+        self.assertEqual(sorted(job.store.c["20261101T023000Z"]["backups"]), ["20261101T023000Z", "20261108T023000Z"])
 
 
 if __name__ == "__main__":

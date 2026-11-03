@@ -282,7 +282,9 @@ def test_killed_during_full():
     check("removed incomplete chain" in out, "it removed what the killed backup left", out)
     check("starting it again" in out, "and took obs_web's full again", out)
     c = chains(MEASUREMENTS, "obs_web")
-    check(all(all(b.values()) for b in c.values()), f"every chain left is complete: {sorted(c)}")
+    new = sorted(set(c) - before)
+    check(len(new) == 1 and len(c) == 2 and max(before) in c and all(all(b.values()) for b in c.values()),
+          f"two complete chains, the new one and the newest from before; the oldest pruned: {sorted(c)}")
 
 
 def main():
