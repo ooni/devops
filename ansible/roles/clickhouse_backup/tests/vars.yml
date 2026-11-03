@@ -1,5 +1,4 @@
-# Role variables for the test environment in compose.yml, with data3's two
-# jobs: the measurement tables and the private tables, each in its own bucket.
+# Role variables for the test environment in compose.yml, with data3's job.
 clickhouse_admin_user: admin
 clickhouse_admin_password: admin
 clickhouse_backup_clickhouse_url: http://clickhouse:8123/
@@ -11,11 +10,7 @@ test_jobs:
   - name: measurements
     s3_bucket: ooni-clickhouse-backup
     include_tables: ["*"]
-    exclude_tables: [msmt_feedback, labeling_frames]
-  - name: private
-    s3_bucket: ooni-clickhouse-backup-private
-    include_tables: [msmt_feedback]
-    exclude_tables: []
+    exclude_tables: [labeling_frames]
 
 # data1 backs up its own labeling_frames
 clickhouse_backup_backed_up_elsewhere: [labeling_frames]

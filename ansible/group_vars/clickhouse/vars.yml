@@ -419,11 +419,6 @@ node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector
 clickhouse_backup_s3_endpoint: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_endpoint', profile='oonidevops_user_prod') }}"
 clickhouse_backup_s3_access_key_id: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_access_key_id', profile='oonidevops_user_prod') }}"
 clickhouse_backup_s3_secret_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_secret_access_key', profile='oonidevops_user_prod') }}"
-# Tables with personal or unpublished data, backed up to the private bucket
-clickhouse_backup_private_tables:
-  - msmt_feedback        # account ids and free-text comments
-  - faulty_measurements  # until its contents are reviewed
-  - url_priorities       # until it's decided whether it's published
 # Plain MergeTree tables whose data only data1 holds (2026-10-20). Remove a
 # table from here once it's replicated, and data3 picks it up.
 clickhouse_backup_data1_tables:

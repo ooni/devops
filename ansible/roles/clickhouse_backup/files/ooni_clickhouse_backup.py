@@ -5,9 +5,7 @@ ClickHouse's native BACKUP, with one incremental chain per table.
 
 Configured by /etc/ooni/clickhouse-backup.json (see the clickhouse_backup
 Ansible role). Runs from a systemd timer. The config lists one or more jobs,
-run one after the other; each job backs up a set of tables to its own bucket
-(R2 tokens grant access per bucket, so private tables get a bucket of their
-own).
+run one after the other; each job backs up a set of tables to a bucket.
 
 Layout in each bucket:
 

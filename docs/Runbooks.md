@@ -183,14 +183,12 @@ Each host runs the jobs set in its host_vars, one after the other:
 
 | Host | Job | Bucket | Tables |
 |---|---|---|---|
-| data3 | `measurements` | `ooni-clickhouse-backup` | every replicated table, minus the private ones and data1's |
-| data3 | `private` | `ooni-clickhouse-backup-private` | `clickhouse_backup_private_tables`: `msmt_feedback`, `faulty_measurements`, `url_priorities` |
+| data3 | `measurements` | `ooni-clickhouse-backup` | every replicated table, minus data1's |
 | data1 | `data1` | `ooni-clickhouse-backup` | `clickhouse_backup_data1_tables`: plain MergeTree tables whose data only data1 holds |
 
 data3 runs the backup for the replicated tables because it isn't on a critical
 path like data1 (fastpath, airflow) or data2 (oonimeasurements).
-Private tables have their own bucket because R2 tokens grant access per
-bucket, and researchers may be given read access to the measurement tables.
+Both jobs write to the one bucket: no table needs a bucket of its own.
 When a data1-only table becomes replicated, remove it from
 `clickhouse_backup_data1_tables` and data3 picks it up.
 
@@ -236,9 +234,9 @@ its `.backup` file. ClickHouse gets the keys from
 without a restart using systemctl reload clickhouse-server.
 
 ### Setting up
-1. In the Cloudflare dashboard, create the R2 buckets `ooni-clickhouse-backup`
-   and `ooni-clickhouse-backup-private` (location hint: Western Europe), and
-   an R2 API token with Object Read & Write on both.
+1. In the Cloudflare dashboard, create the R2 bucket `ooni-clickhouse-backup`
+   (location hint: Western Europe), and an R2 API token with Object Read &
+   Write on it.
 2. Store the S3 endpoint (`https://<account id>.r2.cloudflarestorage.com`) and
    the token's keys in SSM as
    `/oonidevops/secrets/clickhouse_backup_r2_endpoint`,
@@ -268,8 +266,7 @@ Alerts, in `alert_rules.yml`:
   deleted, and the next run retries it.
 - `ClickHouseTableNotBackedUp`: a table on the cluster is in no backup job and
   not excluded. Add it to a job: replicated tables are backed up by data3's
-  `measurements` job unless they're private (`clickhouse_backup_private_tables`),
-  and a table whose data only data1 holds goes in
+  `measurements` job, and a table whose data only data1 holds goes in
   `clickhouse_backup_data1_tables`. Or, if it needs no backup, add it to
   `clickhouse_backup_exclude_tables`.
 - `ClickHouseBackupCompleted`: a job's run backed up every table. One Slack

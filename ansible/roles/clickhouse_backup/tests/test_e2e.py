@@ -1,7 +1,7 @@
 """End-to-end test of the backup in compose.yml's environment, after run.sh has rendered work/ and started it.
 In order:
-  1. a first run takes a full backup of every table, each job to its own bucket
-  2. ClickHouseBackupCompleted reaches Slack once per job, as a notice, without email
+  1. a first run takes a full backup of every table
+  2. ClickHouseBackupCompleted reaches Slack once, as a notice, without email
   3. two more runs take incrementals; restoring the full and each incremental returns the rows of
      its moment, and an EmbeddedRocksDB table comes back with its exported rows
   4. a table created on the cluster's other node only: ClickHouseTableNotBackedUp names it
@@ -22,7 +22,7 @@ import boto3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 COMPOSE = shlex.split(os.environ.get("COMPOSE", "docker compose")) + ["-f", os.path.join(HERE, "compose.yml")]
-MEASUREMENTS, PRIVATE = "ooni-clickhouse-backup", "ooni-clickhouse-backup-private"
+MEASUREMENTS = "ooni-clickhouse-backup"
 DATA3 = "data3.htz-fsn.prod.ooni.nu"  # the instance label prometheus.yml gives the textfile
 s3 = boto3.client(
     "s3", endpoint_url="http://127.0.0.1:19910", region_name="us-east-1",
@@ -120,8 +120,7 @@ def setup():
     wait_for("Prometheus", lambda: "Ready" in http("http://127.0.0.1:19990/-/ready"))
     wait_for("Alertmanager", lambda: "OK" in http("http://127.0.0.1:19993/-/ready"))
     wait_for("Slack stand-in", lambda: http("http://127.0.0.1:19980/") == "[]")
-    for bucket in (MEASUREMENTS, PRIVATE):
-        s3.create_bucket(Bucket=bucket)
+    s3.create_bucket(Bucket=MEASUREMENTS)
     for sql in [
         "CREATE DATABASE ooni",
         "CREATE TABLE ooni.fastpath (measurement_uid String, input String, anomaly LowCardinality(String)) "
@@ -147,24 +146,21 @@ def test_first_run():
     print("== 1. first run: a full backup of every table")
     r = backup("backup", "run")
     check(r.returncode == 0, "the run succeeds", r.stderr)
-    for bucket, table in [(MEASUREMENTS, "fastpath"), (MEASUREMENTS, "obs_web"),
-                          (MEASUREMENTS, "test_groups"), (PRIVATE, "msmt_feedback")]:
-        c = chains(bucket, table)
-        check(len(c) == 1 and all(all(b.values()) for b in c.values()), f"{table}: one complete chain in {bucket}")
+    for table in ("fastpath", "obs_web", "test_groups", "msmt_feedback"):
+        c = chains(MEASUREMENTS, table)
+        check(len(c) == 1 and all(all(b.values()) for b in c.values()), f"{table}: one complete chain")
     check(any(k.endswith("/data.native.zst") for k in keys(MEASUREMENTS, "prod/ooni/test_groups/")),
           "test_groups (EmbeddedRocksDB): its rows are exported too")
-    check(not keys(MEASUREMENTS, "prod/ooni/msmt_feedback/"), "msmt_feedback isn't in the measurements bucket")
     check(not keys(MEASUREMENTS, "prod/ooni/asnmeta_tmp/"), "asnmeta_tmp (excluded) isn't backed up")
     check(not keys(MEASUREMENTS, "prod/ooni/labeling_frames/"), "labeling_frames (data1's) isn't backed up")
 
 
 def test_completed_alert(emails_before):
     print("== 2. ClickHouseBackupCompleted")
-    for job, tables in (("measurements", 3), ("private", 1)):
-        title = f"ClickHouse backup {job} on {DATA3} completed"
-        msgs = wait_for(f"a Slack message: {title}", lambda: [m for m in slack() if m[0].startswith(title)])
-        check(len(msgs) == 1, f"one Slack message for {job}: {msgs[0][0]!r}")
-        check(f"Tables backed up: {tables}, in full: {tables}" in msgs[0][1], f"it says: {msgs[0][1]!r}")
+    title = f"ClickHouse backup measurements on {DATA3} completed"
+    msgs = wait_for(f"a Slack message: {title}", lambda: [m for m in slack() if m[0].startswith(title)])
+    check(len(msgs) == 1, f"one Slack message: {msgs[0][0]!r}")
+    check("Tables backed up: 4, in full: 4" in msgs[0][1], f"it says: {msgs[0][1]!r}")
     check(not any(t.startswith("[FIRING]") for t, _ in slack()), "no [FIRING] in the titles")
     check(email_attempts() == emails_before, "no email sent")
 
