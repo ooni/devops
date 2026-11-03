@@ -40,6 +40,12 @@ Commands:
     list [--job J ...] [--table T ...]
     release [--job J ...] LABEL
 
+ClickHouse cancels running backups when it stops (the role turns
+shutdown_wait_backups_and_restores off), and BACKUP can't resume one. A
+table whose backup ClickHouse cancelled by restarting is started again once
+ClickHouse is back. A run stopped by a reboot isn't finished: the next run
+backs up what it hadn't, and removes what it left.
+
 After each table, the result goes to a Prometheus textfile (metrics_file in
 the config) for node_exporter: last success and attempt per table, whether
 the last attempt failed, its duration and size, and whether a job is running.
@@ -98,6 +104,10 @@ def size(n: int) -> str:
 
 def sql_str(s: str) -> str:
     return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+class ClickHouseDown(RuntimeError):
+    """ClickHouse didn't answer for clickhouse_wait_seconds"""
 
 
 class ClickHouse:
@@ -433,7 +443,9 @@ class BackupJob:
             self.settings["max_backup_bandwidth"] = str(bw)
 
     def tables(self, only: list) -> tuple:
-        """([(name, engine)] to back up, smallest first; [missing names])"""
+        """([(name, engine)] to back up, smallest first; [names that can't be:
+        missing, or unsupported]). An unsupported name's table is reported
+        as failed, or nothing would ever say it isn't backed up."""
         rows = self.ch.rows(
             f"""
             SELECT t.name AS name, t.engine AS engine,
@@ -449,7 +461,7 @@ class BackupJob:
             ORDER BY bytes, name
             """
         )
-        out = []
+        out, unsupported = [], []
         for r in rows:
             name, engine = r["name"], r["engine"]
             if only and name not in only:
@@ -462,7 +474,9 @@ class BackupJob:
                 log.info(f"{self.name}: {name}: excluded")
                 continue
             if not SAFE_NAME.match(name):
-                log.error(f"{name}: unsupported characters in table name, skipping")
+                log.error(f"{self.name}: {name}: unsupported characters in table name, not backed up")
+                self.metrics.table_result(self.name, name, False)
+                unsupported.append(name)
                 continue
             out.append((name, engine))
         # Tables asked for with --table that are this job's but don't exist
@@ -471,7 +485,7 @@ class BackupJob:
         )
         for name in missing:
             log.error(f"{self.name}: {name}: not found")
-        return out, missing
+        return out, missing + unsupported
 
     def includes(self, table: str) -> bool:
         return any(fnmatch.fnmatchcase(table, p) for p in self.include)
@@ -497,7 +511,7 @@ class BackupJob:
                 return
             except (OSError, RuntimeError) as e:
                 if time.monotonic() - t0 >= self.clickhouse_wait_s:
-                    raise RuntimeError(f"ClickHouse not answering after {self.clickhouse_wait_s:.0f}s: {e}")
+                    raise ClickHouseDown(f"ClickHouse not answering after {self.clickhouse_wait_s:.0f}s: {e}")
                 log.info(f"waiting for ClickHouse: {e}")
                 time.sleep(10)
 
@@ -535,6 +549,32 @@ class BackupJob:
                 log.info(f"{what}: still running after {(now - t0) / 3600:.1f}h")
                 last_log = now
             time.sleep(self.poll_s)
+
+    def restarted_since(self, t: float) -> bool:
+        """Whether ClickHouse has started since t (a time.time())"""
+        return time.time() - float(self.ch.query("SELECT uptime()", timeout=30)) > t
+
+    def wait_for_running_backups(self) -> None:
+        """A backup the script lost track of (polling gave up) may still be
+        uploading: the next table's would share the link with it"""
+        if self.running_backups():
+            log.warning(f"{self.name}: waiting for a backup still running on the server")
+        while self.running_backups():
+            time.sleep(self.poll_s)
+
+    def backup_table_retrying(self, table: str, engine: str, force_full: bool, keep: str) -> bool:
+        """backup_table, started again if ClickHouse restarted meanwhile and so
+        cancelled it. ClickHouseDown if ClickHouse doesn't come back."""
+        t0 = time.time()
+        try:
+            return self.backup_table(table, engine, force_full, keep)
+        except Exception as e:
+            self.wait_for_clickhouse()
+            if not self.restarted_since(t0):
+                self.wait_for_running_backups()
+                raise
+            log.warning(f"{self.name}: {table}: ClickHouse restarted during the backup ({e}), starting it again")
+        return self.backup_table(table, engine, force_full, keep)
 
     def cleanup_incomplete(self, table: str, chains: dict) -> None:
         tprefix = self.store.table_prefix(self.db, table)
@@ -636,8 +676,13 @@ class BackupJob:
         try:
             for table, engine in tables:
                 try:
-                    fulls += self.backup_table(table, engine, force_full, keep)
+                    fulls += self.backup_table_retrying(table, engine, force_full, keep)
                     done += 1
+                except ClickHouseDown as e:
+                    log.error(f"{self.name}: {table}: {e}; stopping")
+                    self.metrics.table_result(self.name, table, False)
+                    failed.append(table)
+                    break
                 except Exception as e:
                     log.error(f"{self.name}: {table}: backup failed: {e}")
                     self.metrics.table_result(self.name, table, False)
@@ -646,7 +691,7 @@ class BackupJob:
             self.metrics.job_running(self.name, False)
         self.metrics.run_result(self.name, time.monotonic() - t0, done, fulls, len(failed))
         if not only:
-            self.metrics.forget_tables(self.name, {table for table, _ in tables})
+            self.metrics.forget_tables(self.name, {table for table, _ in tables} | set(failed))
 
         if failed:
             log.error(f"{self.name}: failed tables: {', '.join(failed)}")

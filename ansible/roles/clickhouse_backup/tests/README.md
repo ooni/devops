@@ -8,7 +8,8 @@
 - `test_schedule.py`: which runs start a full backup and what gets pruned,
   over months of daily and weekly runs with failures, ClickHouse and the
   bucket stubbed.
-- `test_job.py`: how a job runs and what it reports, ClickHouse stubbed.
+- `test_job.py`: how a job runs and what it reports, ClickHouse stubbed,
+  including a ClickHouse restart during a table and ClickHouse gone for good.
 - `test_e2e.py`: the real thing, in the containers of `compose.yml`:
   two ClickHouse nodes at production's version (`data3`, where the backups
   run, and `data1`, in one test cluster), MinIO standing in for R2, the script
@@ -17,9 +18,11 @@
   routes, and a stand-in for Slack. Full and incremental backups, and
   restoring the full and each incremental of a chain, and an
   EmbeddedRocksDB table with its exported rows; a table created on `data1`
-  only, which ClickHouseTableNotBackedUp must name; a failed run; an
-  interrupted full, the month's new full, pruning and restoring what's
-  left; and the Slack messages and emails each one causes.
+  only, which ClickHouseTableNotBackedUp must name; a failed run; a full
+  cancelled by restarting ClickHouse, started again by the same run, the
+  month's new full, pruning and restoring what's left; ClickHouse killed during a full; and the Slack messages and emails each one
+  causes. The script runs as the `backup` user, with the grants of
+  `group_vars/clickhouse/vars.yml`.
 
 The configs are rendered from the role's templates into `work/` by
 `render.yml`, with the variables in `vars.yml`.

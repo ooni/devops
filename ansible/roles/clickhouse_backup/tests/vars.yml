@@ -24,8 +24,8 @@ test_configs:
     bandwidth: 0
     jobs: "{{ test_jobs }}"
     check_cluster: test_cluster
-  - name: slow  # ~1 MB/s, so a full backup can be interrupted
-    bandwidth: 3000000
+  - name: slow  # 1 MB/s, so a full backup can be interrupted
+    bandwidth: 1000000
     jobs: "{{ test_jobs }}"
   - name: broken  # its bucket doesn't exist, so every backup fails
     bandwidth: 0

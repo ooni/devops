@@ -6,8 +6,10 @@ In order:
      its moment, and an EmbeddedRocksDB table comes back with its exported rows
   4. a table created on the cluster's other node only: ClickHouseTableNotBackedUp names it
   5. a run whose bucket is missing fails, and ClickHouseBackupFailed reaches Slack and email
-  6. a new month's full interrupted by killing ClickHouse deletes nothing; the next run
-     removes what it left, takes the full and prunes the oldest chain, and the full restores
+  6. a new month's full, cancelled by restarting ClickHouse: the restart doesn't wait for it, and
+     the run takes the full again and prunes the oldest chain; the full restores
+  7. a full interrupted by killing ClickHouse, as the runbook says to for an urgent reboot: the
+     run removes what the killed backup left and takes it again
 Prints each check; exits 1 at the first failure."""
 import json
 import os
@@ -127,8 +129,11 @@ def setup():
         "ENGINE = MergeTree ORDER BY measurement_uid",
         "INSERT INTO ooni.fastpath SELECT toString(number), 'https://example.org/' || toString(number % 100), "
         "if(number % 7 = 0, 't', 'f') FROM numbers(200000)",
-        # ~20 MB that doesn't compress: takes ~20 s to back up with work/slow.json
-        "CREATE TABLE ooni.obs_web (measurement_uid String, blob String) ENGINE = MergeTree ORDER BY measurement_uid",
+        # ~20 MB that doesn't compress: takes ~20 s to back up with work/slow.json. In 40 parts, so
+        # that it's more files than ClickHouse uploads at once (backup_threads, 16): a cancelled
+        # backup only skips the files not yet started.
+        "CREATE TABLE ooni.obs_web (measurement_uid String, blob String) ENGINE = MergeTree "
+        "PARTITION BY cityHash64(measurement_uid) % 40 ORDER BY measurement_uid",
         "INSERT INTO ooni.obs_web SELECT toString(number), randomString(4096) FROM numbers(5000)",
         "CREATE TABLE ooni.test_groups (name String, pattern String) ENGINE = EmbeddedRocksDB PRIMARY KEY name",
         "INSERT INTO ooni.test_groups VALUES ('a', '1.2.3.4'), ('b', '5.6.7.8')",
@@ -139,6 +144,10 @@ def setup():
         "CREATE TABLE ooni.asnmeta_tmp (asn UInt32) ENGINE = MergeTree ORDER BY asn",  # excluded: *_tmp
     ]:
         ch(sql)
+    # the script runs as the backup user, with production's grants
+    with open(os.path.join(HERE, "work", "backup_user.sql")) as f:
+        for sql in filter(None, (s.strip() for s in f.read().split(";"))):
+            ch(sql)
     ch("CREATE DATABASE ooni", port=19912)
 
 
@@ -146,10 +155,6 @@ def test_first_run():
     print("== 1. first run: a full backup of every table")
     r = backup("backup", "run")
     check(r.returncode == 0, "the run succeeds", r.stderr)
-    # the script runs as the backup user, with production's grants
-    with open(os.path.join(HERE, "work", "backup_user.sql")) as f:
-        for sql in filter(None, (s.strip() for s in f.read().split(";"))):
-            ch(sql)
     for table in ("fastpath", "obs_web", "test_groups", "msmt_feedback"):
         c = chains(MEASUREMENTS, table)
         check(len(c) == 1 and all(all(b.values()) for b in c.values()), f"{table}: one complete chain")
@@ -229,8 +234,14 @@ def test_failure_alert(emails_before):
     check(not any(t.startswith("ClickHouse backup broken") for t, _ in slack()), "no 'completed' message for it")
 
 
-def test_interrupted_full():
-    print("== 6. a new month's full, interrupted, then completed")
+def run_in_background(config, *args):
+    return subprocess.Popen(COMPOSE + ["exec", "-T", "runner", "python3", "/role/ooni_clickhouse_backup.py",
+                                       "--config", f"/work/{config}.json", *args],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+
+def test_restart_during_full():
+    print("== 6. a new month's full, cancelled by restarting ClickHouse, started again")
     (chain, backups), = chains(MEASUREMENTS, "obs_web").items()
     full = f"prod/ooni/obs_web/{chain}/{min(backups)}/"
     old, previous = months_ago(2), months_ago(1)
@@ -239,31 +250,39 @@ def test_interrupted_full():
         copy_prefix(MEASUREMENTS, full, f"prod/ooni/obs_web/{c}/{c}/")
     delete_prefix(MEASUREMENTS, f"prod/ooni/obs_web/{chain}/")
 
-    run = subprocess.Popen(COMPOSE + ["exec", "-T", "runner", "python3", "/role/ooni_clickhouse_backup.py",
-                                      "--config", "/work/slow.json", "run", "--table", "obs_web"],
-                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    run = run_in_background("slow", "run", "--table", "obs_web")
     wait_for("the new full's first files", lambda: set(chains(MEASUREMENTS, "obs_web")) - {old, previous}, 60)
-    # killed, not stopped: ClickHouse waits for running backups when it stops
-    # (shutdown_wait_backups_and_restores), so a clean stop would finish this one
-    subprocess.run(COMPOSE + ["kill", "clickhouse"], check=True, capture_output=True)
-    subprocess.run(COMPOSE + ["start", "clickhouse"], check=True, capture_output=True)
+    t0 = time.monotonic()
+    # a clean stop, given time to wait for the backup if it were going to
+    subprocess.run(COMPOSE + ["restart", "-t", "300", "clickhouse"], check=True, capture_output=True)
+    restart_s = time.monotonic() - t0
     out, _ = run.communicate(timeout=900)
-    check(run.returncode == 1, "the interrupted run exits 1", out)
-    c = chains(MEASUREMENTS, "obs_web")
-    new = sorted(set(c) - {old, previous})
-    check(new and not any(c[new[0]].values()), f"the new chain {new[0]} has no .backup")
-    check(all(c[x][x] for x in (old, previous)), f"both older chains, {old} and {previous}, are still there")
-
-    wait_for("ClickHouse after it was killed", lambda: ch("SELECT 1") == "1")
-    r = backup("backup", "run", "--table", "obs_web")
-    check(r.returncode == 0, "the next run succeeds", r.stderr)
-    check("removed incomplete chain" in r.stderr, "it removed the interrupted full")
+    check(run.returncode == 0, "the run succeeds", out)
+    check("starting it again" in out, "the run started obs_web's backup again", out)
+    # had ClickHouse waited for it, the backup would be complete and the second one an incremental on it.
+    # Cancelled, it's gone: ClickHouse removes a failed backup's files.
+    check("incremental" not in out, f"the restart ({restart_s:.0f}s) cancelled the backup rather than wait for it", out)
     c = chains(MEASUREMENTS, "obs_web")
     check(previous in c and old not in c and len(c) == 2 and all(all(b.values()) for b in c.values()),
           f"it took the full and pruned {old}: chains {sorted(c)}")
     new = max(c)
     ch(f"RESTORE TABLE ooni.obs_web AS restored.obs_web FROM S3('{backup_url(MEASUREMENTS, 'obs_web', new, new)}')")
     check(digest("restored.obs_web") == digest("ooni.obs_web"), f"the new full {new} restores obs_web")
+
+
+def test_killed_during_full():
+    print("== 7. ClickHouse killed during a full")
+    before = set(chains(MEASUREMENTS, "obs_web"))
+    run = run_in_background("slow", "run", "--full", "--table", "obs_web")
+    wait_for("obs_web's full under way", lambda: set(chains(MEASUREMENTS, "obs_web")) - before, 60)
+    subprocess.run(COMPOSE + ["kill", "clickhouse"], check=True, capture_output=True)
+    subprocess.run(COMPOSE + ["start", "clickhouse"], check=True, capture_output=True)
+    out, _ = run.communicate(timeout=900)
+    check(run.returncode == 0, "the run succeeds", out)
+    check("removed incomplete chain" in out, "it removed what the killed backup left", out)
+    check("starting it again" in out, "and took obs_web's full again", out)
+    c = chains(MEASUREMENTS, "obs_web")
+    check(all(all(b.values()) for b in c.values()), f"every chain left is complete: {sorted(c)}")
 
 
 def main():
@@ -274,7 +293,8 @@ def main():
     test_incremental_and_restore()
     test_not_backed_up_alert()
     test_failure_alert(emails_before)
-    test_interrupted_full()
+    test_restart_during_full()
+    test_killed_during_full()
     print("PASS")
 
 

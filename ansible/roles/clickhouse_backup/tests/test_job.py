@@ -207,5 +207,77 @@ class TestClickHouseErrors(unittest.TestCase):
         self.assertEqual(j.ch.calls, 3)
 
 
+class TestInterruptions(unittest.TestCase):
+    """ClickHouse restarted mid-backup, or gone for good"""
+
+    def setUp(self):
+        d = tempfile.mkdtemp()
+        self.metrics = backup.Metrics(os.path.join(d, "out.prom"), os.path.join(d, "state.json"))
+        self.calls = []
+        self.failing = {}  # table: the exception its next backup raises
+        self.j = job(metrics=self.metrics)
+        self.j.running_backups = lambda: []
+        self.j.wait_for_clickhouse = lambda: None
+        self.j.tables = lambda only: ([("fastpath", "MergeTree"), ("obs_web", "MergeTree"), ("test_groups", "EmbeddedRocksDB")], [])
+        self.j.backup_table = self.backup_table
+
+    def backup_table(self, table, engine, full, keep):
+        self.calls.append((table, full, keep))
+        if table in self.failing:
+            raise self.failing.pop(table)
+        self.metrics.table_result(self.j.name, table, True, {"total_size": 1, "num_files": 1})
+        return full
+
+    def tables_called(self):
+        return [t for t, _, _ in self.calls]
+
+    def test_a_table_cancelled_by_a_restart_starts_again(self):
+        self.failing["obs_web"] = RuntimeError("obs_web: gone from system.backups (server restart?)")
+        self.j.restarted_since = lambda t: True
+        self.assertEqual(self.j.run([], False, ""), 0)
+        self.assertEqual(self.tables_called(), ["fastpath", "obs_web", "obs_web", "test_groups"])
+
+    def test_a_failure_without_a_restart_isnt_retried(self):
+        self.failing["obs_web"] = RuntimeError("BACKUP_FAILED")
+        self.j.restarted_since = lambda t: False
+        waited = []
+        self.j.wait_for_running_backups = lambda: waited.append(True)
+        self.assertEqual(self.j.run([], False, ""), 1)
+        self.assertEqual(self.tables_called(), ["fastpath", "obs_web", "test_groups"])
+        self.assertEqual(waited, [True], "the next table waits for the failed one's BACKUP, if still running")
+        self.assertEqual(self.metrics.state["tables"]["measurements/obs_web"]["last_failed"], 1)
+
+    def test_clickhouse_gone_stops_the_run(self):
+        self.failing["obs_web"] = RuntimeError("Connection refused")
+
+        def down():  # up when the run starts, then gone after obs_web's backup fails
+            if self.tables_called():
+                raise backup.ClickHouseDown("ClickHouse not answering after 600s")
+        self.j.wait_for_clickhouse = down
+        self.assertEqual(self.j.run([], False, ""), 1)
+        self.assertEqual(self.tables_called(), ["fastpath", "obs_web"], "test_groups isn't tried")
+
+    def test_restarted_since(self):
+        self.j.ch = types.SimpleNamespace(query=lambda sql, timeout=600: "100\n")
+        self.assertTrue(self.j.restarted_since(backup.time.time() - 200))
+        self.assertFalse(self.j.restarted_since(backup.time.time() - 50))
+
+
+class TestUnsupportedNames(unittest.TestCase):
+    def test_a_table_whose_name_cant_be_backed_up_is_reported_failed(self):
+        d = tempfile.mkdtemp()
+        metrics = backup.Metrics(os.path.join(d, "out.prom"), os.path.join(d, "state.json"))
+        j = job(include=["*"], metrics=metrics)
+        j.db = "ooni"
+        j.ch = types.SimpleNamespace(rows=lambda sql, **kw: [
+            {"name": "fastpath", "engine": "MergeTree"}, {"name": "bad-name", "engine": "MergeTree"}])
+        j.running_backups = lambda: []
+        j.wait_for_clickhouse = lambda: None
+        j.backup_table = lambda *a: False
+        self.assertEqual(j.run([], False, ""), 1)
+        entry = metrics.state["tables"]["measurements/bad-name"]
+        self.assertEqual(entry["last_failed"], 1, "kept after the run: forget_tables mustn't drop it")
+
+
 if __name__ == "__main__":
     unittest.main()

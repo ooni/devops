@@ -238,9 +238,60 @@ logs.
 
 ClickHouse cancels running backups when it stops
 (`shutdown_wait_backups_and_restores` off, in `config.d/ooni_backup_shutdown.xml`),
-so it can be restarted at any time, e.g. for a security update, even during a
-full backup. ClickHouse reads that setting at startup only: after the role
-first installs it, restart ClickHouse once while no backup is running.
+so a restart during a full backup, e.g. for a security update, doesn't wait
+for the rest of the backup. It still waits for the files being uploaded, up
+to `backup_threads` (16) at once, to finish: ClickHouse can't interrupt a
+file's upload (24.8 and 25.8). At the bandwidth cap that can take minutes for
+the largest files; to see how large they are:
+
+```sql
+SELECT table, formatReadableSize(max(column_data_compressed_bytes)) AS largest
+FROM system.parts_columns WHERE database = 'ooni' AND active
+GROUP BY table ORDER BY max(column_data_compressed_bytes) DESC LIMIT 5
+```
+
+Neither `KILL QUERY` on the backup nor anything else interrupts those uploads
+either.
+
+Rebooting during a backup, e.g. for a security update: check
+`ooni_clickhouse_backup_running` or `system.backups`. If a backup is
+running, either reboot and let the stop wait for the files in flight, or,
+if that can't wait, kill ClickHouse. Nothing kills it automatically, on
+purpose: clickhouse-server.service keeps `TimeoutStopSec=infinity`, so the
+choice is the operator's. If a `systemctl stop` or the reboot is already
+waiting for ClickHouse, killing it lets that finish, and the unit isn't
+restarted:
+
+```bash
+sudo systemctl kill --signal=KILL clickhouse-server
+```
+
+MergeTree data survives this (parts are written atomically, and what's
+written is in the page cache), but inserts in progress fail, and ClickHouse
+takes longer to start. The backup recovers as from a restart: the run starts
+the table again; after a reboot, start a run as above.
+
+ClickHouse reads `shutdown_wait_backups_and_restores` at startup only: after
+the role first installs it, restart ClickHouse once while no backup is
+running.
+
+BACKUP can't resume a cancelled backup, so that table starts over:
+- ClickHouse restarted during a run: once it's back, the run starts the
+  cancelled table again (`ClickHouse restarted during the backup ... starting
+  it again` in the journal) and goes on with the others.
+- The host rebooted during a run: the run isn't finished. The next Sunday's
+  run backs up the tables it hadn't and removes what it left; nothing it had
+  backed up is lost. To finish sooner, start one: tables already backed up
+  this month get a small incremental.
+  ```bash
+  sudo systemctl start --no-block ooni-clickhouse-backup.service
+  ```
+  A run with `--full` or `--keep` (upgrades) has to be started again by hand
+  with the same options.
+
+The script connects to ClickHouse as the `backup` user, which can take
+backups but not restore them or change tables (grants in
+`group_vars/clickhouse/vars.yml`). Restore as admin.
 
 ### Setting up
 1. In the Cloudflare dashboard, create the R2 bucket `ooni-clickhouse-backup`
@@ -295,6 +346,16 @@ Alerts, in `alert_rules.yml`:
   days, e.g. since the role was deployed and before its first Sunday run.
 - `ClickHouseBackupHostLoadHigh`: data3's 5-minute load is over half its
   CPUs for 15 minutes.
+- `ClickHouseBackupDiskFilling`: during a backup, a disk of the host fills
+  within a day at the rate of the last 6 hours. A running `BACKUP` keeps the
+  parts it copies, so the space merges would free stays used until it ends.
+  If the disk would fill first, stop the backup and restart ClickHouse, which
+  cancels it, and start a run again later.
+- `ClickHouseReplicationLag` and `ClickHouseReplicaReadonly`, for any node of
+  the cluster: replication over 15 minutes behind for 30 minutes, or
+  read-only replicated tables. A backup on data3 shares its link with
+  replication fetches; if one is running, lower
+  `clickhouse_backup_max_bandwidth`.
 
 ```bash
 sudo systemctl status ooni-clickhouse-backup.service
@@ -303,8 +364,9 @@ sudo ooni-clickhouse-backup list
 ```
 
 The unit fails if any table fails; the others are still backed up. If the
-script is stopped, a `BACKUP` already sent keeps running inside ClickHouse.
-The next run refuses to start until it finishes:
+script is stopped while ClickHouse keeps running, a `BACKUP` already sent
+keeps running inside ClickHouse. The next run refuses to start until it
+finishes, or until a ClickHouse restart cancels it:
 
 ```sql
 SELECT id, status, start_time, error FROM system.backups ORDER BY start_time DESC LIMIT 10
@@ -315,12 +377,14 @@ A server can restore backups taken by the same or an older version, but not
 by a newer one. On 24.8, restoring a backup taken on 26.8 crashed the server
 (segfault in `restorePartFromBackup`). After an upgrade step that changes the
 on-disk format (25.8, 26.3), the only way back is restoring a backup taken
-before that step, so:
+before that step. Each host backs up only its own jobs' tables, so steps 2
+and 4 are for both data3 and data1: a host left out has no pinned restore
+point, and once its new chains are complete its pre-upgrade ones are pruned.
 
-1. Disable the timer with `clickhouse_backup_enabled: false` (or
+1. Disable the timers with `clickhouse_backup_enabled: false` (or
    `sudo systemctl stop ooni-clickhouse-backup.timer`) and check that
    `system.backups` shows nothing running.
-2. Take a pinned backup (incrementals, minutes):
+2. On data3 and on data1, take a pinned backup (incrementals, minutes):
    ```bash
    sudo ooni-clickhouse-backup run --keep pre-25.8.29.51
    ```
@@ -328,25 +392,17 @@ before that step, so:
    versions.
 4. Once the whole upgrade is confirmed good, and with the timer still
    disabled (once enabled, it may start a run straight away for a missed
-   Sunday), start new chains on the new version. That takes a day or more,
-   so run it as a service rather than in a shell:
+   Sunday), start new chains on the new version, on data3 and on data1.
+   That takes a day or more, so run it as a service rather than in a shell:
    ```bash
    sudo systemd-run --unit=ooni-clickhouse-backup-full -p TimeoutStartSec=infinity \
      -p SyslogIdentifier=ooni-clickhouse-backup /usr/local/bin/ooni-clickhouse-backup run --full
    sudo journalctl -f --identifier ooni-clickhouse-backup
    ```
-   When the journal shows `all tables backed up` for every job, unpin the
-- `ClickHouseBackupDiskFilling`: during a backup, a disk of the host fills
-  within a day at the rate of the last 6 hours. A running `BACKUP` keeps the
-  parts it copies, so the space merges would free stays used until it ends.
-  If the disk would fill first, stop the backup and restart ClickHouse, which
-  cancels it; `sudo ooni-clickhouse-backup resume` finishes the run later.
-- `ClickHouseReplicationLag` and `ClickHouseReplicaReadonly`, for any node of
-  the cluster: replication over 15 minutes behind for 30 minutes, or
-  read-only replicated tables. A backup on data3 shares its link with
-  replication fetches; if one is running, lower
-  `clickhouse_backup_max_bandwidth`.
-   old chains and re-enable the timer (`clickhouse_backup_enabled: true`):
+   When the journal shows `all tables backed up` for every job on both
+   hosts, unpin the old chains and re-enable the timers
+   (`clickhouse_backup_enabled: true`). `release` unpins the label on every
+   table in the bucket, data1's too, so run it on one host only:
    ```bash
    sudo ooni-clickhouse-backup release pre-25.8.29.51
    ```

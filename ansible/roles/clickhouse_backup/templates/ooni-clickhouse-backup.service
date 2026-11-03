@@ -9,6 +9,3 @@ ExecStart=/usr/local/bin/ooni-clickhouse-backup run
 SyslogIdentifier=ooni-clickhouse-backup
 # A new full backup of the largest tables takes more than a day
 TimeoutStartSec=infinity
-
-[Install]
-WantedBy=multi-user.target
