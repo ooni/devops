@@ -17,60 +17,106 @@ START = datetime(2026, 10, 23, 2, 30, tzinfo=timezone.utc)  # a Friday
 
 
 class FakeStore:
-    """The bucket: {chain: {"backups": {backup: complete}, "keep": [labels]}}"""
+    """The bucket. Backups under prod/: c = {chain: {"backups": {backup: complete}, "keep": []}}; under staging/:
+    staged = {(chain, backup): complete}, and pins = {chain: [labels]}. Each backup's objects are written at the time
+    its name says. With lock_s, prod/ has a lock rule: deleting anything younger is refused, and recorded."""
 
-    def __init__(self):
-        self.c = {}
+    def __init__(self, lock_s=0):
+        self.c, self.staged_, self.pins, self.lock_s, self.refused = {}, {}, {}, lock_s, []
+        self.prefix, self.staging = "prod", "staging"
 
-    def table_prefix(self, db, table):
-        return f"{db}/{table}/"
+    def table_prefix(self, db, table, staging=False):
+        return f"{'staging' if staging else 'prod'}/{db}/{table}/"
 
     def ch_s3(self, key):
         return f"'{key}'"
 
     def chains(self, db, table):
-        return {k: {"backups": dict(e["backups"]), "keep": list(e["keep"])} for k, e in self.c.items()}
+        out = {k: {"backups": dict(e["backups"]), "keep": list(e["keep"])} for k, e in self.c.items()}
+        for chain, labels in self.pins.items():
+            out.setdefault(chain, {"backups": {}, "keep": []})["keep"] += labels
+        return out
 
-    def delete_prefix(self, prefix):
+    def staged(self, db, table):
+        return sorted((c, b, ok) for (c, b), ok in self.staged_.items())
+
+    @staticmethod
+    def parse(prefix):
+        """(root, chain, backup or None)"""
         parts = prefix.rstrip("/").split("/")
-        if parts[-2] in self.c:  # one backup of a chain
-            self.c[parts[-2]]["backups"].pop(parts[-1], None)
-        else:
-            self.c.pop(parts[-1], None)
+        return (parts[0], parts[3], parts[4]) if len(parts) > 4 else (parts[0], parts[3], None)
+
+    def newest(self, prefix):
+        _, chain, b = self.parse(prefix)
+        names = [b] if b else list(self.c.get(chain, {"backups": {}})["backups"])
+        return max((backup.parse_ts(n) for n in names), default=None)
+
+    def move(self, src, dst):
+        _, chain, b = self.parse(src)
+        assert self.staged_[(chain, b)], "only complete backups are moved"
+        assert dst.startswith("prod/")
+        self.c.setdefault(chain, {"backups": {}, "keep": []})["backups"][b] = True
+        del self.staged_[(chain, b)]
         return 1
 
+    def delete_prefix(self, prefix):
+        root, chain, b = self.parse(prefix)
+        if root == "staging":
+            self.staged_.pop((chain, b), None)
+            return 1
+        newest = self.newest(prefix)
+        if self.lock_s and newest and newest + backup.timedelta(seconds=self.lock_s) > backup.utcnow():
+            self.refused.append(prefix)
+            raise RuntimeError(f"objects not deleted under {prefix}: ObjectLockedByBucketPolicy")
+        if b:
+            self.c[chain]["backups"].pop(b, None)
+        else:
+            self.c.pop(chain, None)
+        return 1
+
+    def exists(self, key):
+        _, chain, name = self.parse(key)
+        return name.startswith("KEEP-") and name[5:] in self.pins.get(chain, [])
+
     def put_empty(self, key):
-        pass
+        _, chain, name = self.parse(key)
+        assert key.startswith("staging/") and name.startswith("KEEP-"), key
+        self.pins.setdefault(chain, []).append(name[5:])
 
 
 class FakeClickHouse:
-    """Takes a backup, or fails one part-way: files uploaded, no .backup"""
+    """Takes a backup, or fails one part-way: files uploaded, no .backup. Records each incremental's base."""
 
     def __init__(self, store):
-        self.store, self.fail = store, False
+        self.store, self.fail, self.bases = store, False, []
 
     def query(self, sql, settings=None, timeout=600):
-        chain, name = sql.split("TO S3('")[1].split("'")[0].split("/")[-2:]
-        self.store.c.setdefault(chain, {"backups": {}, "keep": []})["backups"][name] = not self.fail
+        key = sql.split("TO S3('")[1].split("'")[0]
+        assert key.startswith("staging/"), "ClickHouse writes under staging/ only"
+        chain, name = key.split("/")[-2:]
+        if "base_backup" in sql:
+            self.bases.append(sql.split("base_backup = S3('")[1].split("'")[0])
+        self.store.staged_[(chain, name)] = not self.fail
         if self.fail:
             raise RuntimeError("BACKUP_FAILED")
         return json.dumps({"id": "op"})
 
 
-def new_job():
+def new_job(lock_days=0):
     job = backup.BackupJob.__new__(backup.BackupJob)
     job.db, job.name, job.keep_chains, job.settings = "ooni", "t", 2, {}
-    job.store = FakeStore()
+    job.lock_s = lock_days * 86400
+    job.store = FakeStore(job.lock_s)
     job.ch = FakeClickHouse(job.store)
     job.metrics = backup.Metrics()
     job.wait = lambda op, what: {"num_files": 1, "uncompressed_size": 1}
     return job
 
 
-def runs(every_days, until, failing=(), jitter=True, job=None):
-    """Back up a table at 02:30 UTC daily or on Sundays from START. Yields (day, full, complete chains)."""
+def runs(every_days, until, failing=(), jitter=True, job=None, start=START):
+    """Back up a table at 02:30 UTC daily or on Sundays from start. Yields (day, full, complete chains)."""
     job = job or new_job()
-    t, n = START, 0
+    t, n = start, 0
     while t < until:
         # a table's backup starts a few minutes earlier or later each time
         now = t + timedelta(minutes=9 if n % 2 else -7)
@@ -132,8 +178,9 @@ class TestSchedule(unittest.TestCase):
         job = new_job()
         list(runs(7, datetime(2026, 11, 20, tzinfo=timezone.utc), {"2026-11-15"}, job=job))
         nov = job.store.c[max(job.store.c)]["backups"]
-        self.assertEqual([b[:8] for b in sorted(nov)], ["20261101", "20261108", "20261115"])
-        self.assertFalse(nov[max(nov)], "the failed incremental: files but no .backup")
+        self.assertEqual([b[:8] for b in sorted(nov)], ["20261101", "20261108"])
+        (staged,) = job.store.staged("ooni", "obs_web")
+        self.assertEqual((staged[1][:8], staged[2]), ("20261115", False), "the failed incremental, in staging: no .backup")
         job.ch.fail = False
         sql = []
         query = job.ch.query
@@ -143,6 +190,7 @@ class TestSchedule(unittest.TestCase):
         nov = job.store.c[max(job.store.c)]["backups"]
         self.assertEqual([b[:8] for b in sorted(nov)], ["20261101", "20261108", "20261122"])
         self.assertIn("20261108", sql[0].split("base_backup")[1], "the incremental's base")
+        self.assertEqual(job.store.staged("ooni", "obs_web"), [], "the failed one removed from staging")
 
     def test_a_prune_cut_short_is_finished_by_the_next_run(self):
         # killed while deleting the oldest chain: its full's .backup went first (keys are deleted in order),
@@ -157,6 +205,49 @@ class TestSchedule(unittest.TestCase):
         self.assertFalse(job.backup_table("obs_web", "ReplicatedMergeTree", False, ""), "an incremental")
         self.assertEqual(sorted(job.store.c), ["20261004T023000Z", "20261101T023000Z"])
         self.assertEqual(sorted(job.store.c["20261101T023000Z"]["backups"]), ["20261101T023000Z", "20261108T023000Z"])
+
+
+class TestLockedBucket(unittest.TestCase):
+    """prod/ under a 45-day lock rule, as group_vars has it, over 14 months of weekly runs. Fulls fail on the first
+    Sunday of December and of May (taken again a week later), incrementals now and then."""
+
+    FAILING = {"2026-12-06", "2027-01-17", "2027-03-14", "2027-05-02", "2027-08-15", "2027-10-10"}
+
+    def setUp(self):
+        self.job = new_job(lock_days=45)
+        self.steps = list(runs(7, datetime(2028, 1, 1, tzinfo=timezone.utc), self.FAILING, job=self.job))
+
+    def test_no_delete_is_refused(self):
+        self.assertEqual(self.job.store.refused, [], "the script never deletes what the lock still holds")
+
+    def test_a_complete_chain_is_always_locked(self):
+        # its full can't be deleted with the hosts' key, so it can always be restored
+        for day, _, complete in self.steps:
+            now = datetime.fromisoformat(day).replace(tzinfo=timezone.utc)
+            locked = [c for c in complete if now - backup.parse_ts(c) < timedelta(days=45)]
+            self.assertTrue(locked, f"{day}: no complete chain younger than the lock: {complete}")
+
+    def test_the_old_chain_is_pruned_once_the_lock_lets_it(self):
+        for day, _, complete in self.steps:
+            self.assertLessEqual(len(complete), 3, day)
+            if day >= "2027-01-01" and int(day[8:]) >= 22:
+                self.assertEqual(len(complete), 2, f"{day}: {complete}")
+
+    def test_incrementals_are_based_on_the_locked_copy(self):
+        self.assertTrue(self.job.ch.bases)
+        self.assertTrue(all(b.startswith("prod/") for b in self.job.ch.bases), self.job.ch.bases[:3])
+
+    def test_staging_is_left_empty(self):
+        self.assertEqual(self.job.store.staged("ooni", "obs_web"), [], "the last run succeeded")
+
+    def test_a_pinned_chain_outlives_the_lock(self):
+        job = new_job(lock_days=45)
+        list(runs(7, datetime(2026, 11, 2, tzinfo=timezone.utc), job=job))
+        first = min(job.store.c)
+        job.store.pins[first] = ["release-x"]
+        list(runs(7, datetime(2027, 6, 1, tzinfo=timezone.utc), job=job, start=datetime(2026, 11, 8, 2, 30, tzinfo=timezone.utc)))
+        self.assertIn(first, job.store.c, "pinned: never pruned")
+        self.assertEqual(len([c for c in job.store.c if c != first]), 2)
 
 
 if __name__ == "__main__":

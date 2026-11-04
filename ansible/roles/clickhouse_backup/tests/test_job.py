@@ -126,16 +126,17 @@ class TestForget(unittest.TestCase):
 class TestStoreAndState(unittest.TestCase):
     def test_only_this_buckets_running_backups(self):
         j = job()
-        j.store = types.SimpleNamespace(ch_base="https://r2.example/ooni-clickhouse-backup", prefix="prod")
+        j.store = types.SimpleNamespace(ch_base="https://r2.example/ooni-clickhouse-backup", prefix="prod", staging="staging/prod")
         j.ch = types.SimpleNamespace(rows=lambda sql: [
-            {"id": "1", "name": "S3('https://r2.example/ooni-clickhouse-backup-private/prod/ooni/msmt_feedback/a/b')"},
-            {"id": "2", "name": "S3('https://r2.example/ooni-clickhouse-backup/prod/ooni/fastpath/a/b')"},
+            {"id": "1", "name": "S3('https://r2.example/ooni-clickhouse-backup-private/staging/prod/ooni/msmt_feedback/a/b')"},
+            {"id": "2", "name": "S3('https://r2.example/ooni-clickhouse-backup/staging/prod/ooni/fastpath/a/b')"},
+            {"id": "3", "name": "S3('https://r2.example/ooni-clickhouse-backup/staging/test/ooni/fastpath/a/b')"},
         ])
         self.assertEqual([r["id"] for r in j.running_backups()], ["2"])
 
     def test_objects_not_deleted_are_an_error(self):
         store = backup.Store.__new__(backup.Store)
-        store.bucket, store.prefix = "b", "prod"
+        store.bucket, store.prefix, store.staging = "b", "prod", "staging/prod"
         store.s3 = types.SimpleNamespace(
             get_paginator=lambda name: types.SimpleNamespace(paginate=lambda **kw: [{"Contents": [{"Key": "prod/ooni/t/c/x"}]}]),
             delete_objects=lambda **kw: {"Errors": [{"Key": "prod/ooni/t/c/x", "Code": "AccessDenied", "Message": "no"}]},
@@ -151,6 +152,78 @@ class TestStoreAndState(unittest.TestCase):
         m = backup.Metrics(os.path.join(d, "out.prom"), state)
         m.job_running("measurements", True)
         self.assertEqual(m.state["running"], {"measurements": 1})
+
+
+class MemoryS3:
+    """Enough of boto3's S3 client for Store: objects in a dict, every call logged. Keys under `locked` can't be
+    deleted or overwritten, as under a bucket lock."""
+
+    def __init__(self, objects, locked=()):
+        self.objects, self.locked, self.calls = dict(objects), tuple(locked), []
+
+    def get_paginator(self, name):
+        def paginate(Bucket, Prefix, Delimiter=None):
+            return [{"Contents": [{"Key": k, "Size": len(v), "LastModified": 0}
+                                  for k, v in sorted(self.objects.items()) if k.startswith(Prefix)]}]
+        return types.SimpleNamespace(paginate=paginate)
+
+    def copy(self, src, bucket, key, Config=None):
+        if key in self.objects and key.startswith(self.locked):
+            raise RuntimeError(f"ObjectLockedByBucketPolicy: {key}")
+        self.calls.append(("copy", key))
+        self.objects[key] = self.objects[src["Key"]]
+
+    def delete_object(self, Bucket, Key):
+        self.calls.append(("delete", Key))
+        self.objects.pop(Key, None)
+
+    def delete_objects(self, Bucket, Delete, **kw):
+        for o in Delete["Objects"]:
+            self.calls.append(("delete", o["Key"]))
+            self.objects.pop(o["Key"], None)
+        return {}
+
+
+class TestMove(unittest.TestCase):
+    SRC, DST = "staging/prod/ooni/t/c/b/", "prod/ooni/t/c/b/"
+
+    def store(self, objects):
+        store = backup.Store.__new__(backup.Store)
+        store.bucket, store.prefix, store.staging, store.transfer = "b", "prod", "staging/prod", None
+        store.s3 = MemoryS3(objects, locked=["prod/"])
+        return store
+
+    def test_a_backup_is_copied_backup_file_last_then_removed_backup_file_first(self):
+        store = self.store({self.SRC + ".backup": "m", self.SRC + "data/1": "aa", self.SRC + "data/2": "bbb"})
+        self.assertEqual(store.move(self.SRC, self.DST), 3)
+        self.assertEqual(set(store.s3.objects), {self.DST + ".backup", self.DST + "data/1", self.DST + "data/2"})
+        copies = [k for op, k in store.s3.calls if op == "copy"]
+        deletes = [k for op, k in store.s3.calls if op == "delete"]
+        self.assertEqual(copies[-1], self.DST + ".backup", "a copy is complete only once its .backup is there")
+        self.assertEqual(deletes[0], self.SRC + ".backup", "what a cut short delete leaves is incomplete")
+
+    def test_a_move_cut_short_is_finished_without_overwriting(self):
+        # the locked copy has one file already; copying it again would be refused
+        store = self.store({self.SRC + ".backup": "m", self.SRC + "data/1": "aa", self.SRC + "data/2": "bbb",
+                            self.DST + "data/1": "aa"})
+        store.move(self.SRC, self.DST)
+        self.assertEqual([k for op, k in store.s3.calls if op == "copy"], [self.DST + "data/2", self.DST + ".backup"])
+        self.assertFalse([k for k in store.s3.objects if k.startswith("staging/")])
+
+    def test_an_incomplete_backup_isnt_moved(self):
+        store = self.store({self.SRC + "data/1": "aa"})
+        with self.assertRaisesRegex(RuntimeError, "isn't a complete backup"):
+            store.move(self.SRC, self.DST)
+        self.assertEqual(store.s3.calls, [])
+
+    def test_a_copy_that_didnt_arrive_is_an_error_and_nothing_is_removed(self):
+        store = self.store({self.SRC + ".backup": "m", self.SRC + "data/1": "aa"})
+        copy = store.s3.copy
+        store.s3.copy = lambda src, b, key, Config=None: None if key.endswith("data/1") else copy(src, b, key, Config)
+        with self.assertRaisesRegex(RuntimeError, "1 objects of .* not copied"):
+            store.move(self.SRC, self.DST)
+        self.assertIn(self.SRC + "data/1", store.s3.objects)
+        self.assertNotIn(self.DST + ".backup", store.s3.objects, "not complete where it's locked")
 
 
 class TestNotBackedUp(unittest.TestCase):
