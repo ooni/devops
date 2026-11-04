@@ -589,6 +589,7 @@ resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
         "/api/v1/aggregation",
         "/api/v1/aggregation/*",
         "/api/v1/observations",
+        "/api/v1/observations/*",
         "/api/v1/analysis",
       ]
     }
