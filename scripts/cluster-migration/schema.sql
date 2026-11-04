@@ -264,7 +264,10 @@ CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints ON CLUSTER oonidata_cl
     `run_parameters` String,
     `created_at` DateTime64(3, 'UTC') DEFAULT now64()
 )
-ENGINE = MergeTree
+ENGINE = ReplicatedMergeTree (
+        '/clickhouse/{cluster}/tables/ooni/event_detector_v2_changepoints/{shard}',
+        '{replica}'
+)
 ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid);
 
 CREATE TABLE IF NOT EXISTS changepoint_label ON CLUSTER oonidata_cluster
