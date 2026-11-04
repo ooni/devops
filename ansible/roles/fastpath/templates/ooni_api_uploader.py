@@ -9,9 +9,12 @@ from pathlib import Path
 from pathlib import PosixPath as PP
 from datetime import datetime, timedelta
 from typing import List, Dict
+import fcntl
 import gzip
 import logging
+import re
 import tarfile
+import time
 import yaml
 
 import ujson
@@ -74,6 +77,72 @@ def upload_to_s3(s3, bucket_name: str, tarf: PP, s3path: str) -> None:
     obj = s3.Object(bucket_name, s3path)
     log.info(f"Uploading {s3path}")
     obj.put(Body=tarf.read_bytes())
+
+
+def first_free_can_index(s3, bucket_name: str, s3dir: str, basename: str) -> int:
+    """Index of the first can of this run for an hour, cc and test name.
+
+    Measurements for an hour can reach the spool after the hour has been
+    uploaded (a fastpath backlog, or the reuploader re-sending old
+    measurements, which keep their measurement_uid and so their hour). The
+    next run then finds the hour's directory again. Numbering its cans from 0
+    would overwrite the cans already on S3 for that hour, and the jsonl rows
+    pointing into them, so continue after the highest index already there.
+
+    s3dir is "raw/<YYYYMMDD>/<HH>/<cc>/<testname>/", basename
+    "<YYYYMMDDHH>_<cc>_<testname>.<identity>"
+    """
+    pattern = re.compile(re.escape(basename) + r"\.(\d+)\.(tar|jsonl)\.gz$")
+    highest = -1
+    paginator = s3.meta.client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=bucket_name, Prefix=s3dir):
+        for obj in page.get("Contents", []):
+            m = pattern.match(obj["Key"][len(s3dir) :])
+            if m:
+                highest = max(highest, int(m.group(1)))
+    return highest + 1
+
+
+def s3_key_exists(s3, bucket_name: str, s3path: str) -> bool:
+    try:
+        s3.meta.client.head_object(Bucket=bucket_name, Key=s3path)
+        return True
+    except s3.meta.client.exceptions.ClientError as e:
+        if e.response["Error"]["Code"] in ("404", "NoSuchKey", "NotFound"):
+            return False
+        raise
+
+
+def remove_hourdir_if_done(
+    hourdir: PP, tmp_max_age_s: int = 3600, empty_max_age_s: int = 86400
+) -> None:
+    """Clean up an hour's spool directory after its upload.
+
+    The fastpath can still write to it: a .post that arrived after the last
+    can was filled, or a .post.tmp being written, belongs to the next run.
+    Only stale temporary files, left by an interrupted write, are deleted.
+
+    The directory itself is removed only once it has been empty and without
+    writes for empty_max_age_s. The fastpath creates it (mkdir exist_ok) and
+    then writes into it: removing it right after an upload, when late writes
+    for the hour are most likely, could land between the two and make the
+    fastpath's write fail.
+    """
+    now = time.time()
+    for f in hourdir.iterdir():
+        if f.name.endswith(".tmp") and now - f.stat().st_mtime > tmp_max_age_s:
+            log.info(f"Deleting stale {f}")
+            f.unlink()
+    if any(hourdir.iterdir()):
+        log.info(f"Keeping {hourdir}: measurements arrived during the upload")
+        metrics.incr("hourdir_kept")
+        return
+    if now - hourdir.stat().st_mtime < empty_max_age_s:
+        return
+    try:
+        hourdir.rmdir()
+    except OSError:
+        pass  # written to since the check: the next run handles it
 
 
 @metrics.timer("fill_postcan")
@@ -160,6 +229,17 @@ def main():
     log.info(f"Uploader {collector_id} starting")
     assert collector_id, "collector_id is not set"
     log.info(f"Using bucket {bucket_name} and spool {spooldir}")
+    # minutes an hour's spool directory must go without writes before upload
+    quiet_s = 60 * int(conf.get("quiet_minutes", "5"))
+
+    # A run started by hand while the timer's run is in progress would pick
+    # the same can indexes. The timer itself never overlaps (Type=oneshot).
+    lockf = open(spooldir / "uploader.lock", "w")
+    try:
+        fcntl.flock(lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        log.info("Another uploader is running, exiting")
+        return
 
     s3 = create_s3_client(conf)
 
@@ -181,43 +261,67 @@ def main():
         if hourdir_time > threshold:
             log.info(f"Stopping before {hourdir_time}")
             break
+        # Uploaded hours stay as empty directories for a day (see
+        # remove_hourdir_if_done): clean those up without calling S3
+        if not any(f.suffix == ".post" for f in hourdir.iterdir()):
+            remove_hourdir_if_done(hourdir)
+            continue
+        # The hour being over does not mean its measurements have all been
+        # written: a fastpath backlog writes them later, and the reuploader
+        # writes into hours long past. Each write (.tmp, then rename to .post)
+        # updates the directory's mtime: wait until it has been quiet.
+        since_write = time.time() - hourdir.stat().st_mtime
+        if since_write < quiet_s:
+            log.info(f"Skipping {hourdir.name}: written {int(since_write)} s ago, waiting for {quiet_s} s without writes")
+            metrics.incr("hourdir_busy")
+            continue
 
         log.info(f"Processing {hourdir}")
-        # Split msmts across multiple postcans and jsonl files
-        can_cnt = 0
+        s3dir = f"raw/{tstamp[:8]}/{tstamp[8:10]}/{cc}/{testname}/"
+        # Split msmts across multiple postcans and jsonl files, numbered after
+        # any cans already uploaded for this hour
+        can_cnt = first_free_can_index(s3, bucket_name, s3dir, f"{hourdir.name}.{identity}")
+        if can_cnt:
+            log.warning(f"{hourdir.name} was already uploaded: new cans start at {can_cnt}")
+            metrics.incr("late_hour_count")
         while True:
-            # Compress raw POSTs into a tar.gz postcan
             postcanf = hourdir.with_suffix(f".{identity}.{can_cnt}.tar.gz")
             jsonlf = hourdir.with_suffix(f".{identity}.{can_cnt}.jsonl.gz")
+            postcan_s3path = s3dir + postcanf.name
+            jsonl_s3path = s3dir + jsonlf.name
+            # Never replace an object: a replaced can loses its measurements
+            # and leaves their jsonl rows pointing at other measurements
+            if s3_key_exists(s3, bucket_name, postcan_s3path) or s3_key_exists(
+                s3, bucket_name, jsonl_s3path
+            ):
+                log.error(f"{postcan_s3path} or its jsonl already exists, skipping index {can_cnt}")
+                metrics.incr("can_index_taken")
+                can_cnt += 1
+                continue
+            # Compress raw POSTs into a tar.gz postcan
             msmfiles = fill_postcan(hourdir, postcanf)
             if len(msmfiles) == 0:
                 break
-            # Also create jsonl file and delete msmt POSTs
+            # Also create the jsonl file
             lookup_list = fill_jsonl(msmfiles, jsonlf)
+
+            # Upload the postcan and jsonl to S3 and record where each
+            # measurement is. Delete the POSTs only once all of that worked:
+            # if it fails they stay in the spool and the next run uploads them
+            # under the next free index
+            try:
+                upload_to_s3(s3, bucket_name, postcanf, postcan_s3path)
+                upload_to_s3(s3, bucket_name, jsonlf, jsonl_s3path)
+                update_db_table(db_conn, lookup_list, jsonl_s3path)
+            finally:
+                postcanf.unlink()
+                jsonlf.unlink()
             delete_msmt_posts(msmfiles)
-
-            # Upload current postcan to S3
-            postcan_s3path = (
-                f"raw/{tstamp[:8]}/{tstamp[8:10]}/{cc}/{testname}/{postcanf.name}"
-            )
-            jsonl_s3path = (
-                f"raw/{tstamp[:8]}/{tstamp[8:10]}/{cc}/{testname}/{jsonlf.name}"
-            )
-
-            upload_to_s3(s3, bucket_name, postcanf, postcan_s3path)
-            upload_to_s3(s3, bucket_name, jsonlf, jsonl_s3path)
-            update_db_table(db_conn, lookup_list, jsonl_s3path)
-
-            postcanf.unlink()
-            jsonlf.unlink()
 
             can_cnt += 1
             metrics.incr("postcan_count")
 
-        # Delete whole hourly directory
-        for f in sorted(hourdir.iterdir()):
-            f.unlink()
-        hourdir.rmdir()
+        remove_hourdir_if_done(hourdir)
 
     log.info("Exiting")
 
