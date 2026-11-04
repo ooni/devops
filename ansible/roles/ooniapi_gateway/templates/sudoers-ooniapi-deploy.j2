@@ -1,0 +1,25 @@
+# Managed by ansible - roles/ooniapi_gateway/templates/sudoers-ooniapi-deploy.j2
+#
+# Exactly the commands tf/modules/ooniapi_service_deployer/files/deploy.py
+# runs over SSH as {{ ooniapi_gateway_deploy_user }}, an automated CI job, each
+# spelled out per service and slot. No wildcards: sudoers' "*" also matches
+# spaces, which would let extra arguments through.
+#
+# Sources are files the job just scp'd into {{ ooniapi_gateway_staging_dir }},
+# which only {{ ooniapi_gateway_deploy_user }} and root can read.
+{% set staging = ooniapi_gateway_staging_dir %}
+
+Cmnd_Alias OONIAPI_DEPLOY_SLOTS = \
+{% for s in ooniapi_gateway_services %}
+{% for slot in ['a', 'b'] %}
+    /usr/bin/install -m 600 -o root -g root {{ staging }}/{{ s.name }}-{{ slot }}.env /etc/ooniapi/{{ s.name }}/{{ slot }}.env, \
+    /usr/bin/install -m 644 -o root -g root {{ staging }}/{{ s.name }}-{{ slot }}.container /etc/containers/systemd/{{ s.name }}-{{ slot }}.container, \
+    /usr/bin/systemctl restart {{ s.name }}-{{ slot }}.service, \
+{% endfor %}
+    /usr/bin/mv {{ staging }}/{{ s.name }}-upstream.conf /etc/nginx/conf.d/{{ s.name }}-upstream.conf, \
+    /usr/bin/tee /etc/ooniapi/{{ s.name }}/active_slot{{ ", \\" if not loop.last else "" }}
+{% endfor %}
+
+Cmnd_Alias OONIAPI_DEPLOY_HOST = /usr/bin/systemctl daemon-reload, /usr/sbin/nginx -t, /usr/bin/systemctl reload nginx
+
+{{ ooniapi_gateway_deploy_user }} ALL=(root) NOPASSWD: OONIAPI_DEPLOY_SLOTS, OONIAPI_DEPLOY_HOST

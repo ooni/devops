@@ -1,0 +1,22 @@
+# Managed by ansible - roles/cadvisor
+[Unit]
+Description=cAdvisor
+After=podman.socket
+Wants=podman.socket
+
+[Service]
+# Containers only (--docker_only covers Podman's too), not every cgroup
+ExecStart={{ cadvisor_bin_path }} \
+  --listen_ip=127.0.0.1 --port={{ cadvisor_port }} \
+  --podman=unix:///run/podman/podman.sock \
+  --docker_only=true \
+  --store_container_labels=false \
+  --enable_metrics=cpu,memory,network,oom_event \
+  --housekeeping_interval=15s
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

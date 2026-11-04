@@ -76,3 +76,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "extra_ingress_cidrs" {
+  description = "Sources outside the VPC that may submit measurements (8472) and read the measurement spool (8475), e.g. the hosts the API services are deployed to blue/green."
+  type        = list(string)
+  default     = []
+}

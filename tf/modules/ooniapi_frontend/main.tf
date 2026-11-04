@@ -261,378 +261,151 @@ resource "aws_alb_listener_rule" "ooniapi_th" {
   tags = var.tags
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniauth_rule" {
+locals {
+  # routes.yaml is shared with the gateway on the Hetzner hosts
+  # (ansible/roles/ooniapi_gateway), so both serve the same routes
+  routes = yamldecode(file("${path.module}/routes.yaml"))
+
+  target_groups = {
+    ooniauth         = var.ooniapi_ooniauth_target_group_arn
+    oonirun          = var.ooniapi_oonirun_target_group_arn
+    ooniprobe        = var.ooniapi_ooniprobe_target_group_arn
+    ooniprobe_legacy = var.ooniapi_ooniprobe_legacy_target_group_arn
+    oonifindings     = var.ooniapi_oonifindings_target_group_arn
+    oonimeasurements = var.ooniapi_oonimeasurements_target_group_arn
+    testlists        = var.ooniapi_testlists_target_group_arn
+  }
+
+  listener_rules = { for r in local.routes : r.name => r }
+}
+
+resource "aws_lb_listener_rule" "route" {
+  for_each = local.listener_rules
+
   listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 108
+  priority     = each.value.priority
 
   action {
     type             = "forward"
-    target_group_arn = var.ooniapi_ooniauth_target_group_arn
+    target_group_arn = local.target_groups[each.value.service]
   }
 
-  condition {
-    path_pattern {
-      values = [
-        "/api/v2/ooniauth/*",
-        "/api/v1/user_register",
-        "/api/v1/user_login",
-        "/api/v1/user_refresh_token",
-        "/api/_/account_metadata",
-      ]
+  dynamic "condition" {
+    for_each = can(each.value.paths) ? [each.value.paths] : []
+    content {
+      path_pattern {
+        values = condition.value
+      }
+    }
+  }
+
+  dynamic "condition" {
+    for_each = try(each.value.direct_host, false) ? [each.value.service] : []
+    content {
+      host_header {
+        values = ["${condition.value}.${local.direct_domain_suffix}"]
+      }
+    }
+  }
+
+  dynamic "condition" {
+    for_each = can(each.value.http_header) ? [each.value.http_header] : []
+    content {
+      http_header {
+        http_header_name = condition.value.name
+        values           = condition.value.values
+      }
     }
   }
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniauth_rule_host" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 109
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_ooniauth_target_group_arn
-  }
-
-  condition {
-    host_header {
-      values = ["ooniauth.${local.direct_domain_suffix}"]
-    }
-  }
+# the rules were one resource each before routes.yaml
+moved {
+  from = aws_lb_listener_rule.ooniapi_ooniauth_rule
+  to   = aws_lb_listener_rule.route["ooniauth_rule"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_oonirun_rule" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 110
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_oonirun_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/api/v2/oonirun/*"]
-    }
-
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_ooniauth_rule_host
+  to   = aws_lb_listener_rule.route["ooniauth_rule_host"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_oonirun_rule_host" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 111
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_oonirun_target_group_arn
-  }
-
-  condition {
-    host_header {
-      values = ["oonirun.${local.direct_domain_suffix}"]
-    }
-  }
-
+moved {
+  from = aws_lb_listener_rule.ooniapi_oonirun_rule
+  to   = aws_lb_listener_rule.route["oonirun_rule"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 120
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/api/v2/ooniprobe/*",
-        "/api/v1/login",
-        "/api/v1/register",
-        "/api/v1/update/*",
-        "/api/v1/check-in*"
-      ]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_oonirun_rule_host
+  to   = aws_lb_listener_rule.route["oonirun_rule_host"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_2" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 121
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/api/v1/test-helpers*",
-        "/api/v1/test-list/urls",
-        "/report*",
-        "/api/_/show_countries_prioritization",
-        "/api/_/debug_prioritization"
-      ]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_ooniprobe_rule
+  to   = aws_lb_listener_rule.route["ooniprobe_rule"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3_legacy_version" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 122
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_ooniprobe_legacy_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/api/v1/manifest*",
-        "/api/v1/submit_measurement*",
-        "/api/v1/sign_credential*"
-      ]
-    }
-  }
-
-  condition {
-    http_header {
-      http_header_name = "X-Protocol-Version"
-      values           = ["0.1.0"]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_ooniprobe_rule_2
+  to   = aws_lb_listener_rule.route["ooniprobe_rule_2"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3_current_version" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 124
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/api/v1/manifest*",
-        "/api/v1/submit_measurement*",
-        "/api/v1/sign_credential*"
-      ]
-    }
-  }
-
-  # matches any value, but only when the header is present
-  condition {
-    http_header {
-      http_header_name = "X-Protocol-Version"
-      values           = ["*"]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_ooniprobe_rule_3_legacy_version
+  to   = aws_lb_listener_rule.route["ooniprobe_rule_3_legacy_version"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_3_no_version" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 126
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_ooniprobe_legacy_target_group_arn
-  }
-
-  # No X-Protocol-Version header at all: rules 122/124 above already
-  # matched every request that does carry the header, so anything left
-  # here is header-less and should go to the legacy service.
-  condition {
-    path_pattern {
-      values = [
-        "/api/v1/manifest*",
-        "/api/v1/submit_measurement*",
-        "/api/v1/sign_credential*"
-      ]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_ooniprobe_rule_4
+  to   = aws_lb_listener_rule.route["ooniprobe_rule_4"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_4" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 123
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/bouncer/net-tests*",
-        "/api/v1/geolookup*",
-        "/api/v1/collectors*",
-        "/api/v1/test-list/tor-targets",
-        "/api/v1/test-list/psiphon-config"
-      ]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_ooniprobe_rule_3_current_version
+  to   = aws_lb_listener_rule.route["ooniprobe_rule_3_current_version"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_ooniprobe_rule_host" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 125
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_ooniprobe_target_group_arn
-  }
-
-
-  condition {
-    host_header {
-      values = ["ooniprobe.${local.direct_domain_suffix}"]
-    }
-  }
-
+moved {
+  from = aws_lb_listener_rule.ooniapi_ooniprobe_rule_host
+  to   = aws_lb_listener_rule.route["ooniprobe_rule_host"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_oonifindings_rule" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 130
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_oonifindings_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/api/v1/incidents/*",
-      ]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_ooniprobe_rule_3_no_version
+  to   = aws_lb_listener_rule.route["ooniprobe_rule_3_no_version"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_oonifindings_rule_host" {
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 131
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_oonifindings_target_group_arn
-  }
-  condition {
-    host_header {
-      values = ["oonifindings.${local.direct_domain_suffix}"]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_oonifindings_rule
+  to   = aws_lb_listener_rule.route["oonifindings_rule"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_host" {
-  # hotfix: to allow us to deploy the frontend without the measurements service
-  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
-
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 139
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
-  }
-  condition {
-    host_header {
-      values = ["oonimeasurements.${local.direct_domain_suffix}"]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_oonifindings_rule_host
+  to   = aws_lb_listener_rule.route["oonifindings_rule_host"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_1" {
-  # hotfix: to allow us to deploy the frontend without the measurements service
-  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
-
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 140
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/api/v1/measurements/*",
-        "/api/v1/raw_measurement",
-        "/api/v1/measurement_meta",
-        "/api/v1/measurements",
-        "/api/v1/torsf_stats"
-      ]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_oonimeasurements_rule_host[0]
+  to   = aws_lb_listener_rule.route["oonimeasurements_rule_host"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_2" {
-  # hotfix: to allow us to deploy the frontend without the measurements service
-  count = var.ooniapi_oonimeasurements_target_group_arn != null ? 1 : 0
-
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 142
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/api/v1/aggregation",
-        "/api/v1/aggregation/*",
-        "/api/v1/observations",
-        "/api/v1/analysis",
-      ]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_oonimeasurements_rule_1[0]
+  to   = aws_lb_listener_rule.route["oonimeasurements_rule_1"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_oonimeasurements_rule_3" {
-
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 143
-
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_oonimeasurements_target_group_arn
-  }
-
-  condition {
-    path_pattern {
-      values = [
-        "/api/v1/detector/changepoints",
-      ]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_oonimeasurements_rule_2[0]
+  to   = aws_lb_listener_rule.route["oonimeasurements_rule_2"]
 }
 
-resource "aws_lb_listener_rule" "ooniapi_testlists_rule" {
-  # hotfix: to allow us to deploy the frontend without the testlists service
-  count        = var.ooniapi_testlists_target_group_arn != null ? 1 : 0
-  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
-  priority     = 144
+moved {
+  from = aws_lb_listener_rule.ooniapi_oonimeasurements_rule_3
+  to   = aws_lb_listener_rule.route["oonimeasurements_rule_3"]
+}
 
-  action {
-    type             = "forward"
-    target_group_arn = var.ooniapi_testlists_target_group_arn
-  }
-  condition {
-    path_pattern {
-      values = [
-        "/api/_/url-submission/test-list/*",
-        "/api/_/url-priorities/list",
-        "/api/_/url-priorities/update",
-        "/api/v1/url-submission/submit",
-        "/api/v1/url-submission/update-url",
-      ]
-    }
-  }
+moved {
+  from = aws_lb_listener_rule.ooniapi_testlists_rule[0]
+  to   = aws_lb_listener_rule.route["testlists_rule"]
 }

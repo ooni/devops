@@ -1,0 +1,45 @@
+# backend-hel runs the dev API services, deployed blue/green by their
+# deployers in tf/environments/dev (deploy_host_primary), behind the gateway
+# vhost of roles/ooniapi_gateway. It answers for the names the dev ALB
+# answers for; those keep pointing at the ALB until the DNS cutover.
+ooniapi_gateway_primary_domain: api.dev.ooni.io
+ooniapi_gateway_direct_domain_suffix: dev.ooni.io
+
+# testlists stays on its EC2 instance, which only serves plain HTTP: proxy it
+# over HTTPS through the dev ALB. testlists.dev.ooni.io must therefore stay on
+# the ALB at the cutover.
+ooniapi_gateway_testlists_upstream: testlists.dev.ooni.io
+
+# Ports must match ooniapi_deploy_ports in tf/environments/dev/main.tf.
+# Subnets: /28s of 10.250.0.0/24, which nothing else on the host may route
+# (check ip -4 route).
+ooniapi_gateway_services:
+  - {name: ooniprobe, host_port_a: 18011, host_port_b: 18012, subnet: 10.250.0.0/28}
+  - {name: oonirun, host_port_a: 18021, host_port_b: 18022, subnet: 10.250.0.16/28}
+  - {name: oonifindings, host_port_a: 18031, host_port_b: 18032, subnet: 10.250.0.32/28}
+  - {name: ooniauth, host_port_a: 18041, host_port_b: 18042, subnet: 10.250.0.48/28}
+  - {name: oonimeasurements, host_port_a: 18051, host_port_b: 18052, subnet: 10.250.0.64/28, valkey: true}
+
+# dev's caps: twice what it has on ECS, and a fifth of prod's CPU share
+ooniapi_gateway_slices:
+  - {name: ooniapi-dev, cpu_quota: 400%, memory_max: 4G, cpu_weight: 20}
+ooniapi_gateway_valkey_slice: ooniapi-dev.slice
+
+# The certificate for the dev names can only be issued once they resolve
+# here. At the cutover, after moving their DNS: add this line to
+# ssl_domains, run the playbook with --tags dehydrated, then set
+# ooniapi_gateway_cert_ready to true and run it again.
+#   - "api.dev.ooni.io ooniauth.dev.ooni.io ooniprobe.dev.ooni.io oonirun.dev.ooni.io oonifindings.dev.ooni.io oonimeasurements.dev.ooni.io"
+ssl_domains:
+  - "backend-hel.ooni.org"
+ooniapi_gateway_cert_ready: false
+
+# The deploy jobs log in with the private key in dev's
+# oonidevops/ooniapi/deploy_ssh_key secret (eu-central-1); its public half is
+# in the SSM parameter below. To rotate the pair:
+#   ssh-keygen -t ed25519 -N '' -C ooniapi-deploy-dev -f deploy_dev
+#   aws --profile oonidevops_user_dev --region eu-central-1 secretsmanager put-secret-value \
+#     --secret-id oonidevops/ooniapi/deploy_ssh_key --secret-string file://deploy_dev
+#   aws --profile oonidevops_user_dev --region eu-central-1 ssm put-parameter --overwrite \
+#     --name /oonidevops/ooniapi/deploy_ssh_public_key --type String --value "$(cat deploy_dev.pub)"
+ooniapi_gateway_deploy_ssh_public_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/ooniapi/deploy_ssh_public_key', profile='oonidevops_user_dev', region='eu-central-1') }}"

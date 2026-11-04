@@ -1,0 +1,10 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - aws s3 cp "s3://${DEPLOY_BUCKET}/${SERVICE_NAME}/deploy.py" /tmp/deploy.py
+
+  build:
+    commands:
+      - python3 /tmp/deploy.py
