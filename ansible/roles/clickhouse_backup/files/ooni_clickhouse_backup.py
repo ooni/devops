@@ -96,6 +96,8 @@ log = logging.getLogger("ooni-clickhouse-backup")
 
 DEFAULT_CONFIG = "/etc/ooni/clickhouse-backup.json"
 TS_FMT = "%Y%m%dT%H%M%SZ"
+# what R2 answers a write of an object its bucket lock holds
+LOCKED_BY_BUCKET = "ObjectLockedByBucketPolicy"
 SAFE_NAME = re.compile(r"^[A-Za-z0-9_]+$")
 # BACKUP stores only the schema of these engines, so their rows are exported
 EXPORT_ENGINES = {"EmbeddedRocksDB", "Join"}
@@ -255,7 +257,20 @@ class Store:
         todo = [n for n, size in objs.items() if have.get(n) != size and n != ".backup"]
 
         def copy(name):
-            self.s3.copy({"Bucket": self.bucket, "Key": src + name}, self.bucket, dst + name, Config=self.transfer)
+            try:
+                self.s3.copy({"Bucket": self.bucket, "Key": src + name}, self.bucket, dst + name, Config=self.transfer)
+            except Exception as e:
+                code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+                if LOCKED_BY_BUCKET not in (code + str(e)):
+                    raise
+                # there already, though the listing didn't show it: the lock
+                # refuses to overwrite it, and it needn't be if it's the same
+                there = self.s3.head_object(Bucket=self.bucket, Key=dst + name)["ContentLength"]
+                if there != objs[name]:
+                    raise RuntimeError(
+                        f"{dst}{name} is already there, locked, with {there} bytes instead of {objs[name]}: "
+                        f"delete {src} for the next run to take a new backup"
+                    ) from None
 
         def check(names):
             have = {k[len(dst):]: size for k, (size, _) in self.objects(dst).items()}

@@ -154,22 +154,35 @@ class TestStoreAndState(unittest.TestCase):
         self.assertEqual(m.state["running"], {"measurements": 1})
 
 
+class Locked(Exception):
+    """What boto3 raises for R2's 409"""
+    response = {"Error": {"Code": "ObjectLockedByBucketPolicy"}}
+
+
 class MemoryS3:
     """Enough of boto3's S3 client for Store: objects in a dict, every call logged. Keys under `locked` can't be
-    deleted or overwritten, as under a bucket lock."""
+    deleted or overwritten, as under a bucket lock. Keys in `unlisted` are missing from the first listing that would
+    show them, as if written just after it."""
 
-    def __init__(self, objects, locked=()):
-        self.objects, self.locked, self.calls = dict(objects), tuple(locked), []
+    def __init__(self, objects, locked=(), unlisted=()):
+        self.objects, self.locked, self.unlisted, self.calls = dict(objects), tuple(locked), set(unlisted), []
 
     def get_paginator(self, name):
         def paginate(Bucket, Prefix, Delimiter=None):
-            return [{"Contents": [{"Key": k, "Size": len(v), "LastModified": 0}
-                                  for k, v in sorted(self.objects.items()) if k.startswith(Prefix)]}]
+            keys = [k for k in sorted(self.objects) if k.startswith(Prefix)]
+            hidden = self.unlisted & set(keys)
+            self.unlisted -= hidden
+            return [{"Contents": [{"Key": k, "Size": len(self.objects[k]), "LastModified": 0}
+                                  for k in keys if k not in hidden]}]
         return types.SimpleNamespace(paginate=paginate)
+
+    def head_object(self, Bucket, Key):
+        return {"ContentLength": len(self.objects[Key])}
 
     def copy(self, src, bucket, key, Config=None):
         if key in self.objects and key.startswith(self.locked):
-            raise RuntimeError(f"ObjectLockedByBucketPolicy: {key}")
+            self.calls.append(("refused", key))
+            raise Locked(f"An error occurred (ObjectLockedByBucketPolicy) when calling the CopyObject operation")
         self.calls.append(("copy", key))
         self.objects[key] = self.objects[src["Key"]]
 
@@ -187,10 +200,10 @@ class MemoryS3:
 class TestMove(unittest.TestCase):
     SRC, DST = "staging/prod/ooni/t/c/b/", "prod/ooni/t/c/b/"
 
-    def store(self, objects):
+    def store(self, objects, unlisted=()):
         store = backup.Store.__new__(backup.Store)
         store.bucket, store.prefix, store.staging, store.transfer = "b", "prod", "staging/prod", None
-        store.s3 = MemoryS3(objects, locked=["prod/"])
+        store.s3 = MemoryS3(objects, locked=["prod/"], unlisted=unlisted)
         return store
 
     def test_a_backup_is_copied_backup_file_last_then_removed_backup_file_first(self):
@@ -209,6 +222,22 @@ class TestMove(unittest.TestCase):
         store.move(self.SRC, self.DST)
         self.assertEqual([k for op, k in store.s3.calls if op == "copy"], [self.DST + "data/2", self.DST + ".backup"])
         self.assertFalse([k for k in store.s3.objects if k.startswith("staging/")])
+
+    def test_an_object_copied_since_the_listing_is_taken_as_copied(self):
+        # the lock refuses the copy (409); the object there is the same size, so the move goes on
+        store = self.store({self.SRC + ".backup": "m", self.SRC + "data/1": "aa", self.DST + "data/1": "aa"},
+                           unlisted=[self.DST + "data/1"])
+        self.assertEqual(store.move(self.SRC, self.DST), 2)
+        self.assertIn(("refused", self.DST + "data/1"), store.s3.calls)
+        self.assertEqual(store.s3.objects[self.DST + ".backup"], "m")
+        self.assertFalse([k for k in store.s3.objects if k.startswith("staging/")])
+
+    def test_a_different_object_in_the_way_is_a_clear_error_and_nothing_is_removed(self):
+        store = self.store({self.SRC + ".backup": "m", self.SRC + "data/1": "aa", self.DST + "data/1": "a"})
+        with self.assertRaisesRegex(RuntimeError, "already there, locked, with 1 bytes instead of 2: delete staging/"):
+            store.move(self.SRC, self.DST)
+        self.assertIn(self.SRC + ".backup", store.s3.objects, "the staged backup is kept")
+        self.assertNotIn(self.DST + ".backup", store.s3.objects)
 
     def test_an_incomplete_backup_isnt_moved(self):
         store = self.store({self.SRC + "data/1": "aa"})
