@@ -70,14 +70,6 @@ resource "aws_route53_record" "explorer-dev-ooni-org-_CNAME_" {
   zone_id = local.dns_root_zone_ooni_org
 }
 
-# Google Workspace DKIM keys, exactly as Admin console > Apps > Google
-# Workspace > Gmail > Authenticate email shows them, each on one line.
-#
-# A DNS TXT string holds at most 255 bytes, so the records below split each
-# key into 255-character chunks with regexall() and join them with \"\". The
-# AWS provider sends that as one TXT record made of several strings, which
-# receivers concatenate. Do not put the chunks in separate list elements:
-# each element becomes its own TXT record, and DKIM fails.
 locals {
   google_dkim_ooni_org = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxrf/CaRZdg4PjQCtys4YM71kC8Qpi++r5xMdPHOVCFa3ovA+QxKS62QS0A+rvH2lZK36+fqDZYpJnNEaqKdhdOnO6muVqPKgRRDZkvDHLHcIiG3+fUIzARlfKoIOV6zdYWf99FmAYfcu5zLzxMVgz2v7oeIAj+T6swcjM22Z8uWSGDwGdPYXKr6FeismxlY/GBZ4lG5WRfJGf2Kreit9zV6aTg+CD84mQYutBhPVAsPvew8y12gn2aGCjWl3bVQHV8I63PCFKT2j9bUYIO3zLQ+ysxKxXfUBDDKUlpYV4UmXqG6qk6EWIdYc7cA6wE77CKMs8lp3XEgpGAo+pgxKWwIDAQAB"
   google_dkim_ooni_io  = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxrf/CaRZdg4PjQCtys4YM71kC8Qpi++r5xMdPHOVCFa3ovA+QxKS62QS0A+rvH2lZK36+fqDZYpJnNEaqKdhdOnO6muVqPKgRRDZkvDHLHcIiG3+fUIzARlfKoIOV6zdYWf99FmAYfcu5zLzxMVgz2v7oeIAj+T6swcjM22Z8uWSGDwGdPYXKr6FeismxlY/GBZ4lG5WRfJGf2Kreit9zV6aTg+CD84mQYutBhPVAsPvew8y12gn2aGCjWl3bVQHV8I63PCFKT2j9bUYIO3zLQ+ysxKxXfUBDDKUlpYV4UmXqG6qk6EWIdYc7cA6wE77CKMs8lp3XEgpGAo+pgxKWwIDAQAB"
@@ -91,6 +83,8 @@ resource "aws_route53_record" "_dmarc-ooni-org-_TXT_" {
   zone_id = local.dns_root_zone_ooni_org
 }
 
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_record#records-1
+# split each key into 255-character chunks with regexall() and join them with \"\".
 resource "aws_route53_record" "google-_domainkey-ooni-org-_TXT_" {
   name    = "google._domainkey.ooni.org"
   records = [join("\"\"", regexall(".{1,255}", local.google_dkim_ooni_org))]
@@ -507,6 +501,8 @@ resource "aws_route53_record" "_dmarc-ooni-io-_TXT_" {
   zone_id = local.dns_root_zone_ooni_io
 }
 
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_record#records-1
+# split each key into 255-character chunks with regexall() and join them with \"\".
 resource "aws_route53_record" "google-_domainkey-ooni-io-_TXT_" {
   name    = "google._domainkey.ooni.io"
   records = [join("\"\"", regexall(".{1,255}", local.google_dkim_ooni_io))]
