@@ -119,7 +119,7 @@ resource "aws_route53_record" "loghost-ooni-org-_CNAME_" {
 
 resource "aws_route53_record" "monitoring-ooni-org-_AAAA_" {
   name    = "monitoring.ooni.org"
-  records = ["a01:4f8:162:53e8::2"]
+  records = ["2a01:4f8:162:53e8::2"]
   ttl     = "1799"
   type    = "AAAA"
   zone_id = local.dns_root_zone_ooni_org
