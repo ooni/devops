@@ -70,9 +70,24 @@ resource "aws_route53_record" "explorer-dev-ooni-org-_CNAME_" {
   zone_id = local.dns_root_zone_ooni_org
 }
 
+locals {
+  google_dkim_ooni_org = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxrf/CaRZdg4PjQCtys4YM71kC8Qpi++r5xMdPHOVCFa3ovA+QxKS62QS0A+rvH2lZK36+fqDZYpJnNEaqKdhdOnO6muVqPKgRRDZkvDHLHcIiG3+fUIzARlfKoIOV6zdYWf99FmAYfcu5zLzxMVgz2v7oeIAj+T6swcjM22Z8uWSGDwGdPYXKr6FeismxlY/GBZ4lG5WRfJGf2Kreit9zV6aTg+CD84mQYutBhPVAsPvew8y12gn2aGCjWl3bVQHV8I63PCFKT2j9bUYIO3zLQ+ysxKxXfUBDDKUlpYV4UmXqG6qk6EWIdYc7cA6wE77CKMs8lp3XEgpGAo+pgxKWwIDAQAB"
+  google_dkim_ooni_io  = "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxrf/CaRZdg4PjQCtys4YM71kC8Qpi++r5xMdPHOVCFa3ovA+QxKS62QS0A+rvH2lZK36+fqDZYpJnNEaqKdhdOnO6muVqPKgRRDZkvDHLHcIiG3+fUIzARlfKoIOV6zdYWf99FmAYfcu5zLzxMVgz2v7oeIAj+T6swcjM22Z8uWSGDwGdPYXKr6FeismxlY/GBZ4lG5WRfJGf2Kreit9zV6aTg+CD84mQYutBhPVAsPvew8y12gn2aGCjWl3bVQHV8I63PCFKT2j9bUYIO3zLQ+ysxKxXfUBDDKUlpYV4UmXqG6qk6EWIdYc7cA6wE77CKMs8lp3XEgpGAo+pgxKWwIDAQAB"
+}
+
+resource "aws_route53_record" "_dmarc-ooni-org-_TXT_" {
+  name    = "_dmarc.ooni.org"
+  records = ["v=DMARC1; p=none; rua=mailto:admin@ooni.org"]
+  ttl     = "3600"
+  type    = "TXT"
+  zone_id = local.dns_root_zone_ooni_org
+}
+
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_record#records-1
+# split each key into 255-character chunks with regexall() and join them with \"\".
 resource "aws_route53_record" "google-_domainkey-ooni-org-_TXT_" {
   name    = "google._domainkey.ooni.org"
-  records = ["GBZ4lG5WRfJGf2Kreit9zV6aTg+CD84mQYutBhPVAsPvew8y12gn2aGCjWl3bVQHV8I63PCFKT2j9bUYIO3zLQ+ysxKxXfUBDDKUlpYV4UmXqG6qk6EWIdYc7cA6wE77CKMs8lp3XEgpGAo+pgxKWwIDAQAB", "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxrf/CaRZdg4PjQCtys4YM71kC8Qpi++r5xMdPHOVCFa3ovA+QxKS62QS0A+rvH2lZK36+fqDZYpJnNEaqKdhdOnO6muVqPKgRRDZkvDHLHcIiG3+fUIzARlfKoIOV6zdYWf99FmAYfcu5zLzxMVgz2v7oeIAj+T6swcjM22Z8uWSGDwGdPYXKr6FeismxlY/"]
+  records = [join("\"\"", regexall(".{1,255}", local.google_dkim_ooni_org))]
   ttl     = "3600"
   type    = "TXT"
   zone_id = local.dns_root_zone_ooni_org
@@ -478,10 +493,19 @@ resource "aws_route53_record" "explorer-ooni-io-_CNAME_" {
   zone_id = local.dns_root_zone_ooni_io
 }
 
+resource "aws_route53_record" "_dmarc-ooni-io-_TXT_" {
+  name    = "_dmarc.ooni.io"
+  records = ["v=DMARC1; p=none; rua=mailto:admin@ooni.org"]
+  ttl     = "3600"
+  type    = "TXT"
+  zone_id = local.dns_root_zone_ooni_io
+}
+
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route53_record#records-1
+# split each key into 255-character chunks with regexall() and join them with \"\".
 resource "aws_route53_record" "google-_domainkey-ooni-io-_TXT_" {
-  name = "google._domainkey.ooni.io"
-  records = ["v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxrf/CaRZdg4PjQCtys4YM71kC8Qpi++r5xMdPHOVCFa3ovA+QxKS62QS0A+rvH2lZK36+fqDZYpJnNEaqKdhdOnO6muVqPKgRRDZkvDHLHcIiG3+fUIzARlfKoIOV6zdYWf99FmAYfcu5zLzxMVgz2v7oeIAj+T6swcjM22Z8uWSGDwGdPYXKr6FeismxlY/",
-  "GBZ4lG5WRfJGf2Kreit9zV6aTg+CD84mQYutBhPVAsPvew8y12gn2aGCjWl3bVQHV8I63PCFKT2j9bUYIO3zLQ+ysxKxXfUBDDKUlpYV4UmXqG6qk6EWIdYc7cA6wE77CKMs8lp3XEgpGAo+pgxKWwIDAQAB"]
+  name    = "google._domainkey.ooni.io"
+  records = [join("\"\"", regexall(".{1,255}", local.google_dkim_ooni_io))]
   ttl     = "1799"
   type    = "TXT"
   zone_id = local.dns_root_zone_ooni_io
