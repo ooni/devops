@@ -44,21 +44,6 @@
     {
       "Effect": "Allow",
       "Action": [
-        "secretsmanager:GetResourcePolicy",
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret",
-        "secretsmanager:ListSecretVersionIds"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": "secretsmanager:ListSecrets",
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
         "ec2:Describe*",
         "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
         "elasticloadbalancing:DeregisterTargets",

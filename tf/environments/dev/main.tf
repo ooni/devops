@@ -523,41 +523,38 @@ resource "aws_security_group_rule" "elasticache_sg_rule" {
 #### OONI Probe service
 
 # For accessing the s3 bucket
-resource "aws_iam_role_policy" "ooniprobe_role" {
-  name = "${local.name}-task-role"
-  role = module.ooniapi_cluster.container_host_role.name
-
-  policy = <<EOF
-{
-	"Version": "2012-10-17",
-	"Statement": [
-		{
-			"Sid": "",
-			"Effect": "Allow",
-			"Action": "s3:PutObject",
-			"Resource": "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
-			},
-		{
-			"Sid": "",
-			"Effect": "Allow",
-			"Action": "s3:GetObject",
-			"Resource": "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
-		},
-		{
-  		"Sid": "",
-  		"Effect": "Allow",
-  		"Action": "s3:GetObject",
-  		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
-		},
-		{
-  		"Sid": "",
-  		"Effect": "Allow",
-  		"Action": "s3:ListBucket",
-  		"Resource": "${aws_s3_bucket.anoncred_manifests.arn}/*"
-		}
-	]
-}
-EOF
+# The S3 objects ooniprobe reads and writes: failed reports, its private
+# config, and the anonymous credentials manifests
+locals {
+  ooniprobe_s3_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.ooniprobe_failed_reports.arn}/*"
+      },
+      {
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
+      },
+      {
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.anoncred_manifests.arn}/*"
+      },
+      {
+        Sid      = ""
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = "${aws_s3_bucket.anoncred_manifests.arn}/*"
+      },
+    ]
+  })
 }
 
 module "ooniapi_ooniprobe_deployer" {
@@ -579,6 +576,8 @@ module "ooniapi_ooniprobe_deployer" {
 
 module "ooniapi_ooniprobe" {
   source = "../../modules/ooniapi_service"
+
+  task_role_policy = local.ooniprobe_s3_policy
 
   task_memory = 256
 
@@ -640,6 +639,8 @@ module "ooniapi_ooniprobe" {
 # version.
 module "ooniapi_ooniprobe_legacy" {
   source = "../../modules/ooniapi_service"
+
+  task_role_policy = local.ooniprobe_s3_policy
 
   # First run should be set on first run to bootstrap the task definition
   # first_run = true
