@@ -308,6 +308,17 @@ clickhouse_custom_users:
     quota: notebook
     databases: [ooni]
 
+  # Takes the backups (the clickhouse_backup role), with the grants below
+  - user:
+    name: backup
+    password_type: sha256_hash
+    password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_password', profile='oonidevops_user_prod') | hash('sha256') }}"
+    networks:
+      - "IP '127.0.0.1'"
+      - "IP '::1'"
+    profile:
+      - write
+
 clickhouse_role_manage_quotas: True
 clickhouse_custom_quotas:
   - quota:
@@ -384,6 +395,29 @@ clickhouse_custom_grants:
   privileges: [INSERT]
   to: [fastpath]
 
+# backup: BACKUP, plus what the clickhouse_backup role's script does around it.
+# SELECT, S3 and CREATE TEMPORARY TABLE export EmbeddedRocksDB and Join tables'
+# rows with s3(); REMOTE lists the cluster's tables. Restoring needs CREATE and
+# INSERT, so it's left to admin. Checked on 24.8 by the role's tests, which
+# grant these.
+- on:
+  databases: [ooni]
+  tables: ["*"]
+  privileges: [SELECT, BACKUP]
+  to: [backup]
+
+- on:
+  databases: ["*"]
+  tables: ["*"]
+  privileges: [S3, CREATE TEMPORARY TABLE, REMOTE]
+  to: [backup]
+
+- on:
+  databases: [system]
+  tables: [parts, backups]
+  privileges: [SELECT]
+  to: [backup]
+
 clickhouse_custom_grant_roles:
   - roles: [oonimeasurements]
     to: [oonimeasurements]
@@ -410,6 +444,25 @@ clickhouse_prometheus:
   events: true
   asynchronous_metrics: true
   status_info: true
+
+# For textfile metrics, e.g. from clickhouse_backup
+node_exporter_textfile_dir: /var/lib/node_exporter/textfile_collector
+
+# clickhouse_backup runs as the backup user, defined above with its grants
+clickhouse_backup_clickhouse_user: backup
+clickhouse_backup_clickhouse_password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_password', profile='oonidevops_user_prod') }}"
+# clickhouse_backup: Cloudflare R2. The endpoint names the account, so it's
+# kept in SSM with the token's keys.
+clickhouse_backup_s3_endpoint: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_endpoint', profile='oonidevops_user_prod') }}"
+clickhouse_backup_s3_access_key_id: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_access_key_id', profile='oonidevops_user_prod') }}"
+clickhouse_backup_s3_secret_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_secret_access_key', profile='oonidevops_user_prod') }}"
+# Plain MergeTree tables whose data only data1 holds (2026-10-20). Remove a
+# table from here once it's replicated, and data3 picks it up.
+clickhouse_backup_data1_tables:
+  - labeling_frames
+  - event_detector_cusums
+  - event_detector_v2_changepoints
+  - changepoint_label
 
 prometheus_nginx_proxy_config:
   - location: /metrics/node_exporter

@@ -42,6 +42,11 @@ route:
   # All the above attributes are inherited by all child routes and can
   # overwritten on each.
   routes:
+  # Notices of things that went right: Slack only, posted once
+  - receiver: slack-notice
+    match: {alertname: ClickHouseBackupCompleted}
+    group_by: ['alertname', 'instance', 'backup']
+    repeat_interval: 24h
   - receiver: team-email
     repeat_interval: 24h
     match: {severity: info}
@@ -69,6 +74,12 @@ receivers:
     title: '{% raw %}{{ template "slack.ooni.title" . }}{% endraw %}'
     channel: '#ooni-bots'
 
+- name: 'slack-notice' # no email, no "resolved" message
+  slack_configs:
+  - send_resolved: false
+    text: '{% raw %}{{ template "slack.ooni.text" . }}{% endraw %}'
+    title: '{% raw %}{{ template "slack.ooni.notice.title" . }}{% endraw %}'
+    channel: '#ooni-bots'
 - name: 'team-email' # no slack
   email_configs:
 {% for u in ['arturo', 'mehul'] %}

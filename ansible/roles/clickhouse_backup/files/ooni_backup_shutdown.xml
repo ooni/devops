@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- Installed by the clickhouse_backup role.
+     When stopping, cancel running backups rather than wait for them: a full
+     backup takes more than a day, and clickhouse-server.service has
+     TimeoutStopSec=infinity, so a restart (e.g. for a security update) would
+     hang until it finished. Cancelling still waits for the files being
+     uploaded (up to backup_threads, 16, at once) to finish: ClickHouse can't
+     interrupt one (checked on 24.8.6.70 and 25.8.33.6). The backup script
+     starts a cancelled table again once ClickHouse is back, or after a reboot.
+     Read at startup only: it takes effect from the next restart. -->
+<clickhouse>
+    <shutdown_wait_backups_and_restores>false</shutdown_wait_backups_and_restores>
+</clickhouse>

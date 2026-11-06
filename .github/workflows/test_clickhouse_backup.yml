@@ -1,0 +1,26 @@
+# Tests the ClickHouse backup role, its alerts and their Alertmanager routes
+# (ansible/roles/clickhouse_backup/tests), only when one of them changes
+name: Test ClickHouse backups
+on:
+  pull_request:
+    paths:
+      - "ansible/roles/clickhouse_backup/**"
+      - "ansible/roles/prometheus/files/alert_rules.yml"
+      - "ansible/roles/prometheus_alertmanager/**"
+      - ".github/workflows/test_clickhouse_backup.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ansible/roles/clickhouse_backup/**"
+      - "ansible/roles/prometheus/files/alert_rules.yml"
+      - "ansible/roles/prometheus_alertmanager/**"
+      - ".github/workflows/test_clickhouse_backup.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ansible-core python3-boto3
+      - run: ansible/roles/clickhouse_backup/tests/run.sh
