@@ -177,8 +177,8 @@ scrape_configs:
       format: [prometheus]
     static_configs:
       - targets:
+        # Not backend-hel: it runs Debian trixie, which has no netdata
         - backend-fsn.ooni.org:19999
-        - backend-hel.ooni.org:19999
 
   - job_name: 'ooni-api'
     scrape_interval: 5s
