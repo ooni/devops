@@ -458,11 +458,6 @@ clickhouse_backup_s3_access_key_id: "{{ lookup('amazon.aws.aws_ssm', '/oonidevop
 clickhouse_backup_s3_secret_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_backup_r2_secret_access_key', profile='oonidevops_user_prod') }}"
 # Plain MergeTree tables whose data only data1 holds (2026-10-20). Remove a
 # table from here once it's replicated, and data3 picks it up.
-clickhouse_backup_data1_tables:
-  - labeling_frames
-  - event_detector_cusums
-  - event_detector_v2_changepoints
-  - changepoint_label
 
 prometheus_nginx_proxy_config:
   - location: /metrics/node_exporter
