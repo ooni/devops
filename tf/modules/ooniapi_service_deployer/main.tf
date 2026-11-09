@@ -218,7 +218,7 @@ resource "aws_codepipeline" "ooniapi" {
           includes = [var.branch_name]
         }
         file_paths {
-          includes = [var.trigger_path]
+          includes = var.trigger_paths
           excludes = ["**/README.md"]
         }
       }

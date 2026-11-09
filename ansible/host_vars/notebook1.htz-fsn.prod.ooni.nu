@@ -126,8 +126,15 @@ ssh_users:
     keys:
       - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGXhLUbrRculj4wl4jxupwVBZhTUMhV6JtceRy0d6dvl siti.nurliza@sinarproject.org"
 
+  lucasdr:
+    login: lucasdr
+    comment: Lucas DR
+    keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCxx71qIThUNEDV6J0JEtlocg26psoBkHYYNc1aq8VGJ7djM6JFCDSRvzYl6NU4ZteEA2QzGktiXVCCJkctEgYsESsbzuLKb16VCu79vIlAEyAVsa6lNnla0v1PxhqejUA6SXRibHreGViwLL0MmKfL7sW+k0cjLHLMLbtyrngQk05yRI2bVnUNyIuel2F2CmcvYzofdICtAZTmvJx6dBO21pSEkXBbh8O/Dzv5aNsFi2gtPqvLBjKNUwTClkvKwRH8lE33QJ3M7Liisr0TJBpxxavVVMNTaQm/iphPvh20fMgmisNnhnQMmgRWblUI1YLTotYkEffPtAKMqyBclpf89anMRtoSJ5o7BdwE4BKW1WdnnKaO58EckAkUdBidMCMk/ovZCfZNGQ6WHpalxVgeFws40qGNfPMCugpEWb3Fvj61nwOvMfcoPojcTV1NJNKezDkjspTqbplpCJd7icelptrUQohxlrgY78IPBxRy4q/eUBX3aQx0QZjDFjDZX49KAULBd0JBJTNT0bOg5yTafrFUQQxavphq04DEYC9m47rvF613z5Lf/ktk3dk5coJfCCTKgPsjJqGL+KEslDnk+fLdHTA68NVMAFSuWcS6AjVlAB2625MDbguRPTDSGzzzqXLLPvQnKb20eC/dmIdcNSGr4Mlre3UdkD1ZH81b8Q== lucaslmdr@proton.me"
+
+
 admin_usernames: [ art, agrabeli, majakomel, mehul, norbel, luis, aagbsn]
-non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, dillon, lex, imap, sloncocs, aagbsn]
+non_admin_usernames: [ain, siti, ingrid, joss, vasilis, michael, benginoe, felixhoffmnn, snourin, agix, julia-blues, jonath8, johnbauer, toomore, dillon, lex, imap, sloncocs, aagbsn, lucasdr]
 jupyterhub_allowed_users: "{{ ssh_users }}"
 admin_group_name: admin
 

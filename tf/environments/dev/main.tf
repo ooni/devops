@@ -567,7 +567,7 @@ module "ooniapi_ooniprobe_deployer" {
   repo                    = "ooni/backend"
   branch_name             = "master"
   environment             = local.environment
-  trigger_path            = "ooniapi/services/ooniprobe/**"
+  trigger_paths           = ["ooniapi/services/ooniprobe/**", "ooniapi/common/**"]
   buildspec_path          = "ooniapi/services/ooniprobe/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
@@ -697,7 +697,7 @@ module "ooniapi_reverseproxy_deployer" {
   repo                    = "ooni/backend"
   branch_name             = "master"
   environment             = local.environment
-  trigger_path            = "ooniapi/services/reverseproxy/**"
+  trigger_paths           = ["ooniapi/services/reverseproxy/**"]
   buildspec_path          = "ooniapi/services/reverseproxy/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
@@ -989,7 +989,7 @@ module "fastpath_builder" {
   branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "fastpath/buildspec.yml"
-  trigger_path            = "fastpath/**"
+  trigger_paths           = ["fastpath/**"]
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
@@ -1005,7 +1005,7 @@ module "ooniapi_oonirun_deployer" {
   branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/oonirun/buildspec.yml"
-  trigger_path            = "ooniapi/services/oonirun/**"
+  trigger_paths           = ["ooniapi/services/oonirun/**", "ooniapi/common/**"]
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
@@ -1055,7 +1055,7 @@ module "ooniapi_oonifindings_deployer" {
   repo                    = "ooni/backend"
   branch_name             = "master"
   environment             = local.environment
-  trigger_path            = "ooniapi/services/oonifindings/**"
+  trigger_paths           = ["ooniapi/services/oonifindings/**", "ooniapi/common/**"]
   buildspec_path          = "ooniapi/services/oonifindings/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
@@ -1106,7 +1106,7 @@ module "ooniapi_ooniauth_deployer" {
   branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/ooniauth/buildspec.yml"
-  trigger_path            = "ooniapi/services/ooniauth/**"
+  trigger_paths           = ["ooniapi/services/ooniauth/**", "ooniapi/common/**"]
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
@@ -1130,7 +1130,6 @@ module "ooniapi_ooniauth" {
   ecs_cluster_id           = module.ooniapi_cluster.cluster_id
 
   task_secrets = {
-    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
@@ -1175,7 +1174,7 @@ module "ooniapi_oonimeasurements_deployer" {
   repo                    = "ooni/backend"
   branch_name             = "master"
   environment             = local.environment
-  trigger_path            = "ooniapi/services/oonimeasurements/**"
+  trigger_paths           = ["ooniapi/services/oonimeasurements/**", "ooniapi/common/**"]
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
@@ -1201,7 +1200,6 @@ module "ooniapi_oonimeasurements" {
   ecs_cluster_id           = module.oonitier1plus_cluster.cluster_id
 
   task_secrets = {
-    POSTGRESQL_URL              = data.aws_ssm_parameter.oonipg_url.arn
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
     CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_test_url.arn
@@ -1321,7 +1319,7 @@ module "testlists_builder" {
   branch_name             = "master"
   environment             = local.environment
   buildspec_path          = "ooniapi/services/testlists/buildspec.yml"
-  trigger_path            = "ooniapi/services/testlists/**"
+  trigger_paths           = ["ooniapi/services/testlists/**", "ooniapi/common/**"]
   codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
 
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
