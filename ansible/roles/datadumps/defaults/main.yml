@@ -12,4 +12,3 @@ datadumps_htpasswd_path: /etc/nginx/htpasswd_datadumps
 #   {"<username>": "<password>", ...}
 datadumps_users_ssm_path: /oonidevops/secrets/datadumps/users
 tls_cert_dir: /var/lib/dehydrated/certs
-nginx_user: nginx

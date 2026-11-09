@@ -242,6 +242,7 @@ def main() -> int:
     now = args.now or dt.datetime.now(dt.timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=dt.timezone.utc)
+    now = now.astimezone(dt.timezone.utc)
 
     out_dir: Path = args.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)

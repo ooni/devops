@@ -71,13 +71,6 @@
   tags:
     - datadumps
 
-# Basic auth
-- name: Install passlib for the htpasswd module
-  ansible.builtin.apt:
-    name: python3-passlib
-  tags:
-    - datadumps
-
 - name: Load datadumps users from SSM
   ansible.builtin.set_fact:
     datadumps_users: "{{ lookup('amazon.aws.aws_ssm', datadumps_users_ssm_path, profile='oonidevops_user_prod') | from_json }}"
@@ -105,10 +98,21 @@
     - datadumps
     - secrets
 
+# The file may not exist yet: empty user list in SSM, or --check on a first
+# deploy (the add task above doesn't create it in check mode)
+- name: Check for the datadumps basic auth file
+  ansible.builtin.stat:
+    path: "{{ datadumps_htpasswd_path }}"
+  register: datadumps_htpasswd_stat
+  tags:
+    - datadumps
+    - secrets
+
 - name: Read current datadumps basic auth users
   ansible.builtin.slurp:
     src: "{{ datadumps_htpasswd_path }}"
   register: datadumps_htpasswd
+  when: datadumps_htpasswd_stat.stat.exists
   no_log: true
   tags:
     - datadumps
@@ -123,6 +127,7 @@
     {{ (datadumps_htpasswd.content | b64decode).splitlines()
        | select | map('regex_replace', ':.*$', '')
        | difference(datadumps_users.keys() | list) }}
+  when: datadumps_htpasswd_stat.stat.exists
   no_log: true
   notify:
     - Reload nginx
