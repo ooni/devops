@@ -1,0 +1,144 @@
+---
+- name: Create datadumps user
+  ansible.builtin.user:
+    name: "{{ datadumps_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+  tags:
+    - datadumps
+
+- name: Create datadumps directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "0755"
+  loop:
+    - { path: "{{ datadumps_install_dir }}", owner: root }
+    - { path: "{{ datadumps_install_dir }}/queries", owner: root }
+    # nginx only needs read access
+    - { path: "{{ datadumps_output_dir }}", owner: "{{ datadumps_user }}" }
+  tags:
+    - datadumps
+
+- name: Install datadumps script
+  ansible.builtin.copy:
+    src: datadumps.py
+    dest: "{{ datadumps_install_dir }}/datadumps.py"
+    owner: root
+    group: root
+    mode: "0755"
+  tags:
+    - datadumps
+
+- name: Install datadumps queries
+  ansible.builtin.copy:
+    src: queries/
+    dest: "{{ datadumps_install_dir }}/queries/"
+    owner: root
+    group: root
+    mode: "0644"
+  tags:
+    - datadumps
+
+- name: Install datadumps systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - datadumps.service
+    - datadumps.timer
+  notify:
+    - Reload systemd
+  tags:
+    - datadumps
+
+- name: Flush handlers so systemd sees the new units
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - datadumps
+
+- name: Enable and start datadumps timer
+  ansible.builtin.systemd_service:
+    name: datadumps.timer
+    state: started
+    enabled: true
+  tags:
+    - datadumps
+
+# Basic auth
+- name: Install passlib for the htpasswd module
+  ansible.builtin.apt:
+    name: python3-passlib
+  tags:
+    - datadumps
+
+- name: Load datadumps users from SSM
+  ansible.builtin.set_fact:
+    datadumps_users: "{{ lookup('amazon.aws.aws_ssm', datadumps_users_ssm_path, profile='oonidevops_user_prod') | from_json }}"
+  no_log: true
+  tags:
+    - datadumps
+    - secrets
+
+- name: Add datadumps basic auth users
+  community.general.htpasswd:
+    path: "{{ datadumps_htpasswd_path }}"
+    name: "{{ item.key }}"
+    password: "{{ item.value }}"
+    crypt_scheme: bcrypt
+    owner: root
+    group: "{{ nginx_user }}"
+    mode: "0640"
+  loop: "{{ datadumps_users | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  no_log: true
+  notify:
+    - Reload nginx
+  tags:
+    - datadumps
+    - secrets
+
+- name: Read current datadumps basic auth users
+  ansible.builtin.slurp:
+    src: "{{ datadumps_htpasswd_path }}"
+  register: datadumps_htpasswd
+  no_log: true
+  tags:
+    - datadumps
+    - secrets
+
+- name: Remove datadumps basic auth users no longer in SSM
+  community.general.htpasswd:
+    path: "{{ datadumps_htpasswd_path }}"
+    name: "{{ item }}"
+    state: absent
+  loop: >-
+    {{ (datadumps_htpasswd.content | b64decode).splitlines()
+       | select | map('regex_replace', ':.*$', '')
+       | difference(datadumps_users.keys() | list) }}
+  no_log: true
+  notify:
+    - Reload nginx
+  tags:
+    - datadumps
+    - secrets
+
+- name: Setup datadumps nginx config
+  ansible.builtin.template:
+    src: nginx-datadumps.j2
+    dest: /etc/nginx/sites-enabled/02-datadumps
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload nginx
+  tags:
+    - datadumps
+    - config

@@ -1,0 +1,12 @@
+# ansible-managed in ooni/devops.git (roles/datadumps)
+[Unit]
+Description=Hourly data dumps check for {{ datadumps_domain }}
+
+[Timer]
+# The script decides what is due; running hourly makes it self-healing.
+OnCalendar=*-*-* *:05:00
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

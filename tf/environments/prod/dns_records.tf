@@ -775,6 +775,14 @@ resource "aws_route53_record" "notebook-ooni-org-_A_" {
   zone_id = local.dns_root_zone_ooni_org
 }
 
+resource "aws_route53_record" "datadumps-ooni-io-_A_" {
+  name    = "datadumps.ooni.io"
+  records = ["138.201.19.39"]
+  ttl     = "60"
+  type    = "A"
+  zone_id = local.dns_root_zone_ooni_io
+}
+
 resource "aws_route53_record" "notebook1-htz-fsn-prod-ooni-nu-_a_" {
   name    = "notebook1.htz-fsn.prod.ooni.nu"
   records = ["138.201.19.39"]
