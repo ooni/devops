@@ -1,19 +1,16 @@
 -- The tables and views of the ooni database, as production has them (dumped from every replica on
--- 2026-10-20 after asnmeta was made replicated again on data1, OOPRIV-181). Create the database on every
--- node, then load this file into it:
+-- 2026-11-09). Create the database on every node, then load this file into it:
 --   clickhouse-client -q "CREATE DATABASE IF NOT EXISTS ooni ON CLUSTER oonidata_cluster"
 --   clickhouse-client --database ooni --multiquery < schema.sql
 -- Any database name works, e.g. for CI: ON CLUSTER creates each table in the client's database on every
 -- node, and the Keeper paths include {database}, so a second database on the same cluster doesn't share
 -- production's replicas.
 -- Where the replicas differ, this is the definition of the replica that holds the data:
---   event_detector_cusums, labeling_frames: data1 (the only replica with rows, and with their newer columns)
 --   fastpath: data1 and data3 (data2 alone has deduplicate_merge_projection_mode = 'rebuild')
--- event_detector_cusums, event_detector_v2_changepoints, labeling_frames and changepoint_label are not
--- replicated: ON CLUSTER creates an empty local table on each node, as production has them.
+-- changepoint_label is not replicated: ON CLUSTER creates an empty local table on each node, as
+-- production has it.
 -- Not included: the updaters' *_tmp tables (recreated on every run), msmt_feedback_old (superseded by
--- msmt_feedback), session_expunge (unused since backend #972) and the leftover inner table of the dropped
--- counters_test_list view.
+-- msmt_feedback) and session_expunge (unused since backend #972).
 
 CREATE TABLE IF NOT EXISTS analysis_web_measurement ON CLUSTER oonidata_cluster
 (
@@ -155,7 +152,7 @@ CREATE TABLE IF NOT EXISTS event_detector_cusums ON CLUSTER oonidata_cluster
     `tls_blocked_last_change` Int8 DEFAULT 0,
     `tls_blocked_last_ts` Nullable(DateTime64(3, 'UTC'))
 )
-ENGINE = ReplacingMergeTree(ts)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/event_detector_cusums/{shard}', '{replica}', ts)
 ORDER BY (probe_asn, probe_cc, domain)
 SETTINGS index_granularity = 8192;
 
@@ -176,7 +173,7 @@ CREATE TABLE IF NOT EXISTS event_detector_v2_changepoints ON CLUSTER oonidata_cl
     `run_parameters` String,
     `created_at` DateTime64(3, 'UTC') DEFAULT now64()
 )
-ENGINE = MergeTree
+ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/event_detector_v2_changepoints/{shard}', '{replica}')
 ORDER BY (ts_hour, domain, layer, probe_cc, probe_asn, resolver_asn, state, uuid)
 SETTINGS index_granularity = 8192;
 
@@ -302,7 +299,7 @@ CREATE TABLE IF NOT EXISTS labeling_frames ON CLUSTER oonidata_cluster
     `analysis_query` LowCardinality(String),
     `failed_fastpath` Bool
 )
-ENGINE = MergeTree
+ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/labeling_frames/{shard}', '{replica}')
 ORDER BY (stratum, measurement_uid)
 SETTINGS index_granularity = 8192;
 
