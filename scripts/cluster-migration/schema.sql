@@ -1,5 +1,5 @@
 -- The tables and views of the ooni database, as production has them (dumped from every replica on
--- 2026-11-05). Create the database on every node, then load this file into it:
+-- 2026-11-09). Create the database on every node, then load this file into it:
 --   clickhouse-client -q "CREATE DATABASE IF NOT EXISTS ooni ON CLUSTER oonidata_cluster"
 --   clickhouse-client --database ooni --multiquery < schema.sql
 -- Any database name works, e.g. for CI: ON CLUSTER creates each table in the client's database on every
