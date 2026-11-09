@@ -461,6 +461,13 @@ clickhouse_backup_s3_secret_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonid
 # replicated now). Add a table here if one is created on data1 only.
 clickhouse_backup_data1_tables: []
 
+# The bucket's lock rule on prod/ (docs/Runbooks.md). The newest complete
+# chain's full stays locked until the next month's full has been moved: up to
+# 5 weeks and 30 hours later, or a week more if that full fails once.
+clickhouse_backup_s3_lock_days: 45
+# Plain MergeTree tables whose data only data1 holds (2026-10-20). Remove a
+# table from here once it's replicated, and data3 picks it up.
+
 prometheus_nginx_proxy_config:
   - location: /metrics/node_exporter
     proxy_pass: http://127.0.0.1:8100/metrics

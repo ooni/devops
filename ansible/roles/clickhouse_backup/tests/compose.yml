@@ -1,5 +1,6 @@
 # The backup's environment: ClickHouse at production's version, MinIO in place
-# of R2, the backup script in "runner", node_exporter reading its textfile,
+# of R2 behind lockproxy (an R2 bucket lock rule on one bucket), the backup
+# script in "runner", node_exporter reading its textfile,
 # Prometheus with the repo's alert rules, Alertmanager with the repo's routes,
 # and a stand-in for Slack. run.sh renders work/ first.
 name: chbackup-test
@@ -11,6 +12,18 @@ services:
       MINIO_ROOT_USER: testkey
       MINIO_ROOT_PASSWORD: testsecret123
     ports: ["127.0.0.1:19910:9000"]
+
+  # ClickHouse and the script reach MinIO through it; it locks objects under
+  # ooni-clickhouse-backup-locked/prod/ for 150 s after they're written
+  lockproxy:
+    image: docker.io/library/python:3.11-slim-bookworm
+    command: [python3, -u, /lockproxy.py]
+    environment:
+      LOCK_PREFIX: /ooni-clickhouse-backup-locked/prod/
+      LOCK_SECONDS: "150"
+    volumes:
+      - ./lockproxy.py:/lockproxy.py:ro,z
+    ports: ["127.0.0.1:19914:9000"]
 
   # data3, the node the backups run against
   clickhouse:

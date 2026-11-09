@@ -197,7 +197,8 @@ When a data1-only table becomes replicated, remove it from
 - Each table has its own chain: a full backup, then weekly incrementals, each
   on top of the one before. A table starts a new chain with its first backup
   of each calendar month (UTC): the first Sunday of the month.
-  Once a new chain is complete, older chains are deleted unless pinned.
+  Once a new chain is complete, older chains are deleted unless pinned,
+  as soon as the bucket's lock lets them go (see "Bucket lock" below).
 - EmbeddedRocksDB and Join tables (`test_groups`): `BACKUP` saves only their
   schema, so their rows are also exported to `data.native.zst` inside each
   backup.
@@ -223,9 +224,41 @@ When a data1-only table becomes replicated, remove it from
 Layout in the bucket:
 
 ```
-prod/ooni/<table>/<chain>/<backup>/          native backup (first one is full)
-prod/ooni/<table>/<chain>/KEEP-<label>       pinned chain, never pruned
+prod/ooni/<table>/<chain>/<backup>/                  native backup (first one is full)
+staging/prod/ooni/<table>/<chain>/<backup>/          a backup being written, or moved
+staging/prod/ooni/<table>/<chain>/KEEP-<label>       pinned chain, never pruned
 ```
+
+### Bucket lock
+The bucket has an R2 lock rule on `prod/`: nothing there can be deleted or
+overwritten until it's 45 days old (`clickhouse_backup_s3_lock_days`). The
+hosts' R2 token, which pruning needs, therefore can't remove recent backups,
+whether by a bug, a mistyped prefix or a compromised host. Changing the rule
+takes an admin token, which the hosts don't have: their token is Object Read
+& Write, which R2 accepts on its S3 API only, not on the API that manages
+lock rules.
+
+ClickHouse can't write a backup under the lock: it deletes a `.lock` file of
+its own at the end of every backup, and a refused delete fails the backup.
+So each backup is written under `staging/`, which the rule doesn't cover, and
+once it's complete the script copies it to `prod/` within R2 (no traffic
+through the host), `.backup` last, checks that every object arrived, and
+deletes it from `staging/` (`moved to prod/` in the journal). Each
+incremental is based on the copy under `prod/`, so every chain restores from
+`prod/` alone. A move cut short is finished by the next run. A backup's copy
+is twice the space only while it's being moved.
+
+Why 45 days: the newest complete chain's full must stay locked until the
+next month's full has been moved, up to 5 weeks and 30 hours later, or a week
+more if that full fails once. Pruning waits until every object of a chain is
+past the lock (`locked until ... pruning it then` in the journal), so the old
+chain is deleted around the third Sunday of the month instead of the first,
+and three chains are kept until then. A chain is never deleted in part.
+
+What a stolen token can still do: delete what's past the lock (chains older
+than the two kept, and the older full once it's over 45 days old),
+anything under `staging/` (a backup being written, and pins, so a pinned
+chain could be pruned once past the lock), and write new objects (cost).
 
 Never put S3 keys in `BACKUP`/`RESTORE`/`s3()` queries: an incremental
 backup stores its `base_backup` argument, keys included, in plain text in
@@ -297,6 +330,18 @@ backups but not restore them or change tables (grants in
 1. In the Cloudflare dashboard, create the R2 bucket `ooni-clickhouse-backup`
    (location hint: Western Europe), and an R2 API token with Object Read &
    Write on it.
+   Add a bucket lock rule in the bucket's settings: prefix
+   `prod/`, retention 45 days. Or with the API, with a token that can edit
+   R2 bucket configuration, used from your machine and not stored:
+   ```bash
+   curl -X PUT "https://api.cloudflare.com/client/v4/accounts/<account id>/r2/buckets/ooni-clickhouse-backup/lock" \
+     -H "Authorization: Bearer <admin API token>" -H "Content-Type: application/json" \
+     -d '{"rules": [{"id": "prod-45d", "enabled": true, "prefix": "prod/",
+          "condition": {"type": "Age", "maxAgeSeconds": 3888000}}]}'
+   ```
+   The rule must not cover `staging/`. It applies to objects already under
+   `prod/` too. A bucket with a lock rule can't be emptied or deleted until
+   the rule is removed.
 2. Store the S3 endpoint (`https://<account id>.r2.cloudflarestorage.com`) and
    the token's keys in SSM as
    `/oonidevops/secrets/clickhouse_backup_r2_endpoint`,
@@ -400,7 +445,8 @@ point, and once its new chains are complete its pre-upgrade ones are pruned.
    sudo journalctl -f --identifier ooni-clickhouse-backup
    ```
    When the journal shows `all tables backed up` for every job on both
-   hosts, unpin the old chains and re-enable the timers
+   hosts, unpin the old chains (the next runs prune them once they're past
+   the bucket's lock) and re-enable the timers
    (`clickhouse_backup_enabled: true`). `release` unpins the label on every
    table in the bucket, data1's too, so run it on one host only:
    ```bash
@@ -434,8 +480,10 @@ config.
 ### Restoring
 The target server needs `ooni_backup_s3.xml` in `config.d` (the role
 installs it). `ooni-clickhouse-backup list` prints the latest backup URL of
-each table. Restoring the latest incremental restores the whole chain. Run
-the queries as admin: the `backup` user can't restore.
+each table, under `prod/`. Restoring the latest incremental restores the whole
+chain. Run the queries as admin: the `backup` user can't restore. A backup
+`list` shows as `staging: complete, not yet moved` (a run stopped while
+moving it) restores from its `staging/` URL too; the next run moves it.
 
 1. The database isn't part of a table backup:
    ```sql

@@ -10,6 +10,9 @@ In order:
      the run takes the full again and prunes the oldest chain; the full restores
   7. a full interrupted by killing ClickHouse, as the runbook says to for an urgent reboot: the
      run removes what the killed backup left and takes it again
+  8. a bucket with a lock rule on prod/ (lockproxy): each backup is written under staging/ and moved
+     there, the hosts' key can't delete it, and a chain past keep_chains is pruned only once it's
+     past the lock; the incremental restores from prod/
 Prints each check; exits 1 at the first failure."""
 import json
 import os
@@ -25,9 +28,15 @@ import boto3
 HERE = os.path.dirname(os.path.abspath(__file__))
 COMPOSE = shlex.split(os.environ.get("COMPOSE", "docker compose")) + ["-f", os.path.join(HERE, "compose.yml")]
 MEASUREMENTS = "ooni-clickhouse-backup"
+LOCKED = "ooni-clickhouse-backup-locked"  # lockproxy locks prod/ in it for 150 s, the script waits 155
 DATA3 = "data3.htz-fsn.prod.ooni.nu"  # the instance label prometheus.yml gives the textfile
 s3 = boto3.client(
     "s3", endpoint_url="http://127.0.0.1:19910", region_name="us-east-1",
+    aws_access_key_id="testkey", aws_secret_access_key="testsecret123",
+)
+# the same key, the hosts', through the lock
+s3_locked = boto3.client(
+    "s3", endpoint_url="http://127.0.0.1:19914", region_name="us-east-1",
     aws_access_key_id="testkey", aws_secret_access_key="testsecret123",
 )
 
@@ -119,10 +128,12 @@ def setup():
     wait_for("ClickHouse", lambda: ch("SELECT 1") == "1")
     wait_for("ClickHouse's other node", lambda: ch("SELECT 1", port=19912) == "1")
     wait_for("MinIO", lambda: http("http://127.0.0.1:19910/minio/health/live") == "")
+    wait_for("the lock proxy", lambda: http("http://127.0.0.1:19914/minio/health/live") == "")
     wait_for("Prometheus", lambda: "Ready" in http("http://127.0.0.1:19990/-/ready"))
     wait_for("Alertmanager", lambda: "OK" in http("http://127.0.0.1:19993/-/ready"))
     wait_for("Slack stand-in", lambda: http("http://127.0.0.1:19980/") == "[]")
     s3.create_bucket(Bucket=MEASUREMENTS)
+    s3.create_bucket(Bucket=LOCKED)
     for sql in [
         "CREATE DATABASE ooni",
         "CREATE TABLE ooni.fastpath (measurement_uid String, input String, anomaly LowCardinality(String)) "
@@ -181,7 +192,7 @@ def digest(table):
 
 
 def backup_url(bucket, table, chain, name):
-    return f"http://minio:9000/{bucket}/prod/ooni/{table}/{chain}/{name}"
+    return f"http://lockproxy:9000/{bucket}/prod/ooni/{table}/{chain}/{name}"
 
 
 def test_incremental_and_restore():
@@ -251,7 +262,7 @@ def test_restart_during_full():
     delete_prefix(MEASUREMENTS, f"prod/ooni/obs_web/{chain}/")
 
     run = run_in_background("slow", "run", "--table", "obs_web")
-    wait_for("the new full's first files", lambda: set(chains(MEASUREMENTS, "obs_web")) - {old, previous}, 60)
+    wait_for("the new full's first files, under staging/", lambda: keys(MEASUREMENTS, "staging/prod/ooni/obs_web/"), 60)
     t0 = time.monotonic()
     # a clean stop, given time to wait for the backup if it were going to
     subprocess.run(COMPOSE + ["restart", "-t", "300", "clickhouse"], check=True, capture_output=True)
@@ -274,17 +285,50 @@ def test_killed_during_full():
     print("== 7. ClickHouse killed during a full")
     before = set(chains(MEASUREMENTS, "obs_web"))
     run = run_in_background("slow", "run", "--full", "--table", "obs_web")
-    wait_for("obs_web's full under way", lambda: set(chains(MEASUREMENTS, "obs_web")) - before, 60)
+    wait_for("obs_web's full under way, under staging/", lambda: keys(MEASUREMENTS, "staging/prod/ooni/obs_web/"), 60)
     subprocess.run(COMPOSE + ["kill", "clickhouse"], check=True, capture_output=True)
     subprocess.run(COMPOSE + ["start", "clickhouse"], check=True, capture_output=True)
     out, _ = run.communicate(timeout=900)
     check(run.returncode == 0, "the run succeeds", out)
-    check("removed incomplete chain" in out, "it removed what the killed backup left", out)
+    check("removed incomplete backup" in out, "it removed what the killed backup left under staging/", out)
     check("starting it again" in out, "and took obs_web's full again", out)
     c = chains(MEASUREMENTS, "obs_web")
     new = sorted(set(c) - before)
     check(len(new) == 1 and len(c) == 2 and max(before) in c and all(all(b.values()) for b in c.values()),
           f"two complete chains, the new one and the newest from before; the oldest pruned: {sorted(c)}")
+
+
+def test_locked_bucket():
+    print("== 8. a bucket locked under prod/")
+    r = backup("locked", "run")
+    check(r.returncode == 0 and "BACKUP_FAILED" not in r.stderr, "the run succeeds", r.stderr)
+    first = chains(LOCKED, "fastpath")
+    check(len(first) == 1 and all(all(b.values()) for b in first.values()), f"fastpath: a complete chain under prod/")
+    check(not keys(LOCKED, "staging/"), "nothing left under staging/")
+    locked = keys(LOCKED, "prod/")
+    resp = s3_locked.delete_objects(Bucket=LOCKED, Delete={"Objects": [{"Key": k} for k in locked]})
+    codes = {e["Code"] for e in resp.get("Errors", [])}
+    check(codes == {"ObjectLockedByBucketPolicy"} and keys(LOCKED, "prod/") == locked,
+          f"the hosts' key can't delete it: {len(locked)} objects refused")
+
+    for _ in range(2):
+        r = backup("locked", "run", "--full")
+        check(r.returncode == 0, "a new chain", r.stderr)
+    check("locked until" in r.stderr and len(chains(LOCKED, "fastpath")) == 3,
+          "three complete chains: the oldest, past keep_chains, is still locked and kept", r.stderr)
+
+    t0 = min(s3.head_object(Bucket=LOCKED, Key=k)["LastModified"] for k in locked).timestamp()
+    newest = max(s3.head_object(Bucket=LOCKED, Key=k)["LastModified"] for k in locked).timestamp()
+    time.sleep(max(0, newest + 157 - time.time()))
+    ch("INSERT INTO ooni.fastpath SELECT toString(number), 'https://example.org/locked', 'f' FROM numbers(300000, 500)")
+    r = backup("locked", "run")
+    c = chains(LOCKED, "fastpath")
+    check(r.returncode == 0 and "pruned chain" in r.stderr and set(first) - set(c) and len(c) == 2,
+          f"past the lock ({time.time() - t0:.0f}s), the next run prunes it: chains {sorted(c)}", r.stderr)
+    chain = max(c)
+    check(len(c[chain]) == 2 and all(c[chain].values()), f"chain {chain}: a full and an incremental")
+    ch(f"RESTORE TABLE ooni.fastpath AS restored.fastpath_locked FROM S3('{backup_url(LOCKED, 'fastpath', chain, max(c[chain]))}')")
+    check(digest("restored.fastpath_locked") == digest("ooni.fastpath"), "the incremental restores from prod/")
 
 
 def main():
@@ -297,6 +341,7 @@ def main():
     test_failure_alert(emails_before)
     test_restart_during_full()
     test_killed_during_full()
+    test_locked_bucket()
     print("PASS")
 
 
