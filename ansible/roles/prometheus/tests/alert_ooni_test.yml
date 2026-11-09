@@ -1,0 +1,182 @@
+# Tests for the "OONI services" rules in ../files/alert_ooni.yml. Run with:
+#   promtool test rules ansible/roles/prometheus/tests/alert_ooni_test.yml
+rule_files:
+  - ../files/alert_ooni.yml
+
+evaluation_interval: 15s
+
+tests:
+  # APIServiceDown: ooniauth fails 30 of the last 60 minutes, oonirun 5 of them
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="API Services Health - tier 0", instance="https://ooniauth.prod.ooni.io/health", service="ooniauth", tier="tier-0"}'
+        values: '1x59 0x29 1x29'
+      - series: 'probe_success{job="API Services Health - tier 0", instance="https://oonirun.prod.ooni.io/health", service="oonirun", tier="tier-0"}'
+        values: '1x84 0x4 1x29'
+      # not a health check
+      - series: 'probe_success{job="ooni API measurements", instance="https://api.ooni.org/api/v1/measurements"}'
+        values: '0x119'
+    alert_rule_test:
+      - eval_time: 75m  # 15 of the last 60 minutes failed: not yet 20%
+        alertname: APIServiceDown
+        exp_alerts: []
+      # 30 failed, over 20% for more than 5 minutes. The hour holds 61 samples
+      # here (both ends), so 31 of them passed.
+      - eval_time: 90m
+        alertname: APIServiceDown
+        exp_alerts:
+          - exp_labels: {job: "API Services Health - tier 0", instance: "https://ooniauth.prod.ooni.io/health", service: ooniauth, tier: tier-0}
+            exp_annotations:
+              summary: '[ tier-0 ] Service down: ooniauth'
+              description: 'Service ooniauth [ tier-0 ] passed 50.82% of its health checks in the last hour; API services availability might be affected.'
+
+  # APIProbeFailed: api.ooni.io only; api.ooni.org isn't covered (as in Grafana)
+  - interval: 15s
+    input_series:
+      - series: 'probe_success{job="ooni API test-helpers", instance="https://api.ooni.io/api/v1/test-helpers"}'
+        values: '1x3 0x8'
+      - series: 'probe_success{job="ooni API test-helpers", instance="https://api.ooni.org/api/v1/test-helpers"}'
+        values: '0x11'
+      - series: 'probe_success{job="new test helpers", instance="https://api.ooni.io.example/"}'
+        values: '0x11'
+    alert_rule_test:
+      - eval_time: 1m30s
+        alertname: APIProbeFailed
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: APIProbeFailed
+        exp_alerts:
+          - exp_labels: {job: "ooni API test-helpers", instance: "https://api.ooni.io/api/v1/test-helpers"}
+            exp_annotations:
+              summary: 'api.ooni.io HTTPS probe failed: https://api.ooni.io/api/v1/test-helpers'
+              description: 'Blackbox job "ooni API test-helpers". See https://grafana.ooni.org/d/gB3QAKXnz'
+
+  # MeasurementSubmissionsLow: 10/s, then 2/s from minute 10
+  - interval: 1m
+    input_series:
+      - series: 'ooniapi_ooniprobe_http_requests_total{env="prod", status="2xx", handler="/report/{report_id}", ec2_host="a"}'
+        values: '0+600x9 5400+120x20'
+      - series: 'ooniapi_ooniprobe_http_requests_total{env="dev", status="2xx", handler="/report/{report_id}", ec2_host="b"}'
+        values: '0x29'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: MeasurementSubmissionsLow
+        exp_alerts: []
+      - eval_time: 21m
+        alertname: MeasurementSubmissionsLow
+        exp_alerts:
+          - exp_labels: {}
+            exp_annotations:
+              summary: 'Low incoming measurement rate on ooniprobe (prod): 2.0/s'
+              description: 'See https://grafana.ooni.org/d/l-MQSGonk/api-and-fastpath-multihost?orgId=1&viewPanel=98'
+
+  # TestHelperBodyLengthUnexpected: 0.th too short, 1.th too long, 2.th fine,
+  # and wcth0 isn't one of the N.th.ooni.org helpers
+  - interval: 1m
+    input_series:
+      - series: 'probe_http_uncompressed_body_length{job="new test helpers", instance="https://0.th.ooni.org/"}'
+        values: '100x9'
+      - series: 'probe_http_uncompressed_body_length{job="new test helpers", instance="https://1.th.ooni.org/"}'
+        values: '9000x9'
+      - series: 'probe_http_uncompressed_body_length{job="new test helpers", instance="https://2.th.ooni.org/"}'
+        values: '1200x9'
+      - series: 'probe_http_uncompressed_body_length{job="new test helpers", instance="https://wcth0.fra1.prod.ooni.io/"}'
+        values: '0x9'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: TestHelperBodyLengthUnexpected
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: TestHelperBodyLengthUnexpected
+        exp_alerts:
+          - exp_labels: {job: "new test helpers", instance: "https://0.th.ooni.org/"}
+            exp_annotations:
+              summary: 'Unexpected JSON body length from test helper https://0.th.ooni.org/: 100 bytes'
+              description: 'probe_http_uncompressed_body_length from Blackbox, expected 600 to 5000. See https://grafana.ooni.org/d/Dn1R7QEnz/new-test-helpers?orgId=1&viewPanel=25'
+          - exp_labels: {job: "new test helpers", instance: "https://1.th.ooni.org/"}
+            exp_annotations:
+              summary: 'Unexpected JSON body length from test helper https://1.th.ooni.org/: 9000 bytes'
+              description: 'probe_http_uncompressed_body_length from Blackbox, expected 600 to 5000. See https://grafana.ooni.org/d/Dn1R7QEnz/new-test-helpers?orgId=1&viewPanel=25'
+
+  # APIUploaderSlow: one slow run in the hour is enough, and it stays for an hour
+  - interval: 5m
+    input_series:
+      - series: 'netdata_statsd_timer_ooni_api_uploader_total_run_time_milliseconds_average{job="raw-netdata", instance="backend-fsn.ooni.org:19999", dimension="95.0%"}'
+        values: '300000 300000 800000 300000x20'
+      - series: 'netdata_statsd_timer_ooni_api_uploader_total_run_time_milliseconds_average{job="raw-netdata", instance="backend-fsn.ooni.org:19999", dimension="median"}'
+        values: '900000x22'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: APIUploaderSlow
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: APIUploaderSlow
+        exp_alerts:
+          - exp_labels: {job: raw-netdata, instance: "backend-fsn.ooni.org:19999", dimension: "95.0%"}
+            exp_annotations:
+              summary: 'API uploader total runtime too slow on backend-fsn.ooni.org:19999: 800000 ms'
+              description: 'Highest 95th percentile in the last hour. See https://grafana.ooni.org/d/ma3Q6GzVz/api-uploader?orgId=1&viewPanel=2'
+      - eval_time: 75m  # the slow run is over an hour old
+        alertname: APIUploaderSlow
+        exp_alerts: []
+
+  # TestListGenerationSlow: backend-fsn's median only
+  - interval: 1m
+    input_series:
+      - series: 'netdata_statsd_timer_ooni_api_generate_test_list_milliseconds_average{job="raw-netdata", instance="backend-fsn.ooni.org:19999", dimension="median"}'
+        values: '100x4 450x9'
+      - series: 'netdata_statsd_timer_ooni_api_generate_test_list_milliseconds_average{job="raw-netdata", instance="backend-hel.ooni.org:19999", dimension="median"}'
+        values: '900x13'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: TestListGenerationSlow
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: TestListGenerationSlow
+        exp_alerts:
+          - exp_labels: {job: raw-netdata, instance: "backend-fsn.ooni.org:19999", dimension: median}
+            exp_annotations:
+              summary: 'Generate test list median time too high: 450 ms'
+              description: 'See https://grafana.ooni.org/d/75nnWVpMz?orgId=1&viewPanel=25'
+
+  # GeoIPDatabaseSmall: the cc database shrinks, the asn one doesn't
+  - interval: 1m
+    input_series:
+      - series: 'netdata_statsd_gauge_ooni_download_geoip_geoip_asn_node_cnt_value_average{job="raw-netdata", instance="backend-fsn.ooni.org:19999", dimension="gauge"}'
+        values: '900000x20'
+      - series: 'netdata_statsd_gauge_ooni_download_geoip_geoip_cc_node_cnt_value_average{job="raw-netdata", instance="backend-fsn.ooni.org:19999", dimension="gauge"}'
+        values: '900000x4 1000x15'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: GeoIPDatabaseSmall
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: GeoIPDatabaseSmall
+        exp_alerts:
+          - exp_labels: {job: raw-netdata, instance: "backend-fsn.ooni.org:19999", dimension: gauge, database: cc}
+            exp_annotations:
+              summary: 'GeoIP cc database does not contain enough nodes on backend-fsn.ooni.org:19999: 1000'
+              description: 'Expected at least 700000. See https://grafana.ooni.org/d/0e6eROj7z/geoip?orgId=1&viewPanel=3'
+
+  # NTPOffsetHigh: too far ahead, too far behind, and fine
+  - interval: 1m
+    input_series:
+      - series: 'node_ntp_offset_seconds{instance="data1.htz-fsn.prod.ooni.nu"}'
+        values: '0.1x14'
+      - series: 'node_ntp_offset_seconds{instance="data2.htz-fsn.prod.ooni.nu"}'
+        values: '-0.2x14'
+      - series: 'node_ntp_offset_seconds{instance="data3.htz-fsn.prod.ooni.nu"}'
+        values: '0.01x14'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: NTPOffsetHigh
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: NTPOffsetHigh
+        exp_alerts:
+          - exp_labels: {instance: data1.htz-fsn.prod.ooni.nu}
+            exp_annotations:
+              summary: 'Host time offset too large on data1.htz-fsn.prod.ooni.nu: 0.100 s'
+          - exp_labels: {instance: data2.htz-fsn.prod.ooni.nu}
+            exp_annotations:
+              summary: 'Host time offset too large on data2.htz-fsn.prod.ooni.nu: 0.200 s'
