@@ -6,10 +6,9 @@
 -- node, and the Keeper paths include {database}, so a second database on the same cluster doesn't share
 -- production's replicas.
 -- Where the replicas differ, this is the definition of the replica that holds the data:
---   labeling_frames: data1 (the only replica with rows, and with its newer column)
 --   fastpath: data1 and data3 (data2 alone has deduplicate_merge_projection_mode = 'rebuild')
--- labeling_frames and changepoint_label are not replicated: ON CLUSTER creates an empty local table on
--- each node, as production has them.
+-- changepoint_label is not replicated: ON CLUSTER creates an empty local table on each node, as
+-- production has it.
 -- Not included: the updaters' *_tmp tables (recreated on every run), msmt_feedback_old (superseded by
 -- msmt_feedback) and session_expunge (unused since backend #972).
 
@@ -300,7 +299,7 @@ CREATE TABLE IF NOT EXISTS labeling_frames ON CLUSTER oonidata_cluster
     `analysis_query` LowCardinality(String),
     `failed_fastpath` Bool
 )
-ENGINE = MergeTree
+ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/labeling_frames/{shard}', '{replica}')
 ORDER BY (stratum, measurement_uid)
 SETTINGS index_granularity = 8192;
 
