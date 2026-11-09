@@ -6,10 +6,10 @@
 -- node, and the Keeper paths include {database}, so a second database on the same cluster doesn't share
 -- production's replicas.
 -- Where the replicas differ, this is the definition of the replica that holds the data:
---   event_detector_cusums, labeling_frames: data1 (the only replica with rows, and with their newer columns)
+--   labeling_frames: data1 (the only replica with rows, and with its newer column)
 --   fastpath: data1 and data3 (data2 alone has deduplicate_merge_projection_mode = 'rebuild')
--- event_detector_cusums, labeling_frames and changepoint_label are not replicated: ON CLUSTER creates an
--- empty local table on each node, as production has them.
+-- labeling_frames and changepoint_label are not replicated: ON CLUSTER creates an empty local table on
+-- each node, as production has them.
 -- Not included: the updaters' *_tmp tables (recreated on every run), msmt_feedback_old (superseded by
 -- msmt_feedback) and session_expunge (unused since backend #972).
 
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS event_detector_cusums ON CLUSTER oonidata_cluster
     `tls_blocked_last_change` Int8 DEFAULT 0,
     `tls_blocked_last_ts` Nullable(DateTime64(3, 'UTC'))
 )
-ENGINE = ReplacingMergeTree(ts)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/{cluster}/tables/{database}/event_detector_cusums/{shard}', '{replica}', ts)
 ORDER BY (probe_asn, probe_cc, domain)
 SETTINGS index_granularity = 8192;
 
