@@ -304,7 +304,8 @@ clickhouse_custom_quotas:
   - name: ooniprobe
   - name: oonirun
   - name: notebook
-  # The test lists editor only inserts url_priorities rows, so a small quota
+  # The test lists editor reads url_priorities and citizenlab (its /health) and
+  # inserts url_priorities rows, so a small quota
   - name: oonitestlists
     intervals:
       - "INTERVAL 3600 second MAX queries = 1000, errors = 100, execution_time = 600"
@@ -318,6 +319,13 @@ clickhouse_custom_grants:
   - databases: [ooni, oonitest]
     tables: [url_priorities]
     privileges: [INSERT]
+    to: [oonitestlists]
+  # The testlists service reads url_priorities (FINAL) and citizenlab; without this
+  # its SELECTs fail, and each failure counts against its quota's 100 errors an hour,
+  # after which its INSERTs are refused too
+  - databases: [ooni, oonitest]
+    tables: [url_priorities, citizenlab]
+    privileges: [SELECT]
     to: [oonitestlists]
   - databases: [ooni, oonitest]
     tables: [faulty_measurements]
