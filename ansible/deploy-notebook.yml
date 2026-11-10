@@ -7,8 +7,10 @@
   vars:
     notebook_domain: "notebook.ooni.org"
     ssl_domains:
-      - notebook1.htz-fsn.prod.ooni.nu notebook.ooni.org
+      - notebook1.htz-fsn.prod.ooni.nu notebook.ooni.org datadumps.ooni.io
   roles:
     - nginx
     - dehydrated
     - notebook
+    - role: datadumps
+      tags: [datadumps]

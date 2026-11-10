@@ -1,0 +1,14 @@
+datadumps_domain: datadumps.ooni.io
+datadumps_user: datadumps
+datadumps_install_dir: /opt/datadumps
+datadumps_output_dir: /srv/datadumps
+datadumps_keep_weeks: 4
+# Hours after Monday 00:00 UTC before a week's dump is generated, to give
+# late measurements time to arrive.
+datadumps_grace_hours: 3
+datadumps_clickhouse_host: localhost
+datadumps_htpasswd_path: /etc/nginx/htpasswd_datadumps
+# Basic auth users live in SSM:
+#   {"<username>": "<password>", ...}
+datadumps_users_ssm_path: /oonidevops/secrets/datadumps/users
+tls_cert_dir: /var/lib/dehydrated/certs

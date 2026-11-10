@@ -1,0 +1,49 @@
+# ansible-managed in ooni/devops.git (roles/datadumps)
+
+server {
+    listen 80;
+    server_name {{ datadumps_domain }};
+    location ^~ /.well-known/acme-challenge {
+        alias /var/lib/dehydrated/acme-challenges;
+    }
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name {{ datadumps_domain }};
+
+    include /etc/nginx/ssl_intermediate.conf;
+    ssl_certificate {{ tls_cert_dir }}/{{ inventory_hostname }}/fullchain.pem;
+    ssl_certificate_key {{ tls_cert_dir }}/{{ inventory_hostname }}/privkey.pem;
+    ssl_trusted_certificate {{ tls_cert_dir }}/{{ inventory_hostname }}/chain.pem;
+
+    # Separate log so we can see which user downloads what ($remote_user)
+    access_log /var/log/nginx/datadumps.access.log combined;
+    error_log /var/log/nginx/datadumps.error.log;
+
+    root {{ datadumps_output_dir }};
+
+    auth_basic           "OONI data dumps";
+    auth_basic_user_file {{ datadumps_htpasswd_path }};
+
+    # Temp files and the lock file are dot-prefixed: never serve them
+    location ~ /\. {
+        return 404;
+    }
+
+    location ~ \.sha256$ {
+        default_type text/plain;
+        try_files $uri =404;
+    }
+
+    location / {
+        autoindex on;
+        # Machine-readable listing: [{"name", "type", "mtime", "size"}, ...]
+        autoindex_format json;
+        default_type application/octet-stream;
+        try_files $uri $uri/ =404;
+    }
+}
