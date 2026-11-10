@@ -4,7 +4,7 @@
 runbook says (docs/Runbooks.md, "Adding and removing a replica"): by editing the cluster in
 `ansible/group_vars/clickhouse/vars.yml` and rerunning the roles. It uses the real group and
 host vars (secrets replaced by test values) and the configs the clickhouse role renders from
-them, with one ClickHouse 24.8.6.70 container per production host, named and aliased like it
+them, with one ClickHouse 25.3.14.14 container per production host, named and aliased like it
 (`compose.yml`). It checks that:
 
 - data1-3 form the Keeper ensemble and `oonidata_cluster`, and `oonidata_clickhouse` creates
