@@ -13,3 +13,4 @@ WHERE measurement_start_time >= toDateTime({start:String}, 'UTC')
   AND measurement_start_time < toDateTime({end:String}, 'UTC')
   AND msm_failure = 'f'
 GROUP BY probe_cc, probe_asn, domain
+ORDER BY probe_cc, probe_asn, domain
