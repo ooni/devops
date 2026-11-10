@@ -1,5 +1,8 @@
 s3_ooni_open_data_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/s3_ooni_open_data_access_key', profile='oonidevops_user_prod') }}"
-clickhouse_url: "clickhouse://fastpath:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_fastpath_password', profile='oonidevops_user_prod') }}@clickhouse1.prod.ooni.io/ooni"
+# clickhouse2 first, clickhouse1 when clickhouse2 can't be reached (connection
+# refused or timed out; a server error such as a failed login does not fall back).
+# clickhouse-driver tries alt_hosts in order when it (re)connects.
+clickhouse_url: "clickhouse://fastpath:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_fastpath_password', profile='oonidevops_user_prod') }}@clickhouse2.prod.ooni.io/ooni?alt_hosts=clickhouse1.prod.ooni.io"
 bucket_name: "ooni-data-eu-fra"
 # COLLECTOR ID SHOULD BE DIFFERENT BETWEEN EACH FASTPATH INSTANCE
 collector_id: "4"
