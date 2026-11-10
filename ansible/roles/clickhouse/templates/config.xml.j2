@@ -342,6 +342,13 @@
   -->
   <max_thread_pool_size>{{ clickhouse_config.max_thread_pool_size }}</max_thread_pool_size>
 
+  <!-- Soft limit on query processing threads across all queries on the server,
+       as a multiple of the number of cores. A query always gets at least one
+       thread, and more as others finish. -->
+  {% if clickhouse_config.concurrent_threads_soft_limit_ratio_to_cores is defined -%}
+  <concurrent_threads_soft_limit_ratio_to_cores>{{ clickhouse_config.concurrent_threads_soft_limit_ratio_to_cores }}</concurrent_threads_soft_limit_ratio_to_cores>
+  {% endif -%}
+
   <!-- Number of workers to recycle connections in background (see also drain_timeout).
     If the pool is full, connection will be drained synchronously. -->
   <!-- <max_threads_for_connection_collector>10</max_threads_for_connection_collector> -->
