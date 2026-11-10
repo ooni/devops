@@ -33,7 +33,7 @@
 {% for user in clickhouse_default_users %}
     <{{ user.name }}>
 {% if user.password is defined %}
-      <password>{{ user.password }}</password>
+      <password>{{ user.password | default("", true) | e }}</password>
 {% elif user.password_sha256_hex is defined %}
       <password_sha256_hex>{{ user.password_sha256_hex }}</password_sha256_hex>
 {% elif user.password_double_sha1_hex is defined %}
@@ -73,7 +73,7 @@
 {% for user in clickhouse_admin_users %}
     <{{ user.name }}>
 {% if user.password is defined %}
-      <password>{{ user.password }}</password>
+      <password>{{ user.password | default("", true) | e }}</password>
 {% elif user.password_sha256_hex is defined %}
       <password_sha256_hex>{{ user.password_sha256_hex }}</password_sha256_hex>
 {% elif user.password_double_sha1_hex is defined %}
@@ -113,7 +113,7 @@
 {% for user in clickhouse_custom_users_xml %}
     <{{ user.name }}>
 {% if user.password is defined %}
-      <password>{{ user.password }}</password>
+      <password>{{ user.password | default("", true) | e }}</password>
 {% elif user.password_sha256_hex is defined %}
       <password_sha256_hex>{{ user.password_sha256_hex }}</password_sha256_hex>
 {% elif user.password_double_sha1_hex is defined %}
