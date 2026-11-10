@@ -96,13 +96,6 @@ def is_valid(dump: Path) -> bool:
     return True
 
 
-def unlink(path: Path) -> None:
-    try:
-        path.unlink()
-    except FileNotFoundError:
-        pass
-
-
 def generate(args, query: str, sql: str, monday: dt.date) -> None:
     out_dir: Path = args.output_dir
     name = dump_name(query, monday)
@@ -112,8 +105,8 @@ def generate(args, query: str, sql: str, monday: dt.date) -> None:
     # lz4) and are hidden by nginx.
     tmp = out_dir / f".tmp-{name}"
     tmp_sha = out_dir / f".tmp-{name}.sha256"
-    unlink(tmp)
-    unlink(tmp_sha)
+    tmp.unlink(missing_ok=True)
+    tmp_sha.unlink(missing_ok=True)
 
     end = monday + dt.timedelta(weeks=1)
     params = {
@@ -162,13 +155,13 @@ def generate(args, query: str, sql: str, monday: dt.date) -> None:
         os.replace(tmp_sha, final_sha)
         log.info("published %s (%d rows, %d bytes)", name, rows, final.stat().st_size)
     finally:
-        unlink(tmp)
-        unlink(tmp_sha)
+        tmp.unlink(missing_ok=True)
+        tmp_sha.unlink(missing_ok=True)
 
 
 def symlink_atomic(target: str, link: Path) -> None:
     tmp = link.with_name(f".tmp-{link.name}")
-    unlink(tmp)
+    tmp.unlink(missing_ok=True)
     tmp.symlink_to(target)
     os.replace(tmp, link)
 
@@ -185,8 +178,8 @@ def update_latest(out_dir: Path, query: str, mondays: list[dt.date]) -> None:
             symlink_atomic(name, link)
             symlink_atomic(name + ".sha256", link_sha)
             return
-    unlink(link)
-    unlink(link_sha)
+    link.unlink(missing_ok=True)
+    link_sha.unlink(missing_ok=True)
 
 
 def prune(out_dir: Path, query: str, mondays: list[dt.date]) -> None:
@@ -196,7 +189,7 @@ def prune(out_dir: Path, query: str, mondays: list[dt.date]) -> None:
         m = pattern.match(p.name)
         if m and m.group(1) not in keep:
             log.info("deleting %s", p.name)
-            unlink(p)
+            p.unlink()
 
 
 def process_query(args, query: str, sql: str, now: dt.datetime) -> bool:
@@ -255,7 +248,7 @@ def main() -> int:
         return 0
 
     for stale in out_dir.glob(".tmp-*"):
-        unlink(stale)
+        stale.unlink()
 
     queries = sorted(args.queries_dir.glob("*.sql"))
     if not queries:
