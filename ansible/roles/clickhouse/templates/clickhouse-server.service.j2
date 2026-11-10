@@ -16,6 +16,9 @@ User={{ clickhouse_user }}
 Group={{ clickhouse_group }}
 Restart=always
 RestartSec=30
+# As the package's own unit: let ClickHouse finish shutting down (merges, inserts, Keeper)
+# rather than SIGKILL it after systemd's default 90 s, which can leave broken parts
+TimeoutStopSec=infinity
 PrivateTmp= {{ clickhouse_private_tmp }}
 RuntimeDirectory={{ clickhouse_service }}
 ExecStart=/usr/bin/{{ clickhouse_service }} --config={{ clickhouse_config_directory }}/{{ clickhouse_config_file_name }} --pid-file=/run/clickhouse-server/{{ clickhouse_service }}.pid
