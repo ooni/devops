@@ -1,0 +1,56 @@
+# Overlay for the backup/restore checks (harness/backup.py): an S3-compatible
+# store to back the cluster up to, and a standalone node to restore onto.
+#
+# Used together with the base file, always both flags:
+#   docker compose -f docker-compose.yml -f docker-compose.backup.yml <cmd>
+#
+# MinIO Inc. stopped publishing images, so this uses pgsty/minio, the
+# community-maintained fork (AGPLv3, same `server` command and env vars;
+# its image also ships `mc`, used to create the bucket). Production backs up
+# to Hetzner Object Storage, which speaks the same S3 API.
+#
+# ch1/ch2/ch3 get the bucket credentials (config/backup/s3.xml) from the base
+# docker-compose.yml, not from here: harness/compose.py recreates nodes
+# during upgrades with the base file only, and the mount must survive that.
+
+services:
+  minio:
+    image: "docker.io/pgsty/minio:RELEASE.2026-08-04T00-00-00Z"
+    container_name: ooni-minio
+    hostname: minio
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    networks:
+      - chnet
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Recreated (with fresh anonymous volumes) for every restore check, on
+  # whatever version CHR_IMAGE names -- see harness/backup.py.
+  chr:
+    image: "clickhouse/clickhouse-server:${CHR_IMAGE:-24.8.6.70}"
+    container_name: ooni-chr
+    hostname: chr
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    mem_limit: 1500m
+    networks:
+      - chnet
+    ports:
+      - "${CHR_HTTP_PORT:-8126}:8123"
+    volumes:
+      - ./config/restore/node.xml:/etc/clickhouse-server/config.d/node.xml:ro
+      - ./config/common/users.xml:/etc/clickhouse-server/users.d/users.xml:ro
+      - ./config/backup/s3.xml:/etc/clickhouse-server/config.d/backup_s3.xml:ro
+
+volumes:
+  minio_data:
