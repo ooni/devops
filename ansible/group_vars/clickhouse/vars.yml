@@ -46,6 +46,10 @@ clickhouse_config:
   # running alone still gets max_threads (one per core), and in a burst the queries
   # share the limit. 2 is the value in ClickHouse's stock config.xml.
   concurrent_threads_soft_limit_ratio_to_cores: 2
+  # A stop waits up to shutdown_wait_unfinished (5 s, the default) for running
+  # queries, so in-flight inserts from fastpath land instead of being cancelled
+  # (code 394, QUERY_WAS_CANCELLED) and dropped.
+  shutdown_wait_unfinished_queries: 1
   max_server_memory_usage_to_ram_ratio: 0.9
   # for 1GB/s 50% utilization cap
   max_replicated_sends_network_bandwidth_for_server: 62500000

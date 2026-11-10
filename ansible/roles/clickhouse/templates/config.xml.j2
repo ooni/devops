@@ -349,6 +349,16 @@
   <concurrent_threads_soft_limit_ratio_to_cores>{{ clickhouse_config.concurrent_threads_soft_limit_ratio_to_cores }}</concurrent_threads_soft_limit_ratio_to_cores>
   {% endif -%}
 
+  <!-- On shutdown, wait for running queries to finish, for up to
+       shutdown_wait_unfinished seconds, instead of cancelling them. Read at
+       startup only: a change takes effect from the next restart's start. -->
+  {% if clickhouse_config.shutdown_wait_unfinished_queries is defined -%}
+  <shutdown_wait_unfinished_queries>{{ clickhouse_config.shutdown_wait_unfinished_queries }}</shutdown_wait_unfinished_queries>
+  {% endif -%}
+  {% if clickhouse_config.shutdown_wait_unfinished is defined -%}
+  <shutdown_wait_unfinished>{{ clickhouse_config.shutdown_wait_unfinished }}</shutdown_wait_unfinished>
+  {% endif -%}
+
   <!-- Number of workers to recycle connections in background (see also drain_timeout).
     If the pool is full, connection will be drained synchronously. -->
   <!-- <max_threads_for_connection_collector>10</max_threads_for_connection_collector> -->
