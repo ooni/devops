@@ -245,20 +245,19 @@ clickhouse_custom_users:
       - "readonly = 0"
       - "max_memory_usage = 61001001000"  # 61 GB
 
-  # Only SELECT through its grants. CONST stops queries from raising its limits;
-  # other settings, such as log_comment, can still be set per query.
+  # Only SELECT through its grants. Its settings are those of the API's node, data2,
+  # where it was set up by hand with a 4 GiB memory limit and nothing else; the
+  # stricter limits from older vars (1 GB, 30 s, 51000 result rows, ...) were never
+  # in force there and would fail queries the API makes today (e.g. aggregations
+  # with more than 51000 rows). Nothing is CONST, as on data2: a query may set
+  # these (the API's query helpers set max_execution_time on some queries).
   - name: oonimeasurements
     password_type: sha256_hash
     password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') | hash('sha256') }}"
     networks: ["IP '0.0.0.0/0'"]
     settings:
       - "readonly = 0"
-      - "max_memory_usage = 1001001000 CONST"                  # 1 GB
-      - "max_execution_time = 30 CONST"                        # seconds
-      - "max_bytes_to_read = 501001001000 CONST"               # 500 GB
-      - "max_rows_to_read = 5001001000 CONST"                  # 5 B
-      - "timeout_before_checking_execution_speed = 5 CONST"    # seconds
-      - "max_result_rows = 51000 CONST"
+      - "max_memory_usage = 4294967296"  # 4 GiB, as on data2
 
   - name: ooniprobe
     password_type: sha256_hash
