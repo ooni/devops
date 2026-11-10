@@ -255,12 +255,16 @@ clickhouse_custom_users:
   # in force there and would fail queries the API makes today (e.g. aggregations
   # with more than 51000 rows). Nothing is CONST, as on data2: a query may set
   # these (the API's query helpers set max_execution_time on some queries).
+  # readonly = 2, as data1 and data2 have it (from the default profile): the API
+  # only reads, and 2 still lets every query set settings, which ooniapi needs for
+  # the log_comment it puts on each query (common/dependencies.py); readonly = 1
+  # refuses that. A grant added by mistake still can't make it write.
   - name: oonimeasurements
     password_type: sha256_hash
     password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonimeasurements_password', profile='oonidevops_user_prod') | hash('sha256') }}"
     networks: ["IP '0.0.0.0/0'"]
     settings:
-      - "readonly = 0"
+      - "readonly = 2"
       - "max_memory_usage = 4294967296"  # 4 GiB, as on data2
 
   - name: ooniprobe
@@ -271,12 +275,15 @@ clickhouse_custom_users:
       - "readonly = 0"
       - "max_memory_usage = 61001001000"  # 61 GB
 
+  # The oonirun service only reads ClickHouse (url_priorities, and a health check),
+  # with ooniapi's log_comment on every query: readonly = 2, as for oonimeasurements.
+  # Production has it on the write profile (readonly = 0).
   - name: oonirun
     password_type: sha256_hash
     password: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_oonirun_password', profile='oonidevops_user_prod') | hash('sha256') }}"
     networks: ["IP '0.0.0.0/0'"]
     settings:
-      - "readonly = 0"
+      - "readonly = 2"
       - "max_memory_usage = 61001001000"  # 61 GB
 
   - name: oonitestlists
