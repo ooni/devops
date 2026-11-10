@@ -1,0 +1,5 @@
+{# For each quota: CREATE if missing, otherwise ALTER. Without `intervals` or `to`,
+   ALTER leaves the quota's limits or assignment as they are. #}
+{% for quota in clickhouse_custom_quotas %}
+{{ 'ALTER' if quota.name in existing else 'CREATE' }} QUOTA {{ quota.name }}{% if quota.intervals is defined %} FOR {{ quota.intervals | join(', ') }}{% endif %}{% if quota.to is defined %} TO {{ quota.to | join(', ') }}{% endif %};
+{% endfor %}

@@ -1,0 +1,5 @@
+# The version the upgrade test upgrades to when a change doesn't bump clickhouse_version:
+# the next hop after production's, from the upgrade plan in ooni/devops#477 (for #437):
+#   24.8.6.70 -> 25.3.14.14 -> 25.8.29.51 -> 26.3.17.110 -> 26.8.9.10
+# Move it on when production's clickhouse_version reaches it.
+25.3.14.14

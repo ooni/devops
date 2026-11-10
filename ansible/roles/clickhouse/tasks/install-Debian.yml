@@ -1,0 +1,143 @@
+---
+
+- name: CLICKHOUSE | Ensure clickhouse group
+  ansible.builtin.group:
+    name: "{{ clickhouse_group }}"
+    system: yes
+    state: present
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Ensure clickhouse user
+  ansible.builtin.user:
+    name: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    system: yes
+    shell: /usr/sbin/nologin
+    createhome: no
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Ensure base directory exist
+  ansible.builtin.file:
+    state: directory
+    dest: "{{ clickhouse_base_path }}"
+    owner: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    mode: "{{ clickhouse_base_directory_mode }}"
+  become: true
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Update repositories cache and install apt-transport-https, dirmngr ansible.builtin.packages
+  apt:
+    name: "{{ clickhouse_prerequisite_repos }}"
+    state: present
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Ensure keyrings directory exists
+  ansible.builtin.file:
+    path: "{{ clickhouse_deb_keyring_path | dirname }}"
+    state: directory
+    mode: "0755"
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Install pinned apt repository key
+  ansible.builtin.copy:
+    src: clickhouse-repo-keyring.asc
+    dest: "{{ clickhouse_deb_keyring_path }}"
+    mode: "0644"
+  tags: [clickhouse_install]
+
+# The role used to add this repository without signed-by, in a file named after its URL.
+# apt refuses the same repository with two different keys, so remove that entry first.
+- name: CLICKHOUSE | Remove the apt repository entry without signed-by
+  ansible.builtin.apt_repository:
+    repo: "deb https://packages.clickhouse.com/deb {{ clickhouse_release_type }} main"
+    state: absent
+    update_cache: false
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Add clickhouse apt repository (deb)
+  ansible.builtin.apt_repository:
+    repo: "{{ clickhouse_deb_repo }}"
+    state: present
+    filename: clickhouse
+  tags: [clickhouse_install]
+
+# Without a pin, `apt upgrade` (or unattended-upgrades) moves ClickHouse to the
+# newest release in the repo. To upgrade or downgrade, change clickhouse_version
+# and rerun the role.
+- name: CLICKHOUSE | Pin clickhouse packages to clickhouse_version
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/clickhouse
+    content: |
+      # Managed by ansible (clickhouse role): pins ClickHouse to clickhouse_version
+      Package: clickhouse-*
+      Pin: version {{ clickhouse_version }}
+      Pin-Priority: 1000
+    mode: "0644"
+  tags: [clickhouse_install]
+
+# A package upgrade doesn't restart the running server: restart it, or it keeps running
+# the old version until something else restarts it.
+- name: CLICKHOUSE | Be sure clickhouse packages are installed (apt)
+  ansible.builtin.apt:
+    name: "{{ clickhouse_packages }}"
+    state: present
+    update_cache: true
+    allow_downgrade: true
+  notify: Restart-clickhouse
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Ensure user files and access control directories exist
+  ansible.builtin.file:
+    state: directory
+    dest: "{{ item }}"
+    owner: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    mode: 0750
+  with_items:
+    - "{{ clickhouse_access_control_directory }}"
+    - "{{ clickhouse_user_files_directory }}"
+  become: true
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Ensure needed config directories exist
+  ansible.builtin.file:
+    state: directory
+    dest: "{{ item }}"
+    owner: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    mode: "{{ clickhouse_config_directory_mode }}"
+  with_items:
+    - "{{ clickhouse_config_directory }}"
+    - "{{ clickhouse_config_directory_config_d }}"
+    - "{{ clickhouse_config_directory_users_d }}"
+  become: true
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Ensure needed tmp directories exist
+  ansible.builtin.file:
+    state: directory
+    dest: "{{ clickhouse_tmp_directory }}"
+    owner: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    mode: "{{ clickhouse_tmp_directory_mode }}"
+  become: true
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Ensure needed log directory exist
+  ansible.builtin.file:
+    state: directory
+    dest: "{{ clickhouse_log_directory }}"
+    owner: "{{ clickhouse_user }}"
+    group: "{{ clickhouse_group }}"
+    mode: "{{ clickhouse_log_directory_mode }}"
+  become: true
+  tags: [clickhouse_install]
+
+- name: CLICKHOUSE | Clickhouse extra packages are installed (apt)
+  ansible.builtin.apt:
+    name: "{{ clickhouse_packages_extra }}"
+    state: present
+    update_cache: true
+  when: clickhouse_packages_extra is defined
+  tags: [clickhouse_install]

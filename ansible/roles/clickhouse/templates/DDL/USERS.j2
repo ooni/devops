@@ -1,0 +1,7 @@
+{# For each user: CREATE if missing, otherwise ALTER, which keeps its grants and quota
+   assignments. The password is set in a statement of its own, so that a mistake in the
+   other clauses fails without ClickHouse quoting the password hash in its error. #}
+{% for user in clickhouse_custom_users %}
+{{ 'ALTER' if user.name in existing else 'CREATE' }} USER {{ user.name }} IDENTIFIED WITH {{ user.password_type }} BY '{{ user.password }}';
+ALTER USER {{ user.name }} HOST {{ user.networks | join(', ') if user.networks is defined else 'ANY' }} SETTINGS {{ user.settings | join(', ') if user.settings is defined else 'NONE' }};
+{% endfor %}

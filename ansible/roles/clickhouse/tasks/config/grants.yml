@@ -1,0 +1,12 @@
+---
+
+# Each grantee's privileges are replaced in one GRANT ... WITH REPLACE OPTION
+# statement (templates/DDL/GRANTS.j2): privileges it keeps are never revoked, not
+# even for a moment, and ones missing from vars go in the same statement. Reports changed
+# on every run, as the statements are always sent.
+
+- name: CLICKHOUSE | Replace grants
+  ansible.builtin.command:
+    cmd: clickhouse-client --config-file {{ clickhouse_admin_client_config }} --multiquery
+    stdin: "{{ lookup('template', 'DDL/GRANTS.j2') }}"
+  tags: [clickhouse_grants]

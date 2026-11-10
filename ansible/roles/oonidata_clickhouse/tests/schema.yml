@@ -1,0 +1,16 @@
+# oonidata_clickhouse's schema step (tasks/schema.yml) against the test containers
+- hosts: all
+  connection: local
+  gather_facts: false
+  vars:
+    clickhouse_admin_client_config: "{{ lookup('env', 'TESTS') }}/out/admin-{{ inventory_hostname }}.xml"
+    oonidata_clickhouse_schema: "{{ lookup('env', 'SCHEMA') }}"
+  environment:
+    CH_NODE: "{{ inventory_hostname.split('.')[0] }}"
+    PATH: "{{ lookup('env', 'TESTS') }}/bin:{{ lookup('env', 'PATH') }}"
+  tasks:
+    # the clickhouse role's admin client config task, without owner root
+    - name: Admin client configuration
+      ansible.builtin.template: {src: ../../clickhouse/templates/admin-client.xml.j2, dest: "{{ clickhouse_admin_client_config }}", mode: "0644"}
+      no_log: true
+    - ansible.builtin.include_role: {name: oonidata_clickhouse, tasks_from: schema.yml}

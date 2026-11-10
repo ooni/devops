@@ -1,0 +1,16 @@
+{# One statement per grantee, with every privilege the clickhouse_custom_grants
+   entries give it ("PRIVILEGE ON database.table"), replacing all it had before. #}
+{% set grantees = clickhouse_custom_grants | map(attribute='to') | flatten | unique %}
+{% for grantee in grantees %}
+{% set privileges = [] %}
+{% for g in clickhouse_custom_grants if grantee in g.to %}
+{% for database in g.databases %}{% for table in g.tables %}{% for privilege in g.privileges %}
+{% set _ = privileges.append(privilege ~ ' ON ' ~ database ~ '.' ~ table) %}
+{% endfor %}{% endfor %}{% endfor %}
+{% endfor %}
+GRANT {{ privileges | unique | join(', ') }} TO {{ grantee }} WITH REPLACE OPTION;
+{% endfor %}
+{# Users in vars that no entry grants anything to should have no privileges. #}
+{% for user in clickhouse_custom_users | map(attribute='name') | reject('in', grantees) %}
+REVOKE ALL ON *.* FROM {{ user }};
+{% endfor %}
