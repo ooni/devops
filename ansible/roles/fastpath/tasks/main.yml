@@ -152,6 +152,12 @@
     image: "{{ fastpath_image }}"
     state: started
     restart_policy: always
+    # Seconds docker stop waits before SIGKILL. With ooni/backend's
+    # fastpath_drain_on_shutdown, fastpath drains its queue into ClickHouse on
+    # SIGTERM; set this per host once its image has that fix. Without the fix,
+    # a stop hangs until this timeout and the queue is lost anyway. Unset, it's
+    # left out, so the container keeps Docker's 10 s and isn't recreated.
+    stop_timeout: "{{ fastpath_stop_timeout | default(omit) }}"
     user: "{{user_uid.stdout}}:{{user_gid.stdout}}"
     # use network mode = host to allow traffic from fastpath to the statsd exporter without
     # creating a network with redirection rules to match the ports
