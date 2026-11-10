@@ -31,6 +31,7 @@ import argparse
 import datetime as dt
 import fcntl
 import hashlib
+import json
 import logging
 import os
 import re
@@ -43,6 +44,7 @@ log = logging.getLogger("datadumps")
 DATE_FMT = "%Y_%m_%d"
 EXT = ".csv.lz4"
 CH_DT_FMT = "%Y-%m-%d %H:%M:%S"
+APP_NAME = "cron/weekly_dumps"
 
 
 def dump_name(query: str, monday: dt.date) -> str:
@@ -120,6 +122,10 @@ def generate(args, query: str, sql: str, monday: dt.date) -> None:
     )
     cmd = [args.clickhouse_client, "--host", args.clickhouse_host, "--query", full_sql]
     cmd += [f"--param_{k}={v}" for k, v in params.items()]
+    log_comment = json.dumps(
+        {"app_name": APP_NAME, "handler": query}, separators=(",", ":")
+    )
+    cmd.append(f"--log_comment={log_comment}")
     try:
         subprocess.run(cmd, check=True, timeout=args.query_timeout)
 
