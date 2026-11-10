@@ -42,6 +42,10 @@ clickhouse_config:
   max_concurrent_queries: 300
   max_server_memory_usage: 0
   max_thread_pool_size: 10000
+  # Query threads on a node, all users together, are limited to 2 per core: a query
+  # running alone still gets max_threads (one per core), and in a burst the queries
+  # share the limit. 2 is the value in ClickHouse's stock config.xml.
+  concurrent_threads_soft_limit_ratio_to_cores: 2
   max_server_memory_usage_to_ram_ratio: 0.9
   # for 1GB/s 50% utilization cap
   max_replicated_sends_network_bandwidth_for_server: 62500000
