@@ -186,7 +186,7 @@
   {% if clikhouse_interserver_http_credentials is defined -%}
   <interserver_http_credentials>
     <user>{{ clikhouse_interserver_http_credentials.user }}</user>
-    <password>{{ clikhouse_interserver_http_credentials.password }}</password>
+    <password>{{ clikhouse_interserver_http_credentials.password | default("", true) | e }}</password>
   </interserver_http_credentials>
   {% endif -%}
 
@@ -725,7 +725,7 @@
 {% for server in clickhouse_remote_servers %}
     <{{ server.servername }}>
 {% if server.secret is defined %}
-      <secret>{{ server.secret }}</secret>
+      <secret>{{ server.secret | default("", true) | e }}</secret>
 {% endif %}
 {% for shard in server.shards %}
       <shard>
@@ -743,7 +743,7 @@
           <user>{{ replica.user }}</user>
 {% endif %}
 {% if replica.password is defined %}
-          <password>{{ replica.password }}</password>
+          <password>{{ replica.password | default("", true) | e }}</password>
 {% endif %}
 {% if replica.priority is defined %}
           <priority>{{ replica.priority }}</priority>
