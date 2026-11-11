@@ -12,3 +12,8 @@ datadumps_htpasswd_path: /etc/nginx/htpasswd_datadumps
 #   {"<username>": "<password>", ...}
 datadumps_users_ssm_path: /oonidevops/secrets/datadumps/users
 tls_cert_dir: /var/lib/dehydrated/certs
+# Extra files that are also served by this sever
+datadumps_extra_files:
+  - url: /oxford_anomaly_count_2025.csv.lz4
+    file: /mnt/data/oxford/oxford_anomaly_count_2025.csv.lz4
+    public: true
