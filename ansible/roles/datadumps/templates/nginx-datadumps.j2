@@ -34,6 +34,16 @@ server {
         return 404;
     }
 
+{% for f in datadumps_extra_files %}
+    location = {{ f.url }} {
+        alias {{ f.file }};
+        default_type application/octet-stream;
+{% if f.public | default(false) %}
+        auth_basic off;
+{% endif %}
+    }
+
+{% endfor %}
     location ~ \.sha256$ {
         default_type text/plain;
         try_files $uri =404;
