@@ -1613,8 +1613,9 @@ module "ooniapi_slack_invite" {
     SLACK_WEBHOOK_URL = data.aws_ssm_parameter.slack_invite_webhook_url.arn
   }
   task_environment = {
-    WORKSPACE_NAME = "OONI"
-    CONTACT_EMAIL  = "contact@openobservatory.org"
+    WORKSPACE_NAME   = "Open Observatory"
+    SLACK_SIGNIN_URL = "https://openobservatory.slack.com/"
+    CONTACT_EMAIL    = "contact@openobservatory.org"
     # The load balancer adds the client's address last; used to rate limit
     CLIENT_IP_HEADER = "X-Forwarded-For"
   }
