@@ -1568,6 +1568,68 @@ module "testlists_builder" {
   codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
 }
 
+### Slack invite requests (https://github.com/ooni/slack-invite)
+
+data "aws_ssm_parameter" "slack_invite_webhook_url" {
+  # Incoming webhook of the Slack channel where admins see invite requests
+  name = "/oonidevops/secrets/slack_invite/webhook_url"
+}
+
+module "ooniapi_slack_invite_deployer" {
+  source = "../../modules/ooniapi_service_deployer"
+
+  service_name            = "slack-invite"
+  repo                    = "ooni/slack-invite"
+  branch_name             = "main"
+  environment             = local.environment
+  trigger_paths           = ["**"]
+  buildspec_path          = "buildspec.yml"
+  codestar_connection_arn = aws_codestarconnections_connection.oonidevops.arn
+  # Weekly, for Debian and ca-certificates updates
+  rebuild_schedule = "cron(0 6 ? * MON *)"
+
+  codepipeline_bucket = aws_s3_bucket.ooniapi_codepipeline_bucket.bucket
+
+  ecs_service_name = module.ooniapi_slack_invite.ecs_service_name
+  ecs_cluster_name = module.ooniapi_cluster.cluster_name
+}
+
+module "ooniapi_slack_invite" {
+  source = "../../modules/ooniapi_service"
+
+  task_memory = 64
+  vpc_id      = module.network.vpc_id
+
+  service_name             = "slack-invite"
+  default_docker_image_url = "ooni/slack-invite:latest"
+  stage                    = local.environment
+  dns_zone_ooni_io         = local.dns_zone_ooni_io
+  key_name                 = module.adm_iam_roles.oonidevops_key_name
+  ecs_cluster_id           = module.ooniapi_cluster.cluster_id
+
+  service_desired_count = 1
+
+  task_secrets = {
+    SLACK_WEBHOOK_URL = data.aws_ssm_parameter.slack_invite_webhook_url.arn
+  }
+  task_environment = {
+    WORKSPACE_NAME   = "Open Observatory"
+    SLACK_SIGNIN_URL = "https://openobservatory.slack.com/"
+    CONTACT_EMAIL    = "contact@openobservatory.org"
+    # The load balancer adds the client's address last; used to rate limit
+    CLIENT_IP_HEADER = "X-Forwarded-For"
+  }
+
+  ooniapi_service_security_groups = [
+    module.ooniapi_cluster.web_security_group_id
+  ]
+
+  tags = merge(
+    local.tags,
+    { Name = "ooni-tier0-slack-invite" }
+  )
+}
+
 #### OONI Tier0 API Frontend
 
 module "ooniapi_frontend" {
@@ -1584,6 +1646,9 @@ module "ooniapi_frontend" {
   ooniapi_oonifindings_target_group_arn     = module.ooniapi_oonifindings.alb_target_group_id
   ooniapi_oonimeasurements_target_group_arn = module.ooniapi_oonimeasurements.alb_target_group_id
   ooniapi_testlists_target_group_arn        = module.ooniapi_testlists.alb_target_group_id
+  ooniapi_slack_invite_target_group_arn     = module.ooniapi_slack_invite.alb_target_group_id
+
+  slack_invite_domains = ["slack.ooni.org", "slack.ooni.io"]
 
   ooniapi_service_security_groups = [
     module.ooniapi_cluster.web_security_group_id,
@@ -1631,6 +1696,8 @@ locals {
     "oonimeasurements.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "oonifindings.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
     "testlists.${local.environment}.ooni.io" : local.dns_zone_ooni_io,
+    "slack.ooni.org" : local.dns_root_zone_ooni_org,
+    "slack.ooni.io" : local.dns_root_zone_ooni_io,
   }
 
   ooniapi_frontend_main_domain_name         = "api.${local.environment}.ooni.io"

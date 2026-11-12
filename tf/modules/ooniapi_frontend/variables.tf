@@ -72,3 +72,14 @@ variable "aws_region" {
   description = "The AWS region to create things in."
   default     = "eu-central-1"
 }
+
+variable "ooniapi_slack_invite_target_group_arn" {
+  description = "arn for the target group of the slack-invite service"
+  default     = null
+}
+
+variable "slack_invite_domains" {
+  description = "host names served by the slack-invite service, e.g. slack.ooni.org"
+  type        = list(string)
+  default     = []
+}
