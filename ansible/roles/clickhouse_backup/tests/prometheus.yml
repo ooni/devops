@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+rule_files: [alert_rules.yml]
+alerting:
+  alertmanagers:
+    - static_configs: [{targets: ["alertmanager:9093"]}]
+scrape_configs:
+  # The backup's textfile, labelled as data3 like the production scrape
+  - job_name: node
+    static_configs: [{targets: ["node_exporter:9100"]}]
+    relabel_configs:
+      - target_label: instance
+        replacement: data3.htz-fsn.prod.ooni.nu

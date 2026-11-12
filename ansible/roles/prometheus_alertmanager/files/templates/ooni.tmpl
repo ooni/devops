@@ -4,3 +4,7 @@
 {{ define "slack.ooni.title" }}
 {{ range $i, $el := .Alerts }}{{ if gt $i 0 }}
 {{ end }}{{ if eq $el.Status "resolved" }}[RESOLVED] {{ else }}[FIRING] {{ end }}{{ $el.Annotations.summary }}{{ end }}{{ end }}
+
+{{ define "slack.ooni.notice.title" }}
+{{ range $i, $el := .Alerts }}{{ if gt $i 0 }}
+{{ end }}{{ $el.Annotations.summary }}{{ end }}{{ end }}
