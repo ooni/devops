@@ -1173,7 +1173,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "118-missing-meta-fields"
   environment             = local.environment
   trigger_paths           = ["ooniapi/services/oonimeasurements/**", "ooniapi/common/**"]
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
@@ -1203,7 +1203,7 @@ module "ooniapi_oonimeasurements" {
   task_secrets = {
     JWT_ENCRYPTION_KEY          = data.aws_ssm_parameter.jwt_secret.arn
     PROMETHEUS_METRICS_PASSWORD = data.aws_ssm_parameter.prometheus_metrics_password.arn
-    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_test_url.arn
+    CLICKHOUSE_URL              = data.aws_ssm_parameter.clickhouse_oonimeasurements_url.arn # TEMP: point dev at prod db, revert to clickhouse_oonimeasurements_test_url
     ACCOUNT_ID_HASHING_KEY      = data.aws_ssm_parameter.account_id_hashing_key.arn
   }
 
