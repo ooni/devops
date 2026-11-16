@@ -1173,7 +1173,7 @@ module "ooniapi_oonimeasurements_deployer" {
 
   service_name            = "oonimeasurements"
   repo                    = "ooni/backend"
-  branch_name             = "master"
+  branch_name             = "118-missing-meta-fields"
   environment             = local.environment
   trigger_paths           = ["ooniapi/services/oonimeasurements/**", "ooniapi/common/**"]
   buildspec_path          = "ooniapi/services/oonimeasurements/buildspec.yml"
