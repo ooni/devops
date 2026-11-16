@@ -942,7 +942,7 @@ module "ooniapi_ooniprobe" {
   ]
 
   use_autoscaling       = false
-  service_desired_count = 4
+  service_desired_count = 3
   # max_desired_count     = 8
   # autoscale_policies = [
   #   {
@@ -1005,7 +1005,7 @@ module "ooniapi_ooniprobe_legacy" {
   ]
 
   use_autoscaling       = false
-  service_desired_count = 1
+  service_desired_count = 2
 
   tags = merge(
     local.tags,
