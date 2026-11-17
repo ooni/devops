@@ -1,7 +1,10 @@
 s3_ooni_open_data_access_key: "{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/s3_ooni_open_data_access_key', profile='oonidevops_user_prod') }}"
-clickhouse_url: "clickhouse://fastpath:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_fastpath_password', profile='oonidevops_user_prod') }}@clickhouse1.prod.ooni.io/ooni"
+# clickhouse-driver moves to an alt_host only when it can't connect, and stays there: restart fastpath to mvove back
+clickhouse_url: "clickhouse://fastpath:{{ lookup('amazon.aws.aws_ssm', '/oonidevops/secrets/clickhouse_fastpath_password', profile='oonidevops_user_prod') }}@clickhouse1.prod.ooni.io/ooni?alt_hosts=clickhouse2.prod.ooni.io"
 bucket_name: "ooni-data-eu-fra"
 # COLLECTOR ID SHOULD BE DIFFERENT BETWEEN EACH FASTPATH INSTANCE
 collector_id: "4"
 env: "prod"
-fastpath_image: "ooni/fastpath:20260921-ac774cb4"
+# This image drains its queue on docker stop, give it 120s to drain (docker default 10s)
+fastpath_image: "ooni/fastpath:20261117-27f2b28c"
+fastpath_stop_timeout: 120
