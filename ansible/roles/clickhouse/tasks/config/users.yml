@@ -1,0 +1,34 @@
+---
+
+# SQL-driven users (clickhouse_custom_users): created if missing, altered if they
+# already exist, so that changes in vars always apply. ALTER keeps a user's grants
+# and quota assignments.
+
+- name: CLICKHOUSE | List SQL users
+  ansible.builtin.command:
+    cmd: >-
+      clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+      --query "SELECT name FROM system.users WHERE storage = 'local_directory'"
+  register: clickhouse_existing_users
+  changed_when: false
+  check_mode: false  # read-only, so that --check can show what would change
+  tags: [clickhouse_users]
+
+- name: CLICKHOUSE | Drop SQL users missing from vars
+  ansible.builtin.command:
+    cmd: >-
+      clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+      --query "DROP USER {{ item }}"
+  loop: "{{ clickhouse_existing_users.stdout_lines | difference(clickhouse_custom_users | map(attribute='name')) }}"
+  when: clickhouse_sql_objects_drop_unlisted
+  tags: [clickhouse_users]
+
+# Reports changed on every run, as the statements are always sent; they only change
+# the server when the vars have changed.
+- name: CLICKHOUSE | Create or update SQL users
+  ansible.builtin.command:
+    cmd: clickhouse-client --config-file {{ clickhouse_admin_client_config }} --multiquery
+    stdin: "{{ lookup('template', 'DDL/USERS.j2') }}"
+  vars:
+    existing: "{{ clickhouse_existing_users.stdout_lines }}"
+  tags: [clickhouse_users]

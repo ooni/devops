@@ -1,0 +1,33 @@
+---
+
+# SQL-driven quotas (clickhouse_custom_quotas): created if missing, altered if they
+# already exist. Without `to`, ALTER QUOTA leaves the quota's assignment as it is.
+
+- name: CLICKHOUSE | List SQL quotas
+  ansible.builtin.command:
+    cmd: >-
+      clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+      --query "SELECT name FROM system.quotas WHERE storage = 'local_directory'"
+  register: clickhouse_existing_quotas
+  changed_when: false
+  check_mode: false  # read-only, so that --check can show what would change
+  tags: [clickhouse_quotas]
+
+- name: CLICKHOUSE | Drop SQL quotas missing from vars
+  ansible.builtin.command:
+    cmd: >-
+      clickhouse-client --config-file {{ clickhouse_admin_client_config }}
+      --query "DROP QUOTA {{ item }}"
+  loop: "{{ clickhouse_existing_quotas.stdout_lines | difference(clickhouse_custom_quotas | map(attribute='name')) }}"
+  when: clickhouse_sql_objects_drop_unlisted
+  tags: [clickhouse_quotas]
+
+# Reports changed on every run, as the statements are always sent; they only change
+# the server when the vars have changed.
+- name: CLICKHOUSE | Create or update SQL quotas
+  ansible.builtin.command:
+    cmd: clickhouse-client --config-file {{ clickhouse_admin_client_config }} --multiquery
+    stdin: "{{ lookup('template', 'DDL/QUOTAS.j2') }}"
+  vars:
+    existing: "{{ clickhouse_existing_quotas.stdout_lines }}"
+  tags: [clickhouse_quotas]
