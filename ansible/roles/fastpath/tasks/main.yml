@@ -199,6 +199,9 @@
     name: statsd-exporter
     image: prom/statsd-exporter:v0.28.0
     state: started
+    # Without it Docker's default is "no": the exporter stays down after a
+    # reboot or a Docker restart until the next deploy starts it
+    restart_policy: always
     published_ports:
       - "9102:9102" # for /metrics
       - "8125:9125" # for reporting metrics
