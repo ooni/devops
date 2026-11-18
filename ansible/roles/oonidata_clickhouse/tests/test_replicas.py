@@ -246,8 +246,22 @@ def main():
     set_cluster(three)
     check(ansible("render.yml")[0] == 0, "the clickhouse role renders the configs without data4")
     restart_one_at_a_time(three)
-    compose("stop", "data4")
-    sql("data1", "SYSTEM DROP REPLICA '04'")
+    # Time for a clean shutdown (compose kills after 10 s), which closes data4's Keeper
+    # session. Until that session is gone Keeper counts replica 04 as active and DROP
+    # REPLICA refuses ("because it's active"): retry, as the runbook says.
+    start = time.time()
+    compose("stop", "-t", "120", "data4")
+    print(f"     data4 stopped in {time.time() - start:.0f}s")
+    start = time.time()
+    while True:
+        try:
+            sql("data1", "SYSTEM DROP REPLICA '04'")
+            break
+        except RuntimeError as e:
+            if "because it's active" not in str(e) or time.time() - start > 120:
+                raise
+            time.sleep(5)
+    print(f"     DROP REPLICA '04' succeeded after {time.time() - start:.0f}s")
     for n in three:
         check(replicas_in_cluster(n) == [f"clickhouse{i}.prod.ooni.io" for i in (1, 2, 3)],
               f"{n} sees three replicas in oonidata_cluster")
