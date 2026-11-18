@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!--
+  Credentials for the backup bucket on the `minio` service
+  (docker-compose.backup.yml), mounted on ch1/ch2/ch3 and chr. Same mechanism
+  as production's config.d/ooni_backup_s3.xml (ansible role clickhouse_backup):
+  BACKUP/RESTORE and the s3() function pick up keys for any URL under this
+  endpoint, so queries never carry them. That matters because an incremental
+  backup stores its base_backup argument verbatim in its .backup file.
+-->
+<clickhouse>
+    <s3>
+        <ooni_backup>
+            <endpoint>http://minio:9000/backups/</endpoint>
+            <access_key_id>minioadmin</access_key_id>
+            <secret_access_key>minioadmin</secret_access_key>
+        </ooni_backup>
+    </s3>
+</clickhouse>
