@@ -1,0 +1,10 @@
+---
+# ClickHouse rereads config.d by itself within seconds; this applies a change
+# at once, and fails the play if the config doesn't load. systemctl reload
+# won't do: ClickHouse takes its SIGHUP as a request to reopen its logs.
+- name: Reload ClickHouse's config
+  ansible.builtin.command: clickhouse-client -u {{ clickhouse_admin_user }} -q "SYSTEM RELOAD CONFIG"
+  environment:
+    CLICKHOUSE_PASSWORD: "{{ clickhouse_admin_password }}"
+  changed_when: true
+  no_log: true

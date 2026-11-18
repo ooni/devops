@@ -68,6 +68,18 @@
     - node_exporter
     - secrets
 
+- name: Create the textfile collector directory.
+  file:
+    path: "{{ node_exporter_textfile_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  when: node_exporter_textfile_dir | length > 0
+  tags:
+    - prometheus_node_exporter
+    - config
+
 - name: Copy the node_exporter systemd unit file.
   template:
     src: node_exporter.service.j2

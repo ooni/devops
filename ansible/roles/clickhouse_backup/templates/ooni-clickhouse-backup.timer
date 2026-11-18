@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up ClickHouse tables to object storage
+
+[Timer]
+Unit=ooni-clickhouse-backup.service
+OnCalendar={{ clickhouse_backup_on_calendar }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target
