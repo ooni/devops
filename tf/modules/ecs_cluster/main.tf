@@ -207,15 +207,29 @@ resource "aws_autoscaling_group" "container_host" {
   # defined below. Note that this is an ECS cluster, so
   # cluster capacity is directed by task load demands
 
+  # The template's version, not "$Latest": a new template (e.g. a new ECS AMI,
+  # which the template picks up on every apply) then changes the group, and
+  # that starts the instance refresh below.
   launch_template {
     id      = aws_launch_template.container_host.id
-    version = "$Latest"
+    version = aws_launch_template.container_host.latest_version
   }
 
+  # Replace the hosts one at a time when the template changes: start a new
+  # host, let ECS drain the old one's tasks onto it (managed_draining below),
+  # then terminate the old host.
   instance_refresh {
     strategy = "Rolling"
     preferences {
-      min_healthy_percentage = 50
+      # Launch the new host before terminating the old one, so capacity never
+      # drops below what's running
+      min_healthy_percentage = 100
+      max_healthy_percentage = 200
+      # Hosts running tasks are protected from scale-in (managed termination
+      # protection); without this the refresh skips them, i.e. all of them
+      scale_in_protected_instances = "Refresh"
+      # Leave hosts already on the new template alone
+      skip_matching = true
     }
 
     triggers = ["tag"]
@@ -236,7 +250,10 @@ resource "aws_ecs_capacity_provider" "capacity_provider" {
   auto_scaling_group_provider {
     auto_scaling_group_arn         = aws_autoscaling_group.container_host.arn
     managed_termination_protection = "ENABLED"
-    # managed_draining = "ENABLED"
+    # Before a host terminates (e.g. in an instance refresh), ECS starts its
+    # tasks on other hosts and drains them from the load balancer. The
+    # default for capacity providers created since 2024; set to say so.
+    managed_draining = "ENABLED"
 
     managed_scaling {
       maximum_scaling_step_size = 1000
