@@ -50,6 +50,14 @@ clickhouse_backup_jobs:
 # Complete chains kept per table, besides chains pinned with --keep: the
 # current one and the one before, so a month or two of restore points
 clickhouse_backup_keep_chains: 2
+# The lock rule on the bucket's clickhouse_backup_s3_prefix (docs/Runbooks.md),
+# in days: R2 refuses to delete or overwrite an object there until it's that
+# old, so chains are pruned only once all of their objects are. 0 if the
+# bucket has no lock rule. Backups are written under staging/<prefix>, which
+# the rule mustn't cover, and moved once complete.
+clickhouse_backup_s3_lock_days: 0
+# with an hour more, in case this host's clock runs ahead of R2's
+clickhouse_backup_s3_lock_seconds: "{{ ((clickhouse_backup_s3_lock_days | int) * 86400 + 3600) if (clickhouse_backup_s3_lock_days | int) else 0 }}"
 # Bytes/s passed to ClickHouse as max_backup_bandwidth: 100 MB/s
 clickhouse_backup_max_bandwidth: 100000000
 

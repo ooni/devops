@@ -14,7 +14,11 @@ Layout in each bucket:
                                                            data export, for
                                                            EmbeddedRocksDB and
                                                            Join tables only
-    <prefix>/<database>/<table>/<chain>/KEEP-<label>       pin, never pruned
+    <staging>/<database>/<table>/<chain>/<backup>/         a backup being
+                                                           written, or moved
+    <staging>/<database>/<table>/<chain>/KEEP-<label>      pin, never pruned
+
+<staging> is staging/<prefix> unless the config says otherwise.
 
 <chain> and <backup> are UTC timestamps (20261013T023000Z). The first backup
 of a chain is a full backup; every later one is incremental on top of the
@@ -33,7 +37,20 @@ exported separately in Native format.
 
 ClickHouse reads the bucket credentials from an <s3> endpoint in its config
 (config.d/ooni_backup_s3.xml); this script only uses them itself, through
-boto3, to list and delete backups.
+boto3, to list, move and delete backups.
+
+Why staging: the bucket's lock rule (R2 bucket lock) holds every object
+under <prefix> until it is s3_lock_seconds old, so these credentials can't
+delete or overwrite recent backups. ClickHouse can't write a backup there:
+it deletes a .lock file of its own at the end, and would report the backup
+failed when the lock refuses. So it writes each backup under <staging>,
+which isn't locked, and once it's complete the script copies it to <prefix>
+within the bucket, .backup last, and deletes it from <staging>. Incrementals
+name the copy under <prefix> as their base, so every chain restores from
+<prefix> alone. Nothing under <prefix> is deleted until all of the prefix
+being deleted is past the lock, so a chain is never left half deleted:
+pruning waits for that. Pins are under <staging>, so they can be released
+at any time.
 
 Commands:
     run [--job J ...] [--full] [--table T ...] [--keep LABEL]
@@ -68,15 +85,19 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 
 import boto3  # debdeps: python3-boto3
+from boto3.s3.transfer import TransferConfig
 from botocore.config import Config as BotoConfig
 
 log = logging.getLogger("ooni-clickhouse-backup")
 
 DEFAULT_CONFIG = "/etc/ooni/clickhouse-backup.json"
 TS_FMT = "%Y%m%dT%H%M%SZ"
+# what R2 answers a write of an object its bucket lock holds
+LOCKED_BY_BUCKET = "ObjectLockedByBucketPolicy"
 SAFE_NAME = re.compile(r"^[A-Za-z0-9_]+$")
 # BACKUP stores only the schema of these engines, so their rows are exported
 EXPORT_ENGINES = {"EmbeddedRocksDB", "Join"}
@@ -144,13 +165,16 @@ class Store:
     def __init__(self, conf: dict):
         self.bucket = conf["s3_bucket"]
         self.prefix = conf["s3_prefix"].strip("/")
+        self.staging = conf.get("s3_staging_prefix", f"staging/{self.prefix}").strip("/")
+        assert not (self.staging + "/").startswith(self.prefix + "/"), "the staging prefix must be outside the locked one"
         self.key_id = conf["s3_access_key_id"]
         self.secret = conf["s3_secret_access_key"]
         endpoint = conf["s3_endpoint"].rstrip("/")
         # ClickHouse may reach the store under another name (e.g. in tests)
         ch_endpoint = conf.get("clickhouse_s3_endpoint", endpoint).rstrip("/")
         self.ch_base = f"{ch_endpoint}/{self.bucket}"
-        botoconf = dict(s3={"addressing_style": "path"})
+        # 16 copies at once in move(), each up to 4 requests
+        botoconf = dict(s3={"addressing_style": "path"}, max_pool_connections=64)
         try:
             # boto3 >= 1.36 adds checksums some S3-compatible stores reject
             cfg = BotoConfig(
@@ -168,9 +192,14 @@ class Store:
             aws_secret_access_key=self.secret,
             config=cfg,
         )
+        # Copies within the bucket, of objects up to 1.25 TiB: R2 needs a
+        # multipart upload's parts, but the last, to be the same size
+        self.transfer = TransferConfig(
+            multipart_threshold=128 << 20, multipart_chunksize=128 << 20, max_concurrency=4
+        )
 
-    def table_prefix(self, database: str, table: str) -> str:
-        return f"{self.prefix}/{database}/{table}/"
+    def table_prefix(self, database: str, table: str, staging: bool = False) -> str:
+        return f"{self.staging if staging else self.prefix}/{database}/{table}/"
 
     def ch_s3(self, key: str) -> str:
         """S3(...) argument for BACKUP/RESTORE and the s3 function.
@@ -201,6 +230,68 @@ class Store:
                 return False
             raise
 
+    def objects(self, prefix: str) -> dict:
+        """{key: (size, last modified)} under prefix"""
+        out = {}
+        pager = self.s3.get_paginator("list_objects_v2")
+        for page in pager.paginate(Bucket=self.bucket, Prefix=prefix):
+            for o in page.get("Contents", []):
+                out[o["Key"]] = (o["Size"], o["LastModified"])
+        return out
+
+    def newest(self, prefix: str):
+        """When the newest object under prefix (or the key prefix) was
+        written, or None if there's none"""
+        return max((t for _, t in self.objects(prefix).values()), default=None)
+
+    def move(self, src: str, dst: str) -> int:
+        """Copy every object under src to dst, .backup last, check that all
+        arrived, then delete src. An object already at dst with the same size
+        isn't copied again, so a move cut short is finished: the bucket's lock
+        would refuse to overwrite it. The number of objects moved."""
+        assert src.endswith("/") and dst.endswith("/")
+        objs = {k[len(src):]: size for k, (size, _) in self.objects(src).items()}
+        if ".backup" not in objs:
+            raise RuntimeError(f"{src} isn't a complete backup")
+        have = {k[len(dst):]: size for k, (size, _) in self.objects(dst).items()}
+        todo = [n for n, size in objs.items() if have.get(n) != size and n != ".backup"]
+
+        def copy(name):
+            try:
+                self.s3.copy({"Bucket": self.bucket, "Key": src + name}, self.bucket, dst + name, Config=self.transfer)
+            except Exception as e:
+                code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
+                if LOCKED_BY_BUCKET not in (code + str(e)):
+                    raise
+                # there already, though the listing didn't show it: the lock
+                # refuses to overwrite it, and it needn't be if it's the same
+                there = self.s3.head_object(Bucket=self.bucket, Key=dst + name)["ContentLength"]
+                if there != objs[name]:
+                    raise RuntimeError(
+                        f"{dst}{name} is already there, locked, with {there} bytes instead of {objs[name]}: "
+                        f"delete {src} for the next run to take a new backup"
+                    ) from None
+
+        def check(names):
+            have = {k[len(dst):]: size for k, (size, _) in self.objects(dst).items()}
+            missing = [n for n in names if have.get(n) != objs[n]]
+            if missing:
+                raise RuntimeError(f"{len(missing)} objects of {src} not copied to {dst}, e.g. {missing[0]}")
+            return have
+
+        with ThreadPoolExecutor(16) as pool:
+            list(pool.map(copy, todo))
+        # .backup only once the rest is there: with it, the copy is complete
+        have = check([n for n in objs if n != ".backup"])
+        if have.get(".backup") != objs[".backup"]:
+            copy(".backup")
+            check([".backup"])
+        # .backup first: if this is cut short, what's left is an incomplete
+        # backup, removed by the next run
+        self.delete_key(src + ".backup")
+        self.delete_prefix(src)
+        return len(objs)
+
     def put_empty(self, key: str) -> None:
         self.s3.put_object(Bucket=self.bucket, Key=key, Body=b"")
 
@@ -208,7 +299,7 @@ class Store:
         self.s3.delete_object(Bucket=self.bucket, Key=key)
 
     def delete_prefix(self, prefix: str) -> int:
-        assert prefix.endswith("/") and prefix.startswith(self.prefix + "/")
+        assert prefix.endswith("/") and prefix.startswith((self.prefix + "/", self.staging + "/"))
         n = 0
         pager = self.s3.get_paginator("list_objects_v2")
         for page in pager.paginate(Bucket=self.bucket, Prefix=prefix):
@@ -224,21 +315,32 @@ class Store:
         return n
 
     def chains(self, database: str, table: str) -> dict:
-        """{chain: {"backups": {backup: complete}, "keep": [labels]}}"""
-        tprefix = self.table_prefix(database, table)
+        """{chain: {"backups": {backup: complete}, "keep": [labels]}}: the
+        backups under the locked prefix, the pins under either"""
         out = {}
-        for chain in self.subdirs(tprefix):
-            if not chain:
-                continue
-            entry = {"backups": {}, "keep": []}
-            for name in self.subdirs(f"{tprefix}{chain}/"):
-                if name.startswith("KEEP-"):
-                    entry["keep"].append(name[len("KEEP-") :])
-                elif name:
-                    marker = f"{tprefix}{chain}/{name}/.backup"
-                    entry["backups"][name] = self.exists(marker)
-            out[chain] = entry
+        for staging in (False, True):
+            tprefix = self.table_prefix(database, table, staging)
+            for chain in self.subdirs(tprefix):
+                if not chain:
+                    continue
+                for name in self.subdirs(f"{tprefix}{chain}/"):
+                    if name.startswith("KEEP-"):
+                        entry = out.setdefault(chain, {"backups": {}, "keep": []})
+                        entry["keep"].append(name[len("KEEP-") :])
+                    elif name and not staging:
+                        entry = out.setdefault(chain, {"backups": {}, "keep": []})
+                        entry["backups"][name] = self.exists(f"{tprefix}{chain}/{name}/.backup")
         return out
+
+    def staged(self, database: str, table: str) -> list:
+        """[(chain, backup, complete)] under the staging prefix"""
+        tprefix = self.table_prefix(database, table, staging=True)
+        out = []
+        for chain in self.subdirs(tprefix):
+            for name in self.subdirs(f"{tprefix}{chain}/") if chain else []:
+                if name and not name.startswith("KEEP-"):
+                    out.append((chain, name, self.exists(f"{tprefix}{chain}/{name}/.backup")))
+        return sorted(out)
 
 
 def write_atomically(path: str, text: str) -> None:
@@ -427,6 +529,8 @@ class BackupJob:
         )
         self.store = Store(conf)
         self.keep_chains = max(1, int(conf.get("keep_chains", 1)))
+        # the bucket's lock rule, at least as long: 0 if it has none
+        self.lock_s = int(conf.get("s3_lock_seconds", 0))
         # fnmatch patterns: "*" for every table; an empty list selects none, so
         # emptying a host's list can't make it back up every table
         self.include = conf.get("include_tables", [])
@@ -498,9 +602,9 @@ class BackupJob:
         rows = self.ch.rows(
             "SELECT id, name FROM system.backups WHERE status = 'CREATING_BACKUP'"
         )
-        # this job's bucket and prefix only: one bucket's name can begin another's
-        ours = f"{self.store.ch_base}/{self.store.prefix}/"
-        return [r for r in rows if ours in r["name"]]
+        # this job's bucket and prefixes only: one bucket's name can begin another's
+        ours = [f"{self.store.ch_base}/{p}/" for p in (self.store.staging, self.store.prefix)]
+        return [r for r in rows if any(o in r["name"] for o in ours)]
 
     def wait_for_clickhouse(self) -> None:
         """At boot a missed run starts before ClickHouse accepts queries"""
@@ -576,17 +680,55 @@ class BackupJob:
             log.warning(f"{self.name}: {table}: ClickHouse restarted during the backup ({e}), starting it again")
         return self.backup_table(table, engine, force_full, keep)
 
+    def locked_until(self, prefix: str):
+        """When the bucket's lock lets every object under prefix be deleted,
+        or None if it does now"""
+        if not self.lock_s:
+            return None
+        newest = self.store.newest(prefix)
+        if newest is None:
+            return None
+        until = newest + timedelta(seconds=self.lock_s)
+        return until if until > utcnow() else None
+
+    def finish_staged(self, table: str) -> None:
+        """What earlier runs left under the staging prefix: move a complete
+        backup whose move was cut short, remove an incomplete one"""
+        staging = self.store.table_prefix(self.db, table, staging=True)
+        for chain, backup, complete in self.store.staged(self.db, table):
+            src = f"{staging}{chain}/{backup}/"
+            if complete:
+                dst = f"{self.store.table_prefix(self.db, table)}{chain}/{backup}/"
+                n = self.store.move(src, dst)
+                log.info(f"{table}: finished moving {chain}/{backup} ({n} objects)")
+            else:
+                n = self.store.delete_prefix(src)
+                log.info(f"{table}: removed incomplete backup {chain}/{backup} ({n} objects)")
+
     def cleanup_incomplete(self, table: str, chains: dict) -> None:
+        """Incomplete backups under the locked prefix: a copy that failed, or
+        a backup from before staging. Never used (a backup gets a new name),
+        so they can wait for the lock to let them go."""
         tprefix = self.store.table_prefix(self.db, table)
         for chain, entry in chains.items():
+            if not entry["backups"]:
+                continue  # only pins, under the staging prefix
             if not any(entry["backups"].values()) and not entry["keep"]:
-                n = self.store.delete_prefix(f"{tprefix}{chain}/")
-                log.info(f"{table}: removed incomplete chain {chain} ({n} objects)")
+                prefix, what = f"{tprefix}{chain}/", f"incomplete chain {chain}"
+            else:
+                for backup, ok in entry["backups"].items():
+                    if not ok:
+                        self.remove_unless_locked(table, f"{tprefix}{chain}/{backup}/", f"incomplete backup {chain}/{backup}")
                 continue
-            for backup, ok in entry["backups"].items():
-                if not ok:
-                    n = self.store.delete_prefix(f"{tprefix}{chain}/{backup}/")
-                    log.info(f"{table}: removed incomplete backup {chain}/{backup} ({n} objects)")
+            self.remove_unless_locked(table, prefix, what)
+
+    def remove_unless_locked(self, table: str, prefix: str, what: str) -> None:
+        until = self.locked_until(prefix)
+        if until:
+            log.info(f"{table}: {what} locked until {ts(until)}, removing it then")
+            return
+        n = self.store.delete_prefix(prefix)
+        log.info(f"{table}: removed {what} ({n} objects)")
 
     def prune(self, table: str) -> None:
         """Keep the newest keep_chains complete chains plus pinned ones"""
@@ -596,11 +738,16 @@ class BackupJob:
         for chain in done[: -self.keep_chains]:
             if chains[chain]["keep"]:
                 continue
+            until = self.locked_until(f"{tprefix}{chain}/")
+            if until:
+                log.info(f"{table}: chain {chain} locked until {ts(until)}, pruning it then")
+                continue
             n = self.store.delete_prefix(f"{tprefix}{chain}/")
             log.info(f"{table}: pruned chain {chain} ({n} objects)")
 
     def backup_table(self, table: str, engine: str, force_full: bool, keep: str) -> bool:
         """Back up one table; True if that was a full backup"""
+        self.finish_staged(table)
         chains = self.store.chains(self.db, table)
         self.cleanup_incomplete(table, chains)
         chains = self.store.chains(self.db, table)
@@ -616,7 +763,8 @@ class BackupJob:
         )
         chain = ts(now) if full else base_chain
         name = ts(now)
-        key = f"{self.store.table_prefix(self.db, table)}{chain}/{name}"
+        key = f"{self.store.table_prefix(self.db, table, staging=True)}{chain}/{name}"
+        dst = f"{self.store.table_prefix(self.db, table)}{chain}/{name}"
         kind = "full" if full else f"incremental on {base_chain}/{base}"
         what = f"{table}: {chain}/{name} ({kind})"
 
@@ -647,10 +795,16 @@ class BackupJob:
             f"{what}: done in {secs / 60:.1f} min, {st['num_files']} files, "
             f"{size(int(st['uncompressed_size']))} new data"
         )
+        t1 = time.monotonic()
+        n = self.store.move(key + "/", dst + "/")
+        log.info(f"{what}: moved to {self.store.prefix}/ in {(time.monotonic() - t1) / 60:.1f} min ({n} objects)")
+        secs = time.monotonic() - t0
         self.metrics.table_result(self.name, table, True, st, secs)
 
         if keep:
-            self.store.put_empty(f"{self.store.table_prefix(self.db, table)}{chain}/KEEP-{keep}")
+            marker = f"{self.store.table_prefix(self.db, table, staging=True)}{chain}/KEEP-{keep}"
+            if not self.store.exists(marker):
+                self.store.put_empty(marker)
             log.info(f"{table}: chain {chain} pinned as {keep}")
         self.prune(table)
         return full
@@ -704,7 +858,7 @@ class BackupJob:
         # print(), to be read or piped (e.g. the latest: URL into a RESTORE);
         # log is for what run and release report, to stderr and the journal.
         tables = only or sorted(
-            n for n in self.store.subdirs(f"{self.store.prefix}/{self.db}/") if n
+            {n for p in (self.store.prefix, self.store.staging) for n in self.store.subdirs(f"{p}/{self.db}/") if n}
         )
         for table in tables:
             chains = self.store.chains(self.db, table)
@@ -715,6 +869,9 @@ class BackupJob:
                 for backup, ok in sorted(entry["backups"].items()):
                     status = "" if ok else "  (incomplete)"
                     print(f"    {backup}{status}")
+            for chain, backup, complete in self.store.staged(self.db, table):
+                status = "complete, not yet moved" if complete else "incomplete"
+                print(f"{table}/{chain}/{backup}  (staging: {status})")
             chain, backup = latest_backup(chains)
             if backup:
                 key = f"{self.store.table_prefix(self.db, table)}{chain}/{backup}"
@@ -722,17 +879,26 @@ class BackupJob:
         return 0
 
     def release(self, label: str) -> int:
-        n = 0
+        n, locked = 0, 0
         for table in self.store.subdirs(f"{self.store.prefix}/{self.db}/"):
             if not table:
                 continue
             for chain, entry in self.store.chains(self.db, table).items():
-                if label in entry["keep"]:
-                    tprefix = self.store.table_prefix(self.db, table)
-                    self.store.delete_key(f"{tprefix}{chain}/KEEP-{label}")
+                if label not in entry["keep"]:
+                    continue
+                for staging in (True, False):
+                    marker = f"{self.store.table_prefix(self.db, table, staging)}{chain}/KEEP-{label}"
+                    if not self.store.exists(marker):
+                        continue
+                    until = None if staging else self.locked_until(marker)
+                    if until:  # a pin from before staging
+                        log.error(f"{table}: chain {chain}'s pin {label} is locked until {ts(until)}; release it then")
+                        locked += 1
+                        continue
+                    self.store.delete_key(marker)
                     n += 1
         log.info(f"released {n} chain(s) pinned as {label}; the next run prunes them")
-        return 0
+        return 1 if locked else 0
 
 
 def not_backed_up(tables: dict, here: str, jobs: list, excluded: list, elsewhere: list) -> dict:

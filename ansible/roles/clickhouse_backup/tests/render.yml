@@ -15,6 +15,7 @@
         clickhouse_backup_jobs: "{{ item.jobs }}"
         clickhouse_backup_max_bandwidth: "{{ item.bandwidth }}"
         clickhouse_backup_check_cluster: "{{ item.check_cluster | default('') }}"
+        clickhouse_backup_s3_lock_seconds: "{{ item.lock_seconds | default(0) }}"
       loop: "{{ test_configs }}"
 
     # From group_vars/clickhouse, as the hosts get them, so the tests check
