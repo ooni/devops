@@ -637,3 +637,22 @@ resource "aws_lb_listener_rule" "ooniapi_testlists_rule" {
     }
   }
 }
+
+# Every path on the slack-invite host names goes to slack-invite, so this
+# comes before the path rules
+resource "aws_lb_listener_rule" "ooniapi_slack_invite_rule_host" {
+  count        = var.ooniapi_slack_invite_target_group_arn != null ? 1 : 0
+  listener_arn = aws_alb_listener.ooniapi_listener_https.arn
+  priority     = 80
+
+  action {
+    type             = "forward"
+    target_group_arn = var.ooniapi_slack_invite_target_group_arn
+  }
+
+  condition {
+    host_header {
+      values = var.slack_invite_domains
+    }
+  }
+}
