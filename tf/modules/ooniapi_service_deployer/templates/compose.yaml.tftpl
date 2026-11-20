@@ -1,0 +1,34 @@
+name: ${service_name}-${slot}
+
+networks:
+  default:
+    name: ${network_name}
+    external: true
+
+%{ if length(secrets) > 0 ~}
+secrets:
+%{ for name in secrets ~}
+  ${name}:
+    file: /etc/ooniapi/${service_name}/${slot}/secrets/${name}
+%{ endfor ~}
+
+%{ endif ~}
+services:
+  ${service_name}-${slot}:
+    image: docker.io/ooni/api-${service_name}:__IMAGE_TAG__
+    container_name: ${service_name}-${slot}
+    restart: always
+    ports:
+      - "127.0.0.1:${host_port}:${container_port}"
+%{ if length(env_vars) > 0 ~}
+    environment:
+%{ for key, value in env_vars ~}
+      ${key}: ${jsonencode(value)}
+%{ endfor ~}
+%{ endif ~}
+%{ if length(secrets) > 0 ~}
+    secrets:
+%{ for name in secrets ~}
+      - ${name}
+%{ endfor ~}
+%{ endif ~}
