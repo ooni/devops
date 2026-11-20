@@ -716,10 +716,9 @@ Refresh and review the charts on the [ClickHouse queries notebook](#clickhouse-q
 
 In this instance frequent calls to the aggregation API are found.
 
-Review the summary of the API quotas. See
-[Calling the API manually](#calling-the-api-manually)&thinsp;📒 for details:
-
-    $ http https://api.ooni.io/api/_/quotas_summary Authorization:'Bearer <mytoken>'
+Review rate limiting activity via the `rate_limit_hits` and
+`rate_limit_request_duration` metrics exported by the API services. Per-IP quota
+state is stored in Valkey keyed by a hashed IP address and is not enumerable via the API.
 
 Log on [backend-fsn.ooni.org](#backend-fsn.ooni.org)&thinsp;🖥 and review the logs:
 
@@ -838,7 +837,7 @@ Call the API using [httpie](https://httpie.io/) with:
 
 E.g.:
 
-    $ http https://api.ooni.io/api/_/quotas_summary Authorization:'Bearer <mytoken>'
+    $ http https://api.ooni.io/api/_/account_metadata Authorization:'Bearer <mytoken>'
 
 > **note**
 > Do not leave whitespaces after \"Authorization:\"
