@@ -56,7 +56,7 @@ modules:
         insecure_skip_verify: true
 
   # When using this prober, be sure to target:
-  # https://collector.ooni.io/invalidpath
+  # https://dkyhjv0wpi2dk.cloudfront.net/invalidpath
   ooni_collector_ok:
     prober: http
     http:
