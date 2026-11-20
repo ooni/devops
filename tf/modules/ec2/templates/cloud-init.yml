@@ -1,0 +1,12 @@
+%{ if swap_size_mb > 0 ~}
+swap:
+  filename: /swapfile
+  size: ${swap_size_mb * 1048576}
+write_files:
+  - path: /etc/sysctl.d/99-swappiness.conf
+    content: |
+      vm.swappiness=10
+# systemd-sysctl ran before cloud-init wrote the file
+runcmd:
+  - [sysctl, -p, /etc/sysctl.d/99-swappiness.conf]
+%{ endif ~}

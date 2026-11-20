@@ -81,3 +81,9 @@ variable "iam_instance_profile_name" {
   default     = null
   type        = string
 }
+
+variable "swap_size_mb" {
+  description = "Size of a swapfile created by cloud-init at first boot, in MiB. 0 means no swap. Only new instances get it: user_data changes are ignored on existing ones"
+  default     = 0
+  type        = number
+}
