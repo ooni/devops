@@ -225,6 +225,20 @@ module "ooniapi_user" {
 }
 
 
+# GitHub Actions OIDC identity provider. 
+# It lets ooni/* GitHub workflows assume IAM roles via OIDC with no
+# long-lived access keys.
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  thumbprint_list = [
+    "6938fd4d98bab03faadb97b34396831e3780aea1",
+    "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
+  ]
+
+  tags = local.tags
+}
+
 ### Configuration common to all services
 
 data "aws_ssm_parameter" "jwt_secret" {
@@ -330,21 +344,6 @@ resource "aws_s3_bucket" "oonith_codepipeline_bucket" {
 resource "aws_s3_bucket" "ooni_private_config_bucket" {
   bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
 }
-
-# GitHub Actions OIDC identity provider. 
-# It lets ooni/* GitHub workflows assume IAM roles via OIDC with no
-# long-lived access keys.
-resource "aws_iam_openid_connect_provider" "github_actions" {
-  url            = "https://token.actions.githubusercontent.com"
-  client_id_list = ["sts.amazonaws.com"]
-  thumbprint_list = [
-    "6938fd4d98bab03faadb97b34396831e3780aea1",
-    "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
-  ]
-
-  tags = local.tags
-}
-
 
 resource "aws_s3_bucket" "anoncred_manifests" {
   bucket              = "ooni-anoncreds-manifests-${var.aws_region}"
