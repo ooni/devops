@@ -547,6 +547,19 @@ clickhouse_tables_log:
 #   max_compress_block_size:
 #   index_granularity:
 
+# Settings that only some ClickHouse versions know. An older server refuses to start
+# with a merge_tree setting, Keeper coordination setting or (from 26.8) top-level
+# setting it doesn't know, so each group is only rendered when clickhouse_version is
+# at least `since`. A rollback to an older clickhouse_version drops them with it.
+#   merge_tree: added to clickhouse_mergetree_settings
+#   keeper_coordination: added to clickhouse_keeper.coordination_settings
+#   server: top-level settings in config.xml, written as they are (quote booleans: "false")
+# clickhouse_version_settings:
+#   - since: "25.8"
+#     merge_tree:
+#       write_marks_for_substreams_in_compact_parts: 0
+clickhouse_version_settings: []
+
 clickhouse_graphitemergetree_settings:
   name: graphite_rollup_example
   path_column_name: Path
