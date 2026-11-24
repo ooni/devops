@@ -5,6 +5,14 @@
   You can either move the settings to the right place inside "users.xml" file
   or add <skip_check_for_incorrect_settings>1</skip_check_for_incorrect_settings> here.
 -->
+{# clickhouse_version_settings: each group only for the versions that know its settings #}
+{% set versioned = namespace(merge_tree={}, keeper_coordination={}, server={}) %}
+{% for group in clickhouse_version_settings if clickhouse_version is version(group.since | string, '>=') %}
+{% set versioned.merge_tree = versioned.merge_tree | combine(group.merge_tree | default({})) %}
+{% set versioned.keeper_coordination = versioned.keeper_coordination | combine(group.keeper_coordination | default({})) %}
+{% set versioned.server = versioned.server | combine(group.server | default({})) %}
+{% endfor %}
+{% set mergetree_settings = (clickhouse_mergetree_settings | default({})) | combine(versioned.merge_tree) %}
 <clickhouse>
   <logger>
     <!-- Possible levels [1]:
@@ -816,9 +824,9 @@
         <snapshot_storage_path>{{ clickhouse_keeper.snapshot_storage_path }}</snapshot_storage_path>
 
         <coordination_settings>
-            <operation_timeout_ms>{{ clickhouse_keeper.coordination_settings.operation_timeout_ms }}</operation_timeout_ms>
-            <session_timeout_ms>{{ clickhouse_keeper.coordination_settings.session_timeout_ms }}</session_timeout_ms>
-            <raft_logs_level>{{ clickhouse_keeper.coordination_settings.raft_logs_level }}</raft_logs_level>
+{% for setting in clickhouse_keeper.coordination_settings | combine(versioned.keeper_coordination) | dict2items %}
+            <{{ setting.key }}>{{ setting.value }}</{{ setting.key }}>
+{% endfor %}
         </coordination_settings>
 
         <raft_configuration>
@@ -1370,9 +1378,9 @@
     <max_suspicious_broken_parts>5</max_suspicious_broken_parts>
   </merge_tree>
   -->
-{% if clickhouse_mergetree_settings is defined %}
+{% if mergetree_settings %}
   <merge_tree>
-{% for setting in clickhouse_mergetree_settings|dict2items %}
+{% for setting in mergetree_settings|dict2items %}
     <{{ setting.key }}>{{ setting.value }}</{{ setting.key }}>
 {% endfor %}
   </merge_tree>
@@ -1606,6 +1614,9 @@
   </rocksdb>
 {% endif %}
 
+{% for setting in versioned.server | dict2items %}
+  <{{ setting.key }}>{{ setting.value }}</{{ setting.key }}>
+{% endfor %}
 {% if clickhouse_config_xml_extra_config is defined %}
 {{ clickhouse_config_xml_extra_config|indent(2, true) }}
 {% endif %}

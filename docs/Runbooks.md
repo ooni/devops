@@ -1246,6 +1246,9 @@ To remove a replica:
    ```sql
    SYSTEM DROP REPLICA '04'
    ```
+   If it refuses with "because it's active", Keeper hasn't yet noticed the stopped host's
+   session end (at most its session timeout, 30 s by default): check the host's ClickHouse
+   is stopped, wait, and run it again.
 
 A re-imaged replica that keeps its name must also be dropped from Keeper before it's deployed
 again, or creating its replicated tables fails because the replica already exists.

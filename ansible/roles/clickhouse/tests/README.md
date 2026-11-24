@@ -1,6 +1,6 @@
 # Tests
 
-`run.sh` checks what the role's README says it does, against ClickHouse 24.8.6.70
+`run.sh` checks what the role's README says it does, against ClickHouse 25.3.14.14
 (production's version) in containers, using the real
 `ansible/group_vars/clickhouse/vars.yml` with its secrets replaced by test values:
 

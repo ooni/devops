@@ -1,0 +1,30 @@
+# The three hosts of the live-data upgrade test (test_live.py): the upgrade test's Debian 12
+# hosts with systemd (../Dockerfile), named like the production replicas, under their own
+# container names so that they don't collide with ../compose.yml's.
+x-host: &host
+  build: ..
+  image: localhost/clickhouse-role-upgrade-host
+  privileged: true      # systemd
+  pids_limit: -1        # ClickHouse starts hundreds of threads
+  tmpfs: ["/run", "/run/lock"]
+  volumes: ["./cache/debs:/debs:z"]
+  mem_limit: 3g
+services:
+  data1:
+    <<: *host
+    container_name: chlive-data1
+    hostname: clickhouse1.prod.ooni.io
+    networks: {default: {aliases: [data1.htz-fsn.prod.ooni.nu, clickhouse1.prod.ooni.io]}}
+  data2:
+    <<: *host
+    container_name: chlive-data2
+    hostname: clickhouse2.prod.ooni.io
+    networks: {default: {aliases: [data2.htz-fsn.prod.ooni.nu, clickhouse2.prod.ooni.io]}}
+  data3:
+    <<: *host
+    container_name: chlive-data3
+    hostname: clickhouse3.prod.ooni.io
+    networks: {default: {aliases: [data3.htz-fsn.prod.ooni.nu, clickhouse3.prod.ooni.io]}}
+networks:
+  default:
+    enable_ipv6: true

@@ -4,7 +4,10 @@
 # the role matches hosts by their inventory name dataN.htz-fsn.prod.ooni.nu.
 # data4 is the replica that the test adds and removes.
 x-node: &node
-  image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+  image: docker.io/clickhouse/clickhouse-server:25.3.14.14
+  # The config dir is mounted read-only: the image must not write its own default user
+  # (25.3's entrypoint exits when it can't)
+  environment: {CLICKHOUSE_SKIP_USER_SETUP: "1"}
   ulimits: {nofile: 262144}
   mem_limit: 1500m
 services:

@@ -2,7 +2,7 @@
 # production nodes (seed/). users.xml is rendered from the role's template (render.yml);
 # out/ also holds the admin client configs the role's tasks write.
 x-node: &node
-  image: docker.io/clickhouse/clickhouse-server:24.8.6.70
+  image: docker.io/clickhouse/clickhouse-server:25.3.14.14
   environment: {CLICKHOUSE_SKIP_USER_SETUP: "1"}
   volumes:
     - ./out/users.xml:/etc/clickhouse-server/users.xml:ro,z

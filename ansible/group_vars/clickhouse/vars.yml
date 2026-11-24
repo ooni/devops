@@ -34,7 +34,7 @@ nftables_zookeeper_allow:
   - fqdn: notebook.ooni.org
     ip: 138.201.19.39
 
-clickhouse_version: 24.8.6.70
+clickhouse_version: 25.3.14.14
 
 clickhouse_config:
   max_connections: 4096
@@ -84,6 +84,44 @@ clickhouse_config:
   # max_partition_size_to_drop: 0
   format_schema_path: /var/lib/clickhouse/format_schemas/
   # disable_internal_dns_cache: 1
+
+# Pins for the rolling upgrade 24.8 -> 25.3 -> 25.8 -> 26.3 -> 26.8 (ooni/devops#477, #437).
+# A new version writes data parts and Keeper snapshots that the previous versions can't
+# read: a replica still on the old version stops replicating, and a node can't be rolled
+# back. These keep the old formats. The role renders each group only once
+# clickhouse_version reaches `since`, because older servers refuse to start with a
+# setting they don't know; rolling back clickhouse_version removes it again.
+# Removing the merge_tree and keeper_coordination pins is the point of no return
+# (Phase 5 in #437): new parts then get the new formats, and the versions before can no
+# longer read them. Decide it explicitly, after a fresh backup.
+clickhouse_version_settings:
+  # 25.3 replicas can't read 25.8's compact parts ("Unknown mark file extension",
+  # "No columns_substreams.txt"); required, not just insurance
+  - since: "25.8"
+    merge_tree:
+      write_marks_for_substreams_in_compact_parts: 0
+  # Without these, 25.8 detaches every part 26.3 wrote as broken (rollback leaves empty tables)
+  - since: "26.3"
+    merge_tree:
+      serialization_info_version: basic
+      string_serialization_version: single_stream
+      propagate_types_serialization_versions_to_nested_types: 0
+  - since: "26.6"
+    server:
+      # On by default from 26.6; nothing here uses it
+      enable_webterminal: "false"
+  - since: "26.8"
+    merge_tree:
+      # 26.8 packs skip indexes into one file that versions before 26.6 ignore: the
+      # API's measurement_uid lookups would become full scans on them
+      packed_skip_index_max_bytes: 0
+    keeper_coordination:
+      # 26.8 Keeper snapshots can't be loaded by any older Keeper
+      write_snapshot_version: 6
+    server:
+      # 26.8 turns the per-CPU/disk/network metrics on /metrics into labelled series;
+      # "both" also keeps the old names the dashboards use
+      asynchronous_metrics_key_values_mode: both
 
 clickhouse_keeper:
   tcp_port: 9181
@@ -176,6 +214,12 @@ clickhouse_default_profiles:
     use_uncompressed_cache: 0
     load_balancing: random
     max_partitions_per_insert_block: 100
+    # Pinned to today's defaults, which 26.2/26.3 change (ooni/devops#477); every
+    # version since 24.8 knows them. fastpath (default profile) waits on one INSERT
+    # per measurement: async inserts cut its write capacity about 6 times.
+    async_insert: 0
+    # The counters_* MVs on data1 insert many identical one-row blocks
+    deduplicate_blocks_in_dependent_materialized_views: 0
   readonly:
     readonly: 1
     # 1 GB
@@ -183,6 +227,8 @@ clickhouse_default_profiles:
   write:
     readonly: 0
     max_memory_usage: 61001001000
+    async_insert: 0
+    deduplicate_blocks_in_dependent_materialized_views: 0
   admin:
     readonly: 0
 
