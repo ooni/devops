@@ -386,12 +386,15 @@ resource "aws_iam_role_policy" "ooni_config" {
         Effect   = "Allow"
         Action   = "s3:ListBucket"
         Resource = aws_s3_bucket.ooni_private_config_bucket.arn
+        Condition = {
+          StringLike = { "s3:prefix" = ["experiments/*"] }
+        }
       },
       {
-        Sid      = "ReadWriteSchemaObjects"
+        Sid      = "WriteSchemaObjects"
         Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-        Resource = "${aws_s3_bucket.ooni_private_config_bucket.arn}/*"
+        Action   = ["s3:PutObject", "s3:DeleteObject"]
+        Resource = "${aws_s3_bucket.ooni_private_config_bucket.arn}/experiments/*"
       }
     ]
   })
