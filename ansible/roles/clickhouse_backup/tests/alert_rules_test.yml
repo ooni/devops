@@ -116,6 +116,20 @@ tests:
               summary: 'Stale `textfile` at data3'
               description: '`/var/lib/node_exporter/textfile_collector/other.prom` is 3h old.'
 
+  # ClusterCheckFailed: data3 couldn't list the cluster's tables; data1 checks no cluster
+  - interval: 1m
+    input_series:
+      - {series: 'ooni_clickhouse_backup_cluster_check_failed{instance="data3", cluster="oonidata_cluster"}', values: '1x30'}
+      - {series: 'ooni_clickhouse_backup_cluster_check_failed{instance="data2", cluster="oonidata_cluster"}', values: '0x30'}
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ClickHouseBackupClusterCheckFailed
+        exp_alerts:
+          - exp_labels: {instance: data3, cluster: oonidata_cluster}
+            exp_annotations:
+              summary: 'ClickHouse backup on data3 could not list the tables of cluster oonidata_cluster'
+              description: 'ClickHouseTableNotBackedUp is out of date until a run can list them again. The error is in `journalctl --identifier ooni-clickhouse-backup` on data3: if it is ACCESS_DENIED, add the grant it names to the backup user in group_vars/clickhouse/vars.yml.'
+
   # TableNotBackedUp: a table no backup job covers
   - interval: 1m
     input_series:

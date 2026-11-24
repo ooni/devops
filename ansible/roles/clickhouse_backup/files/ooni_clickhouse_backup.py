@@ -300,6 +300,7 @@ class Metrics:
         self.state.setdefault("runs", {})
         self.state.setdefault("running_since", {})
         self.state.setdefault("not_backed_up", {})
+        self.state.setdefault("cluster_check", {})
 
     def table_result(self, job: str, table: str, ok: bool, st: dict = None, duration_s: float = 0) -> None:
         entry = self.state["tables"].setdefault(f"{job}/{table}", {"job": job, "table": table})
@@ -351,6 +352,12 @@ class Metrics:
         self.state["not_backed_up"] = tables
         self.save()
 
+    def cluster_checked(self, cluster: str, ok: bool) -> None:
+        """Whether the last run could list the cluster's tables: if not,
+        not_backed_up is as the last check that could left it"""
+        self.state["cluster_check"] = {cluster: 0 if ok else 1} if cluster else {}
+        self.save()
+
     def run_result(self, job: str, duration_s: float, tables: int, fulls: int, failed: int) -> None:
         self.state["runs"][job] = {
             "finished": time.time(), "duration": round(duration_s, 1),
@@ -383,6 +390,12 @@ class Metrics:
         for table, hosts in sorted(self.state["not_backed_up"].items()):
             labels = f'table="{label_value(table)}",hosts="{label_value(",".join(sorted(hosts)))}"'
             lines.append(f"{p}table_not_backed_up{{{labels}}} 1")
+        lines += [
+            f"# HELP {p}cluster_check_failed 1 if the last run couldn't list the cluster's tables",
+            f"# TYPE {p}cluster_check_failed gauge",
+        ]
+        for cluster, v in sorted(self.state["cluster_check"].items()):
+            lines.append(f'{p}cluster_check_failed{{cluster="{label_value(cluster)}"}} {v}')
         for name, field, help_ in self.GAUGES:
             lines += [f"# HELP {p}{name} {help_}", f"# TYPE {p}{name} gauge"]
             for entry in sorted(self.state["tables"].values(), key=lambda e: (e["job"], e["table"])):
@@ -752,6 +765,7 @@ def check_cluster(conf: dict, metrics: "Metrics") -> None:
     e.g. a new table created on one node only"""
     cluster = conf.get("check_cluster", "")
     if not cluster:
+        metrics.cluster_checked("", True)
         return
     jobs = [BackupJob(j, metrics) for j in job_confs(conf, [])]
     try:
@@ -766,7 +780,9 @@ def check_cluster(conf: dict, metrics: "Metrics") -> None:
         )
     except Exception as e:
         log.error(f"could not list the tables of cluster {cluster}: {e}")
+        metrics.cluster_checked(cluster, False)
         return
+    metrics.cluster_checked(cluster, True)
     missing = not_backed_up(
         {r["name"]: r["hosts"] for r in rows}, here, jobs,
         conf.get("exclude_tables", []), conf.get("backed_up_elsewhere", []),

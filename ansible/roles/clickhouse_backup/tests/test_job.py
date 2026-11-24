@@ -178,6 +178,37 @@ class TestNotBackedUp(unittest.TestCase):
         with open(m.metrics_file) as f:
             self.assertNotIn("made_on_data1", f.read())
 
+    def check_cluster(self, metrics, error=None):
+        """check_cluster with a ClickHouse whose cluster query fails with error"""
+        class ClickHouse(FlakyClickHouse):
+            def rows(self, sql, **kw):
+                if error:
+                    raise RuntimeError(f"ClickHouse error: {error}")
+                return [{"name": "made_on_data1", "hosts": ["data1"]}]
+        j = job("measurements", ["*"], metrics=metrics, ch=ClickHouse())
+        j.db = "ooni"
+        conf = {"check_cluster": "oonidata_cluster", "jobs": [{"name": "measurements", "include_tables": ["*"]}]}
+        with mock.patch.object(backup, "BackupJob", lambda conf, m: j):
+            backup.check_cluster(conf, metrics)
+
+    def test_a_check_that_cant_list_the_tables_is_reported(self):
+        # e.g. 25.8 without SHOW COLUMNS ON system.tables (ClickHouse issue #116340)
+        d = tempfile.mkdtemp()
+        m = backup.Metrics(os.path.join(d, "out.prom"), os.path.join(d, "state.json"))
+        self.check_cluster(m)
+        self.assertEqual(m.state["not_backed_up"], {"made_on_data1": ["data1"]})
+        self.check_cluster(m, error="Code: 497. backup: Not enough privileges. (ACCESS_DENIED)")
+        with open(m.metrics_file) as f:
+            out = f.read()
+        self.assertIn('ooni_clickhouse_backup_cluster_check_failed{cluster="oonidata_cluster"} 1', out)
+        self.assertIn('table_not_backed_up{table="made_on_data1"', out, "the last check's results stay")
+        self.check_cluster(m)
+        with open(m.metrics_file) as f:
+            self.assertIn('ooni_clickhouse_backup_cluster_check_failed{cluster="oonidata_cluster"} 0', f.read())
+        backup.check_cluster({}, m)  # check_cluster no longer set: no gauge
+        with open(m.metrics_file) as f:
+            self.assertNotIn("cluster_check_failed{", f.read())
+
 
 class TestClickHouseErrors(unittest.TestCase):
     def setUp(self):

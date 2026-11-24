@@ -418,6 +418,15 @@ clickhouse_custom_grants:
   privileges: [SELECT]
   to: [backup]
 
+# From 25.8, clusterAllReplicas(..., system.tables) also needs SHOW COLUMNS
+# (ClickHouse issue #116340): without it the cluster check fails with
+# ACCESS_DENIED, seen on 25.8.33.6; 25.3 doesn't need it.
+- on:
+  databases: [system]
+  tables: [tables]
+  privileges: [SHOW COLUMNS]
+  to: [backup]
+
 clickhouse_custom_grant_roles:
   - roles: [oonimeasurements]
     to: [oonimeasurements]

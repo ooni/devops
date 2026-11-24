@@ -164,6 +164,15 @@ groups:
       summary: 'ClickHouse table {{ $labels.table }} is not backed up (on {{ $labels.hosts }})'
       description: 'No backup job covers it and it is not excluded. Add it to a job (clickhouse_backup_data1_tables if only data1 holds its data), or to clickhouse_backup_exclude_tables if it needs no backup. See the runbook, "ClickHouse backup".'
 
+  # The check above couldn't list the cluster's tables, so it reports what it
+  # found the last time it could: e.g. a grant the backup user lacks after an
+  # upgrade (25.8 needs SHOW COLUMNS ON system.tables, ClickHouse issue #116340)
+  - alert: ClickHouseBackupClusterCheckFailed
+    expr: ooni_clickhouse_backup_cluster_check_failed == 1
+    annotations:
+      summary: 'ClickHouse backup on {{ $labels.instance }} could not list the tables of cluster {{ $labels.cluster }}'
+      description: 'ClickHouseTableNotBackedUp is out of date until a run can list them again. The error is in `journalctl --identifier ooni-clickhouse-backup` on {{ $labels.instance }}: if it is ACCESS_DENIED, add the grant it names to the backup user in group_vars/clickhouse/vars.yml.'
+
   # A job's run finished with every table backed up. One Slack message per
   # job run, no email and no "resolved" message: Alertmanager routes it to
   # slack-notice. It clears an hour after the run.
