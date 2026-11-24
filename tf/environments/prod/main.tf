@@ -345,6 +345,62 @@ resource "aws_s3_bucket" "ooni_private_config_bucket" {
   bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
 }
 
+resource "aws_iam_role" "ooni_private_config_bucket_oidc_role" {
+  name = "ooni-private-config-bucket-oidc-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Federated = aws_iam_openid_connect_provider.github_actions.arn }
+        Action    = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:ooni/probe-cli:ref:refs/tags/v*",
+              "repo:ooni/probe-cli:ref:refs/heads/fullbuild",
+              "repo:ooni/probe-cli:ref:refs/heads/master",
+            ]
+          }
+        }
+      }
+    ]
+  })
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy" "ooni_private_config_experiments_write" {
+  name = "ooni-private-config-bucket-role-policy"
+  role = aws_iam_role.ooni_private_config_bucket_oidc_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "ListSchemasPrefix"
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = aws_s3_bucket.ooni_private_config_bucket.arn
+        Condition = {
+          StringLike = { "s3:prefix" = ["experiments/*"] }
+        }
+      },
+      {
+        Sid      = "WriteSchemaObjects"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:DeleteObject"]
+        Resource = "${aws_s3_bucket.ooni_private_config_bucket.arn}/experiments/*"
+      }
+    ]
+  })
+}
+
+
 resource "aws_s3_bucket" "anoncred_manifests" {
   bucket              = "ooni-anoncreds-manifests-${var.aws_region}"
   object_lock_enabled = true
