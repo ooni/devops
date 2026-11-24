@@ -33,4 +33,93 @@ groups:
     annotations:
       summary: 'test helper down: {{ $labels.instance }} ({{ $labels.domain }})'
 
+# These were Grafana-managed alerts (grafana.ooni.org, folders "Alerting" and
+# "Services") until 2026-11, each named below as it was there. Here they're
+# kept in git and sent by Alertmanager like the rest. Tests:
+# roles/prometheus/tests/alert_ooni_test.yml. Not moved, as covered here
+# already or never working:
+# - "Collectors HTTPS success" and "Blackbox HTTPS check success" (test
+#   helpers): BlackboxDown in alert_rules.yml, after 10 minutes instead of 5
+# - "SSH connectivity alert": no job scrapes up{job="ssh"}; InstanceDown
+#   covers hosts that stop answering
+# - the paused ones, on ams-pg's netdata (no longer scraped) and backend-fsn's
+#   measurement rate (replaced by MeasurementSubmissionsLow)
+- name: OONI services
+  rules:
+  # "Service down". Probed every 15 s: fires when a service failed more than
+  # a fifth of its health checks over the last hour.
+  - alert: APIServiceDown
+    expr: avg_over_time(probe_success{job=~"API Services Health.*"}[1h]) < 0.8
+    for: 5m
+    annotations:
+      summary: '[ {{ $labels.tier }} ] Service down: {{ $labels.service }}'
+      description: 'Service {{ $labels.service }} [ {{ $labels.tier }} ] passed {{ $value | humanizePercentage }} of its health checks in the last hour; API services availability might be affected.'
+
+  # "api.ooni.io HTTPS probe status alert". These jobs have
+  # ignore_instance_down, so BlackboxDown leaves them out.
+  - alert: APIProbeFailed
+    expr: probe_success{job=~"ooni API .*", instance=~"https://api.ooni.io.*"} == 0
+    for: 1m
+    annotations:
+      summary: 'api.ooni.io HTTPS probe failed: {{ $labels.instance }}'
+      description: 'Blackbox job "{{ $labels.job }}". See https://grafana.ooni.org/d/gB3QAKXnz'
+
+  # "Incoming msmts per second alert (AWS)"
+  - alert: MeasurementSubmissionsLow
+    expr: sum(rate(ooniapi_ooniprobe_http_requests_total{env="prod", status="2xx", handler="/report/{report_id}"}[5m])) < 5
+    for: 5m
+    annotations:
+      summary: 'Low incoming measurement rate on ooniprobe (prod): {{ printf "%.1f" $value }}/s'
+      description: 'See https://grafana.ooni.org/d/l-MQSGonk/api-and-fastpath-multihost?orgId=1&viewPanel=98'
+
+  # "Blackbox HTTPS body length alert"
+  - alert: TestHelperBodyLengthUnexpected
+    expr: |
+      probe_http_uncompressed_body_length{instance=~"https://[0-9].th.ooni.org/"} < 600
+        or probe_http_uncompressed_body_length{instance=~"https://[0-9].th.ooni.org/"} > 5000
+    for: 5m
+    annotations:
+      summary: 'Unexpected JSON body length from test helper {{ $labels.instance }}: {{ $value }} bytes'
+      description: 'probe_http_uncompressed_body_length from Blackbox, expected 600 to 5000. See https://grafana.ooni.org/d/Dn1R7QEnz/new-test-helpers?orgId=1&viewPanel=25'
+
+  # "API uploader total runtime alert"
+  - alert: APIUploaderSlow
+    expr: max_over_time(netdata_statsd_timer_ooni_api_uploader_total_run_time_milliseconds_average{dimension="95.0%"}[1h]) > 700000
+    for: 1m
+    annotations:
+      summary: 'API uploader total runtime too slow on {{ $labels.instance }}: {{ printf "%.0f" $value }} ms'
+      description: 'Highest 95th percentile in the last hour. See https://grafana.ooni.org/d/ma3Q6GzVz/api-uploader?orgId=1&viewPanel=2'
+
+  # "Generate test list timing"
+  - alert: TestListGenerationSlow
+    expr: netdata_statsd_timer_ooni_api_generate_test_list_milliseconds_average{instance="backend-fsn.ooni.org:19999", dimension="median"} > 300
+    for: 5m
+    annotations:
+      summary: 'Generate test list median time too high: {{ printf "%.0f" $value }} ms'
+      description: 'See https://grafana.ooni.org/d/75nnWVpMz?orgId=1&viewPanel=25'
+
+  # "MMDB database node count alert", one rule per database
+  - alert: GeoIPDatabaseSmall
+    expr: avg_over_time(netdata_statsd_gauge_ooni_download_geoip_geoip_asn_node_cnt_value_average{dimension="gauge"}[5m]) < 700000
+    for: 5m
+    labels: {database: asn}
+    annotations:
+      # a rule's own labels aren't in $labels here
+      summary: 'GeoIP asn database does not contain enough nodes on {{ $labels.instance }}: {{ printf "%.0f" $value }}'
+      description: 'Expected at least 700000. See https://grafana.ooni.org/d/0e6eROj7z/geoip?orgId=1&viewPanel=3'
+  - alert: GeoIPDatabaseSmall
+    expr: avg_over_time(netdata_statsd_gauge_ooni_download_geoip_geoip_cc_node_cnt_value_average{dimension="gauge"}[5m]) < 700000
+    for: 5m
+    labels: {database: cc}
+    annotations:
+      summary: 'GeoIP cc database does not contain enough nodes on {{ $labels.instance }}: {{ printf "%.0f" $value }}'
+      description: 'Expected at least 700000. See https://grafana.ooni.org/d/0e6eROj7z/geoip?orgId=1&viewPanel=3'
+
+  # "Panel Title alert"
+  - alert: NTPOffsetHigh
+    expr: abs(avg_over_time(node_ntp_offset_seconds[5m])) > 0.05
+    for: 5m
+    annotations:
+      summary: 'Host time offset too large on {{ $labels.instance }}: {{ printf "%.3f" $value }} s'
+
 ...
