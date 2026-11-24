@@ -1187,22 +1187,7 @@ PRIMARY KEY (measurement_uid, observation_idx) ORDER BY (measurement_uid, observ
 
 ### Adding users to notebook server
 
-In order to add new users to the jupyterlab notebook server hosted
-`notebook.ooni.org` the steps are:
-
-1. Open a PR adding an entry to this list:
-   https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook.ooni.org (we need ssh key, email and username)
-2. An OONI core team member will run:
-```
-./play deploy-bootstrap.yml -l notebook.ooni.org --diff -i inventory
-```
-3. An OONI core team member logs into `notebook.ooni.org` and runs:
-```
-sudo passwd NEWUSERNAME
-```
-and sets the password of the new user to a randomly generated password prefixed with the string `CHANGEME`
-4. This password is sent privately to the new user and they are told to login via ssh using their key to update the password
-5. This user is now able to login with the password they have chosen via https://notebook.ooni.org/
+See [Adding External Users to the Notebooks Server](#adding-external-users-to-the-notebooks-server).
 
 ### Reprocessing data
 
@@ -1240,21 +1225,29 @@ The notebooks server uses the system’s actual user accounts to authenticate ac
 4. Ask them to log in once to update their password.
 5. They can then log in to [notebook.ooni.org](https://notebook.ooni.org) with their new password.
 
+`notebook.ooni.org` is the server's public name; in Ansible (inventory, host vars, `-l`) the same
+machine is `notebook1.htz-fsn.prod.ooni.nu`.
+
 ### Procedure
 
 0. Ask the person requesting a new account for the following details: **name**, **username** (used to log in to the server), and **SSH key**.
-1. Create a new user entry in the [notebook server’s host vars](https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook.ooni.org). Remember to also add the username to the `non_admin_usernames` variable
-2. In the `ansible` directory, run:
+1. Open a PR adding a user entry to the [notebook server’s host vars](https://github.com/ooni/devops/blob/main/ansible/host_vars/notebook1.htz-fsn.prod.ooni.nu), with their key. Remember to also add the username to the `non_admin_usernames` variable.
+2. Once it's merged, an OONI core team member who can log in to the server runs, in the `ansible` directory:
 
    ```
-   ./play -i inventory deploy-bootstrap.yml -l notebook.ooni.org --diff
+   ./play -i inventory deploy-bootstrap.yml -l notebook1.htz-fsn.prod.ooni.nu -t ssh_users
    ```
+
+   Add `-u <your username>` if needed (see the bootstrap playbooks in `ansible/README.md`).
+   Don't use `playbook-bootstrap.yml`: it logs in as root, which the server refuses.
 3. Log in to `notebook.ooni.org` via SSH.
-4. Set the default password for the new user using:
+4. Set the default password for the new user to a randomly generated one prefixed with `CHANGEME`, using:
 
    ```
    sudo passwd <username>
    ```
+
+   and send it to them privately.
 5. Expire the password using:
 
    ```
