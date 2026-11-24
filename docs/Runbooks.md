@@ -338,6 +338,11 @@ Alerts, in `alert_rules.yml`:
   `measurements` job, and a table whose data only data1 holds goes in
   `clickhouse_backup_data1_tables`. Or, if it needs no backup, add it to
   `clickhouse_backup_exclude_tables`.
+- `ClickHouseBackupClusterCheckFailed`: the run couldn't list the cluster's
+  tables, so `ClickHouseTableNotBackedUp` is out of date. The journal has the
+  error; ACCESS_DENIED after an upgrade means the `backup` user needs a new
+  grant in `group_vars/clickhouse/vars.yml` (25.8 added SHOW COLUMNS ON
+  system.tables).
 - `ClickHouseBackupCompleted`: a job's run backed up every table. One Slack
   message per run in `#ooni-bots`, no email.
 - `ClickHouseBackupStale`: a table hasn't been backed up for 8 days (backups
