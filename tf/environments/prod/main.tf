@@ -374,7 +374,7 @@ resource "aws_iam_role" "ooni_private_config_bucket_oidc_role" {
   tags = local.tags
 }
 
-resource "aws_iam_role_policy" "ooni_config" {
+resource "aws_iam_role_policy" "ooni_private_config_experiments_write" {
   name = "ooni-private-config-bucket-role-policy"
   role = aws_iam_role.ooni_private_config_bucket_oidc_role.id
 
