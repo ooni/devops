@@ -225,6 +225,20 @@ module "ooniapi_user" {
 }
 
 
+# GitHub Actions OIDC identity provider. 
+# It lets ooni/* GitHub workflows assume IAM roles via OIDC with no
+# long-lived access keys.
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  thumbprint_list = [
+    "6938fd4d98bab03faadb97b34396831e3780aea1",
+    "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
+  ]
+
+  tags = local.tags
+}
+
 ### Configuration common to all services
 
 data "aws_ssm_parameter" "jwt_secret" {
@@ -329,6 +343,61 @@ resource "aws_s3_bucket" "oonith_codepipeline_bucket" {
 
 resource "aws_s3_bucket" "ooni_private_config_bucket" {
   bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
+}
+
+resource "aws_iam_role" "ooni_private_config_bucket_oidc_role" {
+  name = "ooni-private-config-bucket-oidc-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Federated = aws_iam_openid_connect_provider.github_actions.arn }
+        Action    = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:ooni/probe-cli:ref:refs/tags/v*",
+              "repo:ooni/probe-cli:ref:refs/heads/fullbuild",
+              "repo:ooni/probe-cli:ref:refs/heads/master",
+            ]
+          }
+        }
+      }
+    ]
+  })
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy" "ooni_private_config_experiments_write" {
+  name = "ooni-private-config-bucket-role-policy"
+  role = aws_iam_role.ooni_private_config_bucket_oidc_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "ListSchemasPrefix"
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = aws_s3_bucket.ooni_private_config_bucket.arn
+        Condition = {
+          StringLike = { "s3:prefix" = ["experiments/*"] }
+        }
+      },
+      {
+        Sid      = "WriteSchemaObjects"
+        Effect   = "Allow"
+        Action   = ["s3:PutObject", "s3:DeleteObject"]
+        Resource = "${aws_s3_bucket.ooni_private_config_bucket.arn}/experiments/*"
+      }
+    ]
+  })
 }
 
 
