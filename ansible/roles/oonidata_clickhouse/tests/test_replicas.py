@@ -167,7 +167,11 @@ def citizenlab(node):
 
 
 def replicated_tables(node):
-    return sql(node, "SELECT table FROM system.replicas WHERE database = 'ooni' ORDER BY table FORMAT TSV").split()
+    """Keeper paths of the node's replicated tables. Not their names: a materialized view
+    without TO keeps its rows in .inner_id.<its UUID>, and each node gives its view its own
+    UUID, while the Keeper path is the same on every replica."""
+    return sql(node, "SELECT zookeeper_path FROM system.replicas WHERE database = 'ooni' "
+                     "ORDER BY zookeeper_path FORMAT TSV").split()
 
 
 def keeper_replicas(node):
@@ -211,7 +215,9 @@ def main():
           "the schema step skips a host that isn't in the cluster")
     n_objects = schema_objects()
     for n in three:
-        count = int(sql(n, "SELECT count() FROM system.tables WHERE database = 'ooni'"))
+        # not counting the hidden .inner_id.* tables of materialized views without TO
+        count = int(sql(n, "SELECT count() FROM system.tables WHERE database = 'ooni' "
+                           "AND NOT startsWith(name, '.inner')"))
         check(count == n_objects, f"{n} has the {n_objects} tables and views of schema.sql ({count})")
     rc, out = ansible("schema.yml")
     check(rc == 0 and all(status(out, "Create the ooni database", HOSTS[n]) == "skipping" for n in three),
