@@ -370,6 +370,14 @@ resource "aws_s3_bucket" "ooni_private_config_bucket" {
   bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
 }
 
+resource "aws_s3_bucket_versioning" "ooni_private_config_bucket" {
+  bucket = aws_s3_bucket.ooni_private_config_bucket.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 data "aws_secretsmanager_secret_version" "deploy_key" {
   secret_id  = module.adm_iam_roles.oonidevops_deploy_key_arn
   depends_on = [module.adm_iam_roles]

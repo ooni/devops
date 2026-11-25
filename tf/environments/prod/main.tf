@@ -345,6 +345,14 @@ resource "aws_s3_bucket" "ooni_private_config_bucket" {
   bucket = "ooni-config-${var.aws_region}-${random_id.artifact_id.hex}"
 }
 
+resource "aws_s3_bucket_versioning" "ooni_private_config_bucket" {
+  bucket = aws_s3_bucket.ooni_private_config_bucket.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 resource "aws_iam_role" "ooni_private_config_bucket_oidc_role" {
   name = "ooni-private-config-bucket-oidc-role"
 
