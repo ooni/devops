@@ -293,14 +293,6 @@ resource "aws_route53_record" "shop-ooni-org-_CNAME_" {
   zone_id = local.dns_root_zone_ooni_org
 }
 
-resource "aws_route53_record" "slack-ooni-org-_A_" {
-  name    = "slack.ooni.org"
-  records = ["37.218.247.98"]
-  ttl     = "60"
-  type    = "A"
-  zone_id = local.dns_root_zone_ooni_org
-}
-
 resource "aws_route53_record" "swag-ooni-org-_CNAME_" {
   name    = "swag.ooni.org"
   records = ["shops.myshopify.com"]
@@ -660,14 +652,6 @@ resource "aws_route53_record" "run-ooni-io-_CNAME_" {
   records = ["cname.vercel-dns.com"]
   ttl     = "60"
   type    = "CNAME"
-  zone_id = local.dns_root_zone_ooni_io
-}
-
-resource "aws_route53_record" "slack-ooni-io-_A_" {
-  name    = "slack.ooni.io"
-  records = ["37.218.247.98"]
-  ttl     = "60"
-  type    = "A"
   zone_id = local.dns_root_zone_ooni_io
 }
 

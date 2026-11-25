@@ -301,3 +301,50 @@ resource "aws_codepipeline" "ooniapi" {
     name = "Deploy"
   }
 }
+
+# Run the pipeline on a schedule too, so the image is rebuilt with base image
+# updates (e.g. ca-certificates) when nothing is pushed
+resource "aws_cloudwatch_event_rule" "rebuild" {
+  count = var.rebuild_schedule == null ? 0 : 1
+
+  name                = "ooniapi-${var.service_name}-rebuild"
+  description         = "Rebuild and redeploy ooniapi-${var.service_name}"
+  schedule_expression = var.rebuild_schedule
+}
+
+resource "aws_iam_role" "rebuild" {
+  count = var.rebuild_schedule == null ? 0 : 1
+
+  name = "ooniapi-${var.service_name}-rebuild"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "events.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "rebuild" {
+  count = var.rebuild_schedule == null ? 0 : 1
+
+  name = "start-pipeline"
+  role = aws_iam_role.rebuild[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "codepipeline:StartPipelineExecution"
+      Resource = aws_codepipeline.ooniapi.arn
+    }]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "rebuild" {
+  count = var.rebuild_schedule == null ? 0 : 1
+
+  rule     = aws_cloudwatch_event_rule.rebuild[0].name
+  arn      = aws_codepipeline.ooniapi.arn
+  role_arn = aws_iam_role.rebuild[0].arn
+}

@@ -43,3 +43,9 @@ variable "environment" {
   description = "Deployment environment (e.g., prod, dev)"
   type        = string
 }
+
+variable "rebuild_schedule" {
+  description = "EventBridge schedule expression to also run the pipeline without a push, e.g. \"cron(0 6 ? * MON *)\", so the image picks up base image updates. null: only on pushes"
+  type        = string
+  default     = null
+}
