@@ -1,8 +1,18 @@
+# public: schema.yml below runs clickhouse-client with the clickhouse role's
+# clickhouse_admin_client_config, a default that is private to the role otherwise
 - ansible.builtin.include_role:
-    name: idealista.clickhouse_role
+    name: clickhouse
+    public: true
   tags:
     - oonidata
     - clickhouse
+
+- name: Create the ooni database on a new replica
+  ansible.builtin.include_tasks: schema.yml
+  tags:
+    - oonidata
+    - clickhouse
+    - clickhouse_schema
 
 - name: Create nftables rule for clickhouse native port
   set_fact:

@@ -1,11 +1,14 @@
 ---
 - name: Deploy oonidata clickhouse hosts
+  # Not the notebook: its ClickHouse isn't part of the cluster.
   hosts:
-    - notebook.ooni.org
     - data1.htz-fsn.prod.ooni.nu
     - data2.htz-fsn.prod.ooni.nu
     - data3.htz-fsn.prod.ooni.nu
   become: true
+  # One host at a time: a config change restarts ClickHouse, and data1-3 are
+  # also the Keeper ensemble, so restarting them together loses quorum.
+  serial: 1
   roles:
     - role: prometheus_node_exporter
       tags: [node_exporter]
