@@ -14,6 +14,9 @@ node_exporter_host: 'localhost'
 node_exporter_port: 8100
 node_exporter_htpasswd: '/etc/ooni/prometheus_passwd'
 node_exporter_options: ''
+# Directory for the textfile collector (*.prom files written by other jobs,
+# e.g. clickhouse_backup). Empty: no textfile collector directory.
+node_exporter_textfile_dir: ''
 
 node_exporter_state: started
 node_exporter_enabled: true

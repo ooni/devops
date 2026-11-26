@@ -1,0 +1,16 @@
+<clickhouse>
+    <!-- Keep the test server small -->
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <trace_log remove="1"/>
+    <max_server_memory_usage_to_ram_ratio>0.5</max_server_memory_usage_to_ram_ratio>
+    <!-- The two test nodes, for the check of tables no backup covers -->
+    <remote_servers>
+        <test_cluster>
+            <shard>
+                <replica><host>clickhouse</host><port>9000</port><user>admin</user><password>admin</password></replica>
+                <replica><host>clickhouse2</host><port>9000</port><user>admin</user><password>admin</password></replica>
+            </shard>
+        </test_cluster>
+    </remote_servers>
+</clickhouse>

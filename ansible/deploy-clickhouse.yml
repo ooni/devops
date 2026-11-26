@@ -11,3 +11,16 @@
       tags: [node_exporter]
     - role: oonidata_clickhouse
       tags: [clickhouse]
+
+# data3 backs up the replicated tables: they hold the same data on every
+# node, and data3 isn't behind clickhouseproxy and doesn't run Airflow.
+# data1 backs up the plain MergeTree tables whose data only it holds (see
+# clickhouse_backup_data1_tables). The jobs are set in host_vars.
+- name: Deploy ClickHouse backups
+  hosts:
+    - data1.htz-fsn.prod.ooni.nu
+    - data3.htz-fsn.prod.ooni.nu
+  become: true
+  roles:
+    - role: clickhouse_backup
+      tags: [clickhouse_backup]
