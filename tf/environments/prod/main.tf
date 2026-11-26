@@ -295,7 +295,7 @@ resource "aws_secretsmanager_secret_version" "oonipg_url" {
   secret_id = aws_secretsmanager_secret.oonipg_url.id
   secret_string = format("postgresql://%s:%s@%s/%s",
     jsondecode(data.aws_secretsmanager_secret_version.pg_login.secret_string)["username"],
-    jsondecode(data.aws_secretsmanager_secret_version.pg_login.secret_string)["password"],
+    urlencode(jsondecode(data.aws_secretsmanager_secret_version.pg_login.secret_string)["password"]),
     module.oonipg.pg_endpoint,
     module.oonipg.pg_db_name
   )
